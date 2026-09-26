@@ -130,19 +130,22 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .modal-overlay{
   display:none;
   position:fixed;
-  inset:0;
+  top:var(--visual-viewport-top,0px);
+  left:var(--visual-viewport-left,0px);
+  width:var(--visual-viewport-width,100vw);
+  height:var(--visual-viewport-height,100svh);
   z-index:1000;
-  align-items:center;
-  justify-content:center;
-  padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px)) 18px;
+  align-items:stretch;
+  justify-content:stretch;
+  padding:0;
   background:rgba(0,0,0,.55);
 }
 .modal-overlay.active{display:flex}
 .book{
-  width:100vw;
+  width:100%;
   min-width:0;
-  height:100dvh;
-  min-height:100vh;
+  height:100%;
+  min-height:0;
   background:var(--paper);
   border:0;
   border-radius:0;
@@ -330,13 +333,16 @@ textarea{min-height:42vh}
 .input-actions button{flex:1}
 .hidden-file-input{display:none}
 .bookhead{
-  padding:7px 8px;
+  padding:calc(7px + env(safe-area-inset-top,0px)) 8px 7px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:6px;
   flex-wrap:nowrap;
   white-space:nowrap;
+  position:relative;
+  z-index:5;
+  background:var(--paper);
 }
 .booktitle{font-size:12px;line-height:1;font-weight:900;flex:0 0 auto}
 .top-page-nav{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;flex:1 1 auto}
@@ -505,32 +511,128 @@ let pageIndex=0;
 let customFontUrl='';
 let customFontStyle=null;
 const READING_STORAGE='ebookViewerReadingMobileV1';
+const READING_WINDOW_PREFIX='__ebookViewerReadingMobileV1__:';
+const READING_DB_NAME='ebookViewerReadingDBV2';
+const READING_DB_STORE='sessions';
+let restoredSessionUpdatedAt=0;
+let userEditedAfterRestore=false;
 
 function setStatus(msg,err=false){
   statusEl.textContent=msg;
   statusEl.classList.toggle('error',!!err);
 }
 
-function loadReadingSession(){
+function parseReadingRecord(raw){
+  if(!raw)return null;
   try{
-    const raw=localStorage.getItem(READING_STORAGE);
-    if(raw)return JSON.parse(raw);
+    const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+    if(!parsed||typeof parsed!=='object'||typeof parsed.text!=='string')return null;
+    return {
+      text:parsed.text,
+      pageIndex:Number.isFinite(Number(parsed.pageIndex))?Number(parsed.pageIndex):0,
+      isOpen:!!parsed.isOpen,
+      updatedAt:Number.isFinite(Number(parsed.updatedAt))?Number(parsed.updatedAt):0
+    };
+  }catch(e){
+    return null;
+  }
+}
+
+function newestReadingRecord(records){
+  const valid=records.filter(Boolean);
+  if(!valid.length)return null;
+  return valid.reduce((best,item)=>item.updatedAt>=best.updatedAt?item:best);
+}
+
+function loadReadingSessionSync(){
+  const records=[];
+  try{ records.push(parseReadingRecord(localStorage.getItem(READING_STORAGE))); }catch(e){}
+  try{ records.push(parseReadingRecord(sessionStorage.getItem(READING_STORAGE))); }catch(e){}
+  try{ records.push(parseReadingRecord(history.state?.ebookViewerReadingMobileV1)); }catch(e){}
+  try{
+    if(typeof window.name==='string'&&window.name.startsWith(READING_WINDOW_PREFIX)){
+      records.push(parseReadingRecord(window.name.slice(READING_WINDOW_PREFIX.length)));
+    }
   }catch(e){}
-  return null;
+  return newestReadingRecord(records);
+}
+
+function openReadingDatabase(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
+    const request=indexedDB.open(READING_DB_NAME,1);
+    request.onupgradeneeded=()=>{
+      if(!request.result.objectStoreNames.contains(READING_DB_STORE)){
+        request.result.createObjectStore(READING_DB_STORE);
+      }
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Reading DB open failed'));
+  });
+}
+
+async function loadReadingSessionDB(){
+  try{
+    const db=await openReadingDatabase();
+    return await new Promise(resolve=>{
+      const request=db.transaction(READING_DB_STORE,'readonly').objectStore(READING_DB_STORE).get('current');
+      request.onsuccess=()=>{ const value=parseReadingRecord(request.result); db.close(); resolve(value); };
+      request.onerror=()=>{ db.close(); resolve(null); };
+    });
+  }catch(e){
+    return null;
+  }
+}
+
+async function saveReadingSessionDB(record){
+  try{
+    const db=await openReadingDatabase();
+    await new Promise((resolve,reject)=>{
+      const request=db.transaction(READING_DB_STORE,'readwrite').objectStore(READING_DB_STORE).put(record,'current');
+      request.onsuccess=()=>resolve();
+      request.onerror=()=>reject(request.error||new Error('Reading DB write failed'));
+    });
+    db.close();
+  }catch(e){}
 }
 
 function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
   const text=isOpen&&fullText!==''?fullText:inputText.value;
+  const record={
+    text,
+    pageIndex,
+    isOpen,
+    updatedAt:Date.now()
+  };
+  const raw=JSON.stringify(record);
+  let savedSomewhere=false;
+  try{ localStorage.setItem(READING_STORAGE,raw); savedSomewhere=true; }catch(e){}
+  try{ sessionStorage.setItem(READING_STORAGE,raw); savedSomewhere=true; }catch(e){}
   try{
-    localStorage.setItem(READING_STORAGE,JSON.stringify({
-      text,
-      pageIndex,
-      isOpen
-    }));
+    const state=(history.state&&typeof history.state==='object')?history.state:{};
+    history.replaceState({...state,ebookViewerReadingMobileV1:raw},'');
+    savedSomewhere=true;
   }catch(e){}
+  try{ window.name=READING_WINDOW_PREFIX+raw; savedSomewhere=true; }catch(e){}
+  void saveReadingSessionDB(record);
+  restoredSessionUpdatedAt=Math.max(restoredSessionUpdatedAt,record.updatedAt);
+  return savedSomewhere;
 }
 
-inputText.addEventListener('input',()=>saveReadingSession(false));
+inputText.addEventListener('input',()=>{
+  userEditedAfterRestore=true;
+  saveReadingSession(false);
+});
+
+/* 새로고침/백그라운드 전환 직전에도 마지막 값을 한 번 더 저장 */
+addEventListener('pagehide',()=>saveReadingSession(viewerOverlay.classList.contains('active')));
+addEventListener('beforeunload',()=>saveReadingSession(viewerOverlay.classList.contains('active')));
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')saveReadingSession(viewerOverlay.classList.contains('active'));
+});
 
 /* ---------------- 보기 설정 ---------------- */
 const VIEWER_STORAGE='ebookViewerSettingsV1';
@@ -1140,31 +1242,46 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight')goNextPage();
 });
 
-addEventListener('resize',scheduleRepaginate);
+function syncVisualViewport(){
+  const vv=window.visualViewport;
+  const top=vv?Math.max(0,vv.offsetTop):0;
+  const left=vv?Math.max(0,vv.offsetLeft):0;
+  const width=vv?vv.width:window.innerWidth;
+  const height=vv?vv.height:window.innerHeight;
+  const root=document.documentElement;
+  root.style.setProperty('--visual-viewport-top',top+'px');
+  root.style.setProperty('--visual-viewport-left',left+'px');
+  root.style.setProperty('--visual-viewport-width',Math.max(1,width)+'px');
+  root.style.setProperty('--visual-viewport-height',Math.max(1,height)+'px');
+}
+
+syncVisualViewport();
+addEventListener('resize',()=>{
+  syncVisualViewport();
+  scheduleRepaginate();
+});
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',()=>{
+    syncVisualViewport();
+    scheduleRepaginate();
+  });
+  window.visualViewport.addEventListener('scroll',syncVisualViewport);
+}
+
 
 /* 초기화 */
 applyViewerSettings(false);
 render();
 
-(async()=>{
-  try{
-    const saved=await getSavedFont();
-    if(saved){
-      await applyCustomFont(saved);
-      setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${saved.name}`);
-    }
-  }catch(error){
-    setFontUploadStatus(error.message||'저장된 글꼴을 불러오지 못했습니다.',true);
-  }
-
-  const reading=loadReadingSession();
-  if(reading&&typeof reading.text==='string'){
-    inputText.value=reading.text;
-  }
-  if(reading?.isOpen&&typeof reading.text==='string'&&reading.text.trim()){
+function restoreReadingSession(reading){
+  if(!reading||typeof reading.text!=='string')return;
+  restoredSessionUpdatedAt=Math.max(restoredSessionUpdatedAt,Number(reading.updatedAt)||0);
+  inputText.value=reading.text;
+  if(reading.isOpen&&reading.text.trim()){
     fullText=reading.text;
     setStatus('');
     viewerOverlay.classList.add('active');
+    syncVisualViewport();
     requestAnimationFrame(()=>{
       pages=splitIntoPages(fullText);
       const savedIndex=Number.isFinite(Number(reading.pageIndex))?Number(reading.pageIndex):0;
@@ -1174,6 +1291,38 @@ render();
       );
       render();
     });
+  }else{
+    viewerOverlay.classList.remove('active');
+    fullText='';
+    pages=[];
+    pageIndex=0;
+    render();
+  }
+}
+
+/* 동기 저장소부터 즉시 복원해서 화면이 비어 보이는 시간을 없앤다. */
+const syncReading=loadReadingSessionSync();
+if(syncReading)restoreReadingSession(syncReading);
+
+(async()=>{
+  /* 영구 저장용 IndexedDB에 더 최신 백업이 있으면 그것을 사용한다. */
+  const dbReading=await loadReadingSessionDB();
+  if(
+    dbReading&&
+    !userEditedAfterRestore&&
+    (Number(dbReading.updatedAt)||0)>restoredSessionUpdatedAt
+  ){
+    restoreReadingSession(dbReading);
+  }
+
+  try{
+    const saved=await getSavedFont();
+    if(saved){
+      await applyCustomFont(saved);
+      setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${saved.name}`);
+    }
+  }catch(error){
+    setFontUploadStatus(error.message||'저장된 글꼴을 불러오지 못했습니다.',true);
   }
 })();
 </script>
