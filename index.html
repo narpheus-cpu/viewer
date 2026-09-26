@@ -826,7 +826,7 @@ function clampValue(key,value){
   return Math.min(max,Math.max(min,Number.isFinite(n)?n:viewerDefaults[key]));
 }
 
-function applyViewerSettings(repaginateAfter=true){
+function applyViewerSettingsVisuals(syncControls=true){
   viewerSettings.fontSize=clampValue('fontSize',viewerSettings.fontSize);
   viewerSettings.lineHeight=clampValue('lineHeight',viewerSettings.lineHeight);
   viewerSettings.padTop=clampValue('padTop',viewerSettings.padTop);
@@ -852,53 +852,135 @@ function applyViewerSettings(repaginateAfter=true){
   pageInnerLeft.style.fontFamily=selectedFont;
   pageInnerRight.style.fontFamily=selectedFont;
 
-  $('#viewerFont').value=viewerSettings.font;
-  Object.entries(viewerControls).forEach(([key,[rangeSel,numSel]])=>{
-    $(rangeSel).value=viewerSettings[key];
-    $(numSel).value=viewerSettings[key];
-  });
+  if(syncControls){
+    $('#viewerFont').value=viewerSettings.font;
+    Object.entries(viewerControls).forEach(([key,[rangeSel,numSel]])=>{
+      $(rangeSel).value=viewerSettings[key];
+      $(numSel).value=viewerSettings[key];
+    });
+  }
+}
 
+let liveSettingFrame=0;
+let repaginateTimer;
+let repaginateDeferredBySettings=false;
+
+function settingsPanelIsOpen(){
+  return $('#viewerSettings').classList.contains('open');
+}
+
+/*
+  긴 책에서 가장 비싼 작업은 splitIntoPages() 전체 재실행이다.
+  설정 패널이 열려 있는 동안에는 CSS 값만 즉시 바꾸고,
+  실제 페이지 재분할은 설정 패널을 닫을 때 한 번만 수행한다.
+*/
+function scheduleRepaginate(delay=90){
+  if(!viewerOverlay.classList.contains('active'))return;
+  if(settingsPanelIsOpen()){
+    repaginateDeferredBySettings=true;
+    clearTimeout(repaginateTimer);
+    return;
+  }
+  repaginateDeferredBySettings=false;
+  clearTimeout(repaginateTimer);
+  repaginateTimer=setTimeout(repaginate,delay);
+}
+
+function flushLiveViewerSettings(){
+  if(liveSettingFrame){
+    cancelAnimationFrame(liveSettingFrame);
+    liveSettingFrame=0;
+  }
+  applyViewerSettingsVisuals(false);
+}
+
+function queueLiveViewerSettings(){
+  if(liveSettingFrame)return;
+  liveSettingFrame=requestAnimationFrame(()=>{
+    liveSettingFrame=0;
+    applyViewerSettingsVisuals(false);
+  });
+}
+
+function commitViewerSettings(){
+  flushLiveViewerSettings();
+  saveViewerSettings();
+  scheduleRepaginate();
+}
+
+function applyViewerSettings(repaginateAfter=true){
+  flushLiveViewerSettings();
+  applyViewerSettingsVisuals(true);
   saveViewerSettings();
   if(repaginateAfter)scheduleRepaginate();
 }
 
 function bindViewerPair(key,rangeSel,numSel){
   const range=$(rangeSel),num=$(numSel);
-  const handler=value=>{
+
+  const live=value=>{
     viewerSettings[key]=clampValue(key,value);
     range.value=viewerSettings[key];
     num.value=viewerSettings[key];
-    applyViewerSettings(true);
+    repaginateDeferredBySettings=true;
+    queueLiveViewerSettings();
   };
-  range.addEventListener('input',()=>handler(range.value));
-  num.addEventListener('input',()=>handler(num.value));
-  num.addEventListener('change',()=>handler(num.value));
+
+  const commit=()=>commitViewerSettings();
+
+  /* 드래그 중에는 전체 페이지 재분할 금지 */
+  range.addEventListener('input',()=>live(range.value));
+  /* 모바일 Safari/Chrome 모두 손을 뗀 뒤 한 번 확정 */
+  range.addEventListener('change',commit);
+  range.addEventListener('pointerup',commit);
+  range.addEventListener('touchend',commit,{passive:true});
+
+  /* 숫자 입력 중에도 키 입력마다 재분할하지 않는다. */
+  num.addEventListener('input',()=>live(num.value));
+  num.addEventListener('change',commit);
+  num.addEventListener('blur',commit);
+  num.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      e.preventDefault();
+      num.blur();
+    }
+  });
 }
 
 Object.entries(viewerControls).forEach(([key,[rangeSel,numSel]])=>bindViewerPair(key,rangeSel,numSel));
 
 $('#viewerFont').addEventListener('change',()=>{
   viewerSettings.font=$('#viewerFont').value;
-  applyViewerSettings(true);
+  repaginateDeferredBySettings=true;
+  applyViewerSettingsVisuals(false);
+  saveViewerSettings();
+  scheduleRepaginate();
 });
 
 $('#toggleViewerSettings').onclick=()=>{
   const panel=$('#viewerSettings');
+  const opening=!panel.classList.contains('open');
   panel.classList.toggle('open');
-  scheduleRepaginate();
+
+  if(opening){
+    /* 패널이 열리며 본문 높이가 달라져도 조작 중에는 재분할하지 않는다. */
+    repaginateDeferredBySettings=true;
+    clearTimeout(repaginateTimer);
+  }else{
+    /* 모든 변경을 저장하고, 패널이 닫힌 최종 크기에서 단 한 번 재분할 */
+    flushLiveViewerSettings();
+    saveViewerSettings();
+    requestAnimationFrame(()=>scheduleRepaginate(0));
+  }
 };
 
 $('#resetViewerSettings').onclick=()=>{
   viewerSettings={...viewerDefaults};
-  applyViewerSettings(true);
+  repaginateDeferredBySettings=true;
+  applyViewerSettingsVisuals(true);
+  saveViewerSettings();
+  scheduleRepaginate();
 };
-
-let repaginateTimer;
-function scheduleRepaginate(){
-  if(!viewerOverlay.classList.contains('active'))return;
-  clearTimeout(repaginateTimer);
-  repaginateTimer=setTimeout(repaginate,120);
-}
 
 /* ---------------- Markdown ---------------- */
 function escapeHtml(s){
@@ -1033,9 +1115,15 @@ function markdownToBlocks(md){
 }
 
 /* ---------------- 페이지 분할 ---------------- */
+let cachedMarkdownSource=null;
+let cachedMarkdownBlocks=[];
+
 function splitIntoPages(text){
   const box=pageInnerLeft;
-  const blocks=markdownToBlocks(text);
+  /* 설정 변경 재분할에서는 원문이 같으므로 마크다운 파싱 결과를 재사용 */
+  const blocks=text===cachedMarkdownSource
+    ? cachedMarkdownBlocks
+    : (cachedMarkdownSource=text,cachedMarkdownBlocks=markdownToBlocks(text));
   const result=[];
   let current=[];
 
