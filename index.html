@@ -329,30 +329,48 @@ textarea{min-height:42vh}
 .input-actions{display:flex;gap:8px;margin-top:10px}
 .input-actions button{flex:1}
 .hidden-file-input{display:none}
-.bookhead{padding:9px 10px;align-items:flex-start;flex-wrap:wrap}
-.booktitle{font-size:14px;padding-top:7px}
-.book-actions{gap:5px}
-.book-actions button{padding:7px 8px;font-size:11px}
-.book-actions button .button-note{display:none}
+.bookhead{
+  padding:7px 8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  flex-wrap:nowrap;
+  white-space:nowrap;
+}
+.booktitle{font-size:12px;line-height:1;font-weight:900;flex:0 0 auto}
+.top-page-nav{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;flex:1 1 auto}
+.counter{min-width:42px;text-align:center;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.page-jump{display:flex;align-items:center;gap:3px;min-width:0}
+.page-jump input{width:48px;min-width:0;padding:5px 4px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);text-align:center;font-size:11px;line-height:1.1}
+.page-jump button{min-width:0;padding:5px 6px;font-size:10px;line-height:1.1}
+.book-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;flex-wrap:nowrap}
+.book-actions button{min-width:0;padding:5px 6px;font-size:10px;line-height:1.1}
 .viewer-settings{padding:10px}
 .settings-grid{grid-template-columns:1fr;gap:8px}
 .setting-row{grid-template-columns:92px minmax(70px,1fr) 62px;gap:6px}
 .setting-font{grid-template-columns:92px 1fr}
 .font-upload{grid-template-columns:92px minmax(0,1fr)}
 .font-upload button{grid-column:2;justify-self:start}
-.page-spread{grid-template-columns:1fr}
+.page-spread{
+  grid-template-columns:1fr;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  tap-highlight-color:transparent;
+}
+.page,.page-inner{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent}
 .page-right{display:none}
 .page + .page{border-left:0}
 .page{--viewer-pad-right:18px;--viewer-pad-left:18px}
 .page-inner{font-size:var(--viewer-font-size)}
-.controls{display:flex;justify-content:center;align-items:center;gap:10px;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));}
-.counter{min-width:80px;align-self:center}
-.page-jump{display:flex;justify-content:center;align-items:center;gap:6px}
-.page-spread{cursor:pointer;touch-action:manipulation}
-.page-jump input{width:92px;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);text-align:center;font-size:13px}
-.page-jump button{min-width:64px;padding:8px 10px;font-size:12px}
 @media(max-width:360px){
-  .book-actions{width:100%;justify-content:flex-start}
+  .bookhead{gap:3px;padding-left:5px;padding-right:5px}
+  .booktitle{font-size:11px}
+  .counter{min-width:38px;font-size:10px}
+  .page-jump{gap:2px}
+  .page-jump input{width:42px;padding-left:2px;padding-right:2px;font-size:10px}
+  .page-jump button,.book-actions button{padding-left:5px;padding-right:5px;font-size:9px}
   .setting-row{grid-template-columns:82px minmax(60px,1fr) 58px}
 }
 </style>
@@ -380,10 +398,16 @@ textarea{min-height:42vh}
   <section class="book" id="book">
     <div class="bookhead">
       <div class="booktitle">전자책 보기</div>
+      <div class="top-page-nav" aria-label="페이지 이동">
+        <div class="counter" id="counter">0 / 0</div>
+        <div class="page-jump">
+          <input id="pageJumpInput" type="number" min="1" step="1" inputmode="numeric" placeholder="쪽" aria-label="이동할 페이지 번호">
+          <button id="pageJumpBtn" type="button">이동</button>
+        </div>
+      </div>
       <div class="book-actions">
-        <button class="secondary" id="toggleViewerSettings" type="button">보기 설정</button>
-         <button class="secondary" id="copyAll" type="button" title="기존 TXT 파일을 열어 기존 내용은 그대로 두고, 파일 끝에서 두 줄 아래에 현재 전체 텍스트를 추가합니다.">전체 텍스트 다운로드<span class="button-note">기존 TXT 열기 → 두 줄 아래에 추가</span></button>
-        <button class="secondary" id="closeViewer" type="button">닫기 ✕</button>
+        <button class="secondary" id="toggleViewerSettings" type="button">설정</button>
+        <button class="secondary" id="closeViewer" type="button">닫기</button>
       </div>
     </div>
 
@@ -455,13 +479,6 @@ textarea{min-height:42vh}
       </div>
     </div>
 
-    <div class="controls">
-      <div class="counter" id="counter">0 / 0</div>
-      <div class="page-jump" aria-label="페이지 이동">
-        <input id="pageJumpInput" type="number" min="1" step="1" inputmode="numeric" placeholder="페이지" aria-label="이동할 페이지 번호">
-        <button id="pageJumpBtn" type="button">이동</button>
-      </div>
-    </div>
   </section>
 </div>
 
@@ -503,15 +520,17 @@ function loadReadingSession(){
 }
 
 function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
-  if(!fullText)return;
+  const text=isOpen&&fullText!==''?fullText:inputText.value;
   try{
     localStorage.setItem(READING_STORAGE,JSON.stringify({
-      text:fullText,
+      text,
       pageIndex,
       isOpen
     }));
   }catch(e){}
 }
+
+inputText.addEventListener('input',()=>saveReadingSession(false));
 
 /* ---------------- 보기 설정 ---------------- */
 const VIEWER_STORAGE='ebookViewerSettingsV1';
@@ -764,7 +783,6 @@ $('#viewerFont').addEventListener('change',()=>{
 $('#toggleViewerSettings').onclick=()=>{
   const panel=$('#viewerSettings');
   panel.classList.toggle('open');
-  $('#toggleViewerSettings').textContent=panel.classList.contains('open')?'보기 설정 닫기':'보기 설정';
   scheduleRepaginate();
 };
 
@@ -1060,85 +1078,6 @@ pageJumpInput.addEventListener('keydown',e=>{
   }
 });
 
-async function downloadTextFile(text){
-  const suggestedName='전자책-전체텍스트.txt';
-
-  /*
-    기존 파일에 이어붙일 때는 "저장" 창(showSaveFilePicker)이 아니라
-    "열기" 창(showOpenFilePicker)을 사용한다.
-    그래야 기존 파일 선택 시 "파일이 이미 있습니다. 바꾸시겠습니까?"라는
-    덮어쓰기 확인 창이 뜨지 않는다.
-  */
-  if('showOpenFilePicker' in window){
-    try{
-      const [fileHandle]=await window.showOpenFilePicker({
-        multiple:false,
-        types:[{
-          description:'텍스트 파일',
-          accept:{'text/plain':['.txt']}
-        }]
-      });
-      if(!fileHandle)return;
-
-      let permission='granted';
-      if(fileHandle.queryPermission){
-        permission=await fileHandle.queryPermission({mode:'readwrite'});
-      }
-      if(permission!=='granted'&&fileHandle.requestPermission){
-        permission=await fileHandle.requestPermission({mode:'readwrite'});
-      }
-      if(permission!=='granted'){
-        throw new Error('선택한 파일에 쓰기 권한이 허용되지 않았습니다.');
-      }
-
-      const existingFile=await fileHandle.getFile();
-      const existingText=await existingFile.text();
-      const existingWithoutBom=existingText.replace(/^\uFEFF/,'');
-
-      /* 비어 있는 파일(또는 BOM만 있는 파일)은 새 텍스트만 기록 */
-      if(existingWithoutBom.length===0){
-        const writable=await fileHandle.createWritable();
-        await writable.write('\uFEFF'+text);
-        await writable.close();
-        return;
-      }
-
-      /* 기존 줄바꿈 형식을 따르면서, 끝에 최소 두 번의 줄바꿈을 확보 */
-      const newline=existingText.includes('\r\n')?'\r\n':'\n';
-      const trailing=existingText.match(/(?:\r\n|\r|\n)+$/)?.[0]||'';
-      const trailingCount=(trailing.match(/\r\n|\r|\n/g)||[]).length;
-      const separator=newline.repeat(Math.max(0,2-trailingCount));
-
-      /* 기존 데이터는 유지하고 파일 끝에서부터 새 텍스트만 추가 */
-      const writable=await fileHandle.createWritable({keepExistingData:true});
-      await writable.seek(existingFile.size);
-      await writable.write(separator+text);
-      await writable.close();
-      return;
-    }catch(error){
-      if(error?.name==='AbortError')return;
-      alert('기존 파일에 이어붙이지 못했습니다.\n'+(error?.message||String(error)));
-      return;
-    }
-  }
-
-  /* File System Access API 미지원 브라우저에서는 새 파일 다운로드 */
-  const blob=new Blob(['\uFEFF',text],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement('a');
-  link.href=url;
-  link.download=suggestedName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-
-$('#copyAll').onclick=async()=>{
-  if(!fullText)return;
-  await downloadTextFile(fullText);
-};
-
 /* ---------------- TXT 파일 불러오기 ---------------- */
 $('#chooseTxtBtn').onclick=()=>txtFileInput.click();
 txtFileInput.addEventListener('change',async()=>{
@@ -1152,6 +1091,7 @@ txtFileInput.addEventListener('change',async()=>{
   try{
     const text=await file.text();
     inputText.value=text.replace(/^\uFEFF/,'');
+    saveReadingSession(false);
     setStatus(`불러옴: ${file.name}`);
   }catch(error){
     setStatus(error.message||'TXT 파일을 읽지 못했습니다.',true);
@@ -1168,6 +1108,7 @@ function openViewer(){
   setStatus('');
   fullText=text;
   viewerOverlay.classList.add('active');
+  saveReadingSession(true);
   requestAnimationFrame(()=>{
     pageIndex=0;
     pages=splitIntoPages(fullText);
@@ -1217,8 +1158,10 @@ render();
   }
 
   const reading=loadReadingSession();
-  if(reading?.isOpen&&typeof reading.text==='string'&&reading.text.trim()){
+  if(reading&&typeof reading.text==='string'){
     inputText.value=reading.text;
+  }
+  if(reading?.isOpen&&typeof reading.text==='string'&&reading.text.trim()){
     fullText=reading.text;
     setStatus('');
     viewerOverlay.classList.add('active');
