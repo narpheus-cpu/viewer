@@ -390,6 +390,76 @@ textarea{min-height:42vh}
   .page-jump button,.book-actions button{padding-left:5px;padding-right:5px;font-size:9px}
   .setting-row{grid-template-columns:82px minmax(60px,1fr) 58px}
 }
+
+
+/* ---------------- 최근 내역 ---------------- */
+.recent-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:2000;
+  background:rgba(0,0,0,.52);
+  padding:max(14px,env(safe-area-inset-top,0px)) 12px max(14px,env(safe-area-inset-bottom,0px));
+  align-items:center;
+  justify-content:center;
+}
+.recent-overlay.active{display:flex}
+.recent-panel{
+  width:min(560px,100%);
+  max-height:min(78vh,720px);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  background:var(--paper);
+  color:var(--ink);
+  border:1px solid var(--ink);
+  border-radius:8px;
+}
+.recent-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:12px;
+  border-bottom:1px solid var(--line);
+}
+.recent-head strong{font-size:14px}
+.recent-head-actions{display:flex;gap:6px}
+.recent-head-actions button{padding:6px 8px;font-size:11px}
+.recent-list{
+  flex:1 1 auto;
+  overflow:auto;
+  padding:8px;
+  -webkit-overflow-scrolling:touch;
+}
+.recent-empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:12px}
+.recent-item{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  margin-bottom:7px;
+  background:var(--paper);
+}
+.recent-item:last-child{margin-bottom:0}
+.recent-main{min-width:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.recent-title{
+  font-weight:850;
+  font-size:13px;
+  line-height:1.35;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.recent-meta{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.3}
+.recent-actions{display:flex;gap:5px;align-items:center}
+.recent-actions button{padding:6px 8px;font-size:10px;white-space:nowrap}
+#recentHistoryBtn{font-weight:800}
+
 </style>
 </head>
 <body>
@@ -403,11 +473,27 @@ textarea{min-height:42vh}
     <textarea id="inputText" placeholder="여기에 텍스트(마크다운 서식 가능)를 입력하거나 붙여넣으세요."></textarea>
     <div class="input-actions">
       <button class="secondary" id="chooseTxtBtn" type="button">TXT 파일 선택</button>
+      <button class="secondary" id="recentHistoryBtn" type="button">최근 내역</button>
       <input class="hidden-file-input" id="txtFileInput" type="file" accept=".txt,text/plain">
     </div>
 
     <button class="primary" id="openViewerBtn" type="button">📖 전자책으로 보기</button>
     <div class="status" id="status"></div>
+  </section>
+</div>
+
+<div class="recent-overlay" id="recentOverlay" aria-hidden="true">
+  <section class="recent-panel" role="dialog" aria-modal="true" aria-labelledby="recentTitle">
+    <div class="recent-head">
+      <strong id="recentTitle">최근 내역 · 최대 5개</strong>
+      <div class="recent-head-actions">
+        <button class="secondary" id="clearRecentHistory" type="button">전체 삭제</button>
+        <button class="secondary" id="closeRecentHistory" type="button">닫기</button>
+      </div>
+    </div>
+    <div class="recent-list" id="recentList">
+      <div class="recent-empty">저장된 내역이 없습니다.</div>
+    </div>
   </section>
 </div>
 
@@ -515,6 +601,8 @@ const txtFileInput=$('#txtFileInput');
 const customFontOption=$('#customFontOption');
 const fontFile=$('#fontFile');
 const fontUploadStatus=$('#fontUploadStatus');
+const recentOverlay=$('#recentOverlay');
+const recentList=$('#recentList');
 
 let fullText='';
 let pages=[];
@@ -532,6 +620,16 @@ const READING_DB_STORE='sessions';
 let restoredSessionUpdatedAt=0;
 let userEditedAfterRestore=false;
 
+/* 최근 5개 본문은 IndexedDB에 저장하고, 페이지 이동 시에는 작은 메타데이터만 갱신한다. */
+const RECENT_DB_NAME='ebookViewerRecentHistoryV1';
+const RECENT_DB_VERSION=1;
+const RECENT_TEXT_STORE='texts';
+const RECENT_META_STORE='meta';
+const RECENT_LIMIT=5;
+let activeRecentId='';
+let activeRecentMeta=null;
+let recentSaveTimer=0;
+
 function setStatus(msg,err=false){
   statusEl.textContent=msg;
   statusEl.classList.toggle('error',!!err);
@@ -547,6 +645,7 @@ function parseReadingRecord(raw){
       pageIndex:Number.isFinite(Number(parsed.pageIndex))?Number(parsed.pageIndex):0,
       pageAnchor:Number.isFinite(Number(parsed.pageAnchor))?Number(parsed.pageAnchor):null,
       layoutSignature:typeof parsed.layoutSignature==='string'?parsed.layoutSignature:'',
+      recentId:typeof parsed.recentId==='string'?parsed.recentId:'',
       isOpen:!!parsed.isOpen,
       updatedAt:Number.isFinite(Number(parsed.updatedAt))?Number(parsed.updatedAt):0
     };
@@ -616,6 +715,289 @@ async function saveReadingSessionDB(record){
   }catch(e){}
 }
 
+
+function openRecentDatabase(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){
+      reject(new Error('최근 내역 저장소를 사용할 수 없습니다.'));
+      return;
+    }
+    const request=indexedDB.open(RECENT_DB_NAME,RECENT_DB_VERSION);
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains(RECENT_TEXT_STORE))db.createObjectStore(RECENT_TEXT_STORE,{keyPath:'id'});
+      if(!db.objectStoreNames.contains(RECENT_META_STORE))db.createObjectStore(RECENT_META_STORE,{keyPath:'id'});
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('최근 내역 저장소를 열 수 없습니다.'));
+  });
+}
+
+function transactionDone(tx){
+  return new Promise((resolve,reject)=>{
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error||new Error('저장 중 오류가 발생했습니다.'));
+    tx.onabort=()=>reject(tx.error||new Error('저장이 취소되었습니다.'));
+  });
+}
+
+async function digestTextId(text){
+  const value=String(text||'');
+  try{
+    if(globalThis.crypto?.subtle&&globalThis.TextEncoder){
+      const bytes=new TextEncoder().encode(value);
+      const hash=await crypto.subtle.digest('SHA-256',bytes);
+      return 'sha256-'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){}
+  /* file:// 등 WebCrypto가 제한된 환경용 안정적인 fallback */
+  let h1=0x811c9dc5,h2=0x9e3779b9;
+  for(let i=0;i<value.length;i++){
+    const c=value.charCodeAt(i);
+    h1=Math.imul(h1^c,0x01000193)>>>0;
+    h2=Math.imul(h2^(c+i),0x85ebca6b)>>>0;
+  }
+  return `fnv-${value.length}-${h1.toString(16)}-${h2.toString(16)}`;
+}
+
+function makeRecentTitle(text){
+  const cleaned=String(text||'')
+    .replace(/```[\s\S]*?```/g,' ')
+    .replace(/[#>*_~`\[\]()|]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  const title=(cleaned||'제목 없는 텍스트').slice(0,44);
+  return cleaned.length>44?title+'…':title;
+}
+
+function formatRecentTime(ts){
+  const d=new Date(Number(ts)||Date.now());
+  try{
+    return new Intl.DateTimeFormat('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(d);
+  }catch(e){return d.toLocaleString();}
+}
+
+function formatTextLength(n){
+  n=Math.max(0,Number(n)||0);
+  if(n>=10000)return `${(n/10000).toFixed(n>=100000?0:1)}만 자`;
+  return `${n.toLocaleString()}자`;
+}
+
+async function getRecentMetas(){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction(RECENT_META_STORE,'readonly');
+    const request=tx.objectStore(RECENT_META_STORE).getAll();
+    const rows=await new Promise((resolve,reject)=>{
+      request.onsuccess=()=>resolve(request.result||[]);
+      request.onerror=()=>reject(request.error||new Error('최근 내역을 읽을 수 없습니다.'));
+    });
+    return rows.sort((a,b)=>(Number(b.updatedAt)||0)-(Number(a.updatedAt)||0));
+  }finally{db.close();}
+}
+
+async function getRecentMeta(id){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction(RECENT_META_STORE,'readonly');
+    const request=tx.objectStore(RECENT_META_STORE).get(id);
+    return await new Promise((resolve,reject)=>{
+      request.onsuccess=()=>resolve(request.result||null);
+      request.onerror=()=>reject(request.error||new Error('최근 내역 정보를 읽을 수 없습니다.'));
+    });
+  }finally{db.close();}
+}
+
+async function getRecentBook(id){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction([RECENT_TEXT_STORE,RECENT_META_STORE],'readonly');
+    const textReq=tx.objectStore(RECENT_TEXT_STORE).get(id);
+    const metaReq=tx.objectStore(RECENT_META_STORE).get(id);
+    const [textRec,meta]=await Promise.all([
+      new Promise((resolve,reject)=>{textReq.onsuccess=()=>resolve(textReq.result||null);textReq.onerror=()=>reject(textReq.error);}),
+      new Promise((resolve,reject)=>{metaReq.onsuccess=()=>resolve(metaReq.result||null);metaReq.onerror=()=>reject(metaReq.error);})
+    ]);
+    if(!textRec||typeof textRec.text!=='string')return null;
+    return {text:textRec.text,meta:meta||{id}};
+  }finally{db.close();}
+}
+
+async function putRecentTextAndMeta(text,meta){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction([RECENT_TEXT_STORE,RECENT_META_STORE],'readwrite');
+    tx.objectStore(RECENT_TEXT_STORE).put({id:meta.id,text,createdAt:meta.createdAt||Date.now()});
+    tx.objectStore(RECENT_META_STORE).put(meta);
+    await transactionDone(tx);
+  }finally{db.close();}
+}
+
+async function putRecentMeta(meta){
+  if(!meta?.id)return;
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction(RECENT_META_STORE,'readwrite');
+    tx.objectStore(RECENT_META_STORE).put(meta);
+    await transactionDone(tx);
+  }finally{db.close();}
+}
+
+async function deleteRecentById(id){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction([RECENT_TEXT_STORE,RECENT_META_STORE],'readwrite');
+    tx.objectStore(RECENT_TEXT_STORE).delete(id);
+    tx.objectStore(RECENT_META_STORE).delete(id);
+    await transactionDone(tx);
+  }finally{db.close();}
+  if(activeRecentId===id){activeRecentId='';activeRecentMeta=null;}
+}
+
+async function clearRecentHistory(){
+  const db=await openRecentDatabase();
+  try{
+    const tx=db.transaction([RECENT_TEXT_STORE,RECENT_META_STORE],'readwrite');
+    tx.objectStore(RECENT_TEXT_STORE).clear();
+    tx.objectStore(RECENT_META_STORE).clear();
+    await transactionDone(tx);
+  }finally{db.close();}
+  activeRecentId='';
+  activeRecentMeta=null;
+}
+
+async function pruneRecentHistory(){
+  const metas=await getRecentMetas();
+  if(metas.length<=RECENT_LIMIT)return;
+  for(const meta of metas.slice(RECENT_LIMIT))await deleteRecentById(meta.id);
+}
+
+async function upsertRecentText(text,{resetPosition=true}={}){
+  const id=await digestTextId(text);
+  let existing=null;
+  try{existing=await getRecentMeta(id);}catch(e){}
+  const now=Date.now();
+  const meta={
+    id,
+    title:makeRecentTitle(text),
+    length:String(text).length,
+    createdAt:Number(existing?.createdAt)||now,
+    updatedAt:now,
+    pageIndex:resetPosition?0:(Number(existing?.pageIndex)||0),
+    pageAnchor:resetPosition?0:(Number(existing?.pageAnchor)||0),
+    layoutSignature:resetPosition?'':(typeof existing?.layoutSignature==='string'?existing.layoutSignature:'')
+  };
+  await putRecentTextAndMeta(text,meta);
+  activeRecentId=id;
+  activeRecentMeta=meta;
+  await pruneRecentHistory();
+  return meta;
+}
+
+function currentRecentPositionMeta(){
+  if(!activeRecentId||!activeRecentMeta)return null;
+  const safeIndex=Math.min(Math.max(0,pageIndex),Math.max(0,pageAnchors.length-1));
+  const anchor=pageAnchors.length?(Number(pageAnchors[safeIndex])||0):0;
+  return {
+    ...activeRecentMeta,
+    id:activeRecentId,
+    pageIndex,
+    pageAnchor:anchor,
+    layoutSignature:pages.length?getLayoutSignature():(activeRecentMeta.layoutSignature||''),
+    updatedAt:Date.now()
+  };
+}
+
+async function saveActiveRecentPosition(){
+  if(restoreInProgress)return;
+  const meta=currentRecentPositionMeta();
+  if(!meta)return;
+  activeRecentMeta=meta;
+  try{await putRecentMeta(meta);}catch(e){}
+}
+
+function scheduleActiveRecentPositionSave(delay=180){
+  if(!activeRecentId||restoreInProgress)return;
+  clearTimeout(recentSaveTimer);
+  recentSaveTimer=setTimeout(()=>{
+    recentSaveTimer=0;
+    void saveActiveRecentPosition();
+  },delay);
+}
+
+function flushActiveRecentPositionSave(){
+  clearTimeout(recentSaveTimer);
+  recentSaveTimer=0;
+  void saveActiveRecentPosition();
+}
+
+async function activateRecentFromReading(reading){
+  const id=typeof reading?.recentId==='string'?reading.recentId:'';
+  if(!id)return;
+  try{
+    const book=await getRecentBook(id);
+    if(book?.meta){activeRecentId=id;activeRecentMeta=book.meta;}
+  }catch(e){}
+}
+
+async function renderRecentHistory(){
+  recentList.innerHTML='<div class="recent-empty">불러오는 중...</div>';
+  try{
+    const metas=(await getRecentMetas()).slice(0,RECENT_LIMIT);
+    if(!metas.length){
+      recentList.innerHTML='<div class="recent-empty">저장된 내역이 없습니다.</div>';
+      return;
+    }
+    recentList.innerHTML='';
+    for(const meta of metas){
+      const row=document.createElement('div');
+      row.className='recent-item';
+      row.dataset.id=meta.id;
+      const main=document.createElement('div');
+      main.className='recent-main';
+      main.tabIndex=0;
+      const title=document.createElement('div');
+      title.className='recent-title';
+      title.textContent=meta.title||'제목 없는 텍스트';
+      const sub=document.createElement('div');
+      sub.className='recent-meta';
+      sub.textContent=`${formatRecentTime(meta.updatedAt)} · ${formatTextLength(meta.length)} · ${Math.max(1,(Number(meta.pageIndex)||0)+1)}쪽에서 읽음`;
+      main.append(title,sub);
+      const actions=document.createElement('div');
+      actions.className='recent-actions';
+      const open=document.createElement('button');
+      open.type='button';open.className='secondary';open.textContent='열기';
+      const del=document.createElement('button');
+      del.type='button';del.className='secondary';del.textContent='삭제';
+      open.addEventListener('click',()=>void openRecentBook(meta.id));
+      main.addEventListener('click',()=>void openRecentBook(meta.id));
+      main.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void openRecentBook(meta.id);}});
+      del.addEventListener('click',async e=>{
+        e.stopPropagation();
+        await deleteRecentById(meta.id);
+        await renderRecentHistory();
+      });
+      actions.append(open,del);
+      row.append(main,actions);
+      recentList.appendChild(row);
+    }
+  }catch(error){
+    recentList.innerHTML='<div class="recent-empty">최근 내역을 불러오지 못했습니다.</div>';
+    setStatus(error.message||'최근 내역을 불러오지 못했습니다.',true);
+  }
+}
+
+function showRecentHistory(){
+  recentOverlay.classList.add('active');
+  recentOverlay.setAttribute('aria-hidden','false');
+  void renderRecentHistory();
+}
+
+function hideRecentHistory(){
+  recentOverlay.classList.remove('active');
+  recentOverlay.setAttribute('aria-hidden','true');
+}
+
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect();
   return [
@@ -661,6 +1043,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
     pageIndex,
     pageAnchor,
     layoutSignature:isOpen&&pages.length?getLayoutSignature():'',
+    recentId:activeRecentId||'',
     isOpen,
     updatedAt:Date.now()
   };
@@ -685,10 +1068,13 @@ inputText.addEventListener('input',()=>{
 });
 
 /* 새로고침/백그라운드 전환 직전에는 지연 저장을 취소하고 즉시 확정한다. */
-addEventListener('pagehide',()=>flushReadingSessionSave(viewerOverlay.classList.contains('active')));
-addEventListener('beforeunload',()=>flushReadingSessionSave(viewerOverlay.classList.contains('active')));
+addEventListener('pagehide',()=>{flushReadingSessionSave(viewerOverlay.classList.contains('active'));flushActiveRecentPositionSave();});
+addEventListener('beforeunload',()=>{flushReadingSessionSave(viewerOverlay.classList.contains('active'));flushActiveRecentPositionSave();});
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden')flushReadingSessionSave(viewerOverlay.classList.contains('active'));
+  if(document.visibilityState==='hidden'){
+    flushReadingSessionSave(viewerOverlay.classList.contains('active'));
+    flushActiveRecentPositionSave();
+  }
 });
 
 /* ---------------- 보기 설정 ---------------- */
@@ -1389,7 +1775,10 @@ function render(){
   $('#pageJumpBtn').disabled=false;
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
-  if(!restoreInProgress)scheduleReadingSessionSave(true);
+  if(!restoreInProgress){
+    scheduleReadingSessionSave(true);
+    scheduleActiveRecentPositionSave();
+  }
 }
 
 function repaginate(){
@@ -1484,27 +1873,95 @@ txtFileInput.addEventListener('change',async()=>{
 });
 
 /* ---------------- 팝업 열기/닫기 ---------------- */
-function openViewer(){
+async function openViewer(){
   const text=inputText.value;
   if(!text.trim()){
     setStatus('전자책으로 볼 텍스트를 입력하세요.',true);
     return;
   }
   setStatus('');
+
+  /* 버튼을 누르는 순간 최근 내역 저장을 시작한다. 실패해도 독서는 계속 가능하다. */
+  try{
+    await upsertRecentText(text,{resetPosition:true});
+  }catch(error){
+    activeRecentId='';
+    activeRecentMeta=null;
+    setStatus('최근 내역 저장에는 실패했지만 전자책 보기는 계속할 수 있습니다.',true);
+  }
+
   fullText=text;
   viewerOverlay.classList.add('active');
-  requestAnimationFrame(()=>{
-    pageIndex=0;
-    pages=splitIntoPages(fullText);
-    render();
-    flushReadingSessionSave(true);
-  });
+  await waitForViewerLayout();
+  pageIndex=0;
+  pages=splitIntoPages(fullText);
+  render();
+  flushReadingSessionSave(true);
+  flushActiveRecentPositionSave();
 }
 
 function closeViewer(){
+  flushActiveRecentPositionSave();
   viewerOverlay.classList.remove('active');
   flushReadingSessionSave(false);
 }
+
+
+async function openRecentBook(id){
+  try{
+    const bookRecord=await getRecentBook(id);
+    if(!bookRecord||typeof bookRecord.text!=='string'){
+      setStatus('해당 최근 내역을 찾을 수 없습니다.',true);
+      await renderRecentHistory();
+      return;
+    }
+
+    const meta=bookRecord.meta||{id};
+    activeRecentId=id;
+    activeRecentMeta=meta;
+    inputText.value=bookRecord.text;
+    fullText=bookRecord.text;
+    userEditedAfterRestore=false;
+    hideRecentHistory();
+    setStatus('');
+    restoreInProgress=true;
+    viewerOverlay.classList.add('active');
+
+    await waitForViewerLayout();
+    pages=splitIntoPages(fullText);
+
+    const savedIndex=Number.isFinite(Number(meta.pageIndex))?Number(meta.pageIndex):0;
+    const currentLayoutSignature=getLayoutSignature();
+    if(meta.layoutSignature&&meta.layoutSignature===currentLayoutSignature&&savedIndex>=0&&savedIndex<pages.length){
+      pageIndex=savedIndex;
+    }else if(Number.isFinite(Number(meta.pageAnchor))){
+      pageIndex=findPageIndexForAnchor(Number(meta.pageAnchor));
+    }else{
+      pageIndex=Math.min(Math.max(0,pages.length-1),Math.max(0,Math.floor(savedIndex)));
+    }
+
+    restoreInProgress=false;
+    render();
+    /* 다시 연 항목을 최신 순으로 올리고 현재 위치를 확정 저장 */
+    activeRecentMeta={...activeRecentMeta,updatedAt:Date.now()};
+    flushReadingSessionSave(true);
+    flushActiveRecentPositionSave();
+  }catch(error){
+    restoreInProgress=false;
+    setStatus(error.message||'최근 내역을 열지 못했습니다.',true);
+  }
+}
+
+$('#recentHistoryBtn').onclick=showRecentHistory;
+$('#closeRecentHistory').onclick=hideRecentHistory;
+$('#clearRecentHistory').onclick=async()=>{
+  if(!confirm('최근 내역 5개를 모두 삭제할까요?'))return;
+  try{
+    await clearRecentHistory();
+    await renderRecentHistory();
+  }catch(error){setStatus(error.message||'최근 내역을 삭제하지 못했습니다.',true);}
+};
+recentOverlay.addEventListener('click',e=>{if(e.target===recentOverlay)hideRecentHistory();});
 
 openViewerBtn.onclick=openViewer;
 $('#closeViewer').onclick=closeViewer;
@@ -1513,6 +1970,7 @@ viewerOverlay.addEventListener('click',e=>{
 });
 
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&recentOverlay.classList.contains('active')){hideRecentHistory();return;}
   if(e.key==='Escape'&&viewerOverlay.classList.contains('active')){
     closeViewer();
     return;
@@ -1578,6 +2036,7 @@ function applyReadingRecordToInput(reading){
 async function restoreReadingSession(reading){
   if(!reading||typeof reading.text!=='string')return;
   applyReadingRecordToInput(reading);
+  await activateRecentFromReading(reading);
 
   if(reading.isOpen&&reading.text.trim()){
     restoreInProgress=true;
