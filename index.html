@@ -4,6 +4,456 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>전자책 뷰어 - 모바일</title>
+<script>
+/* assets/android.js를 대체한다. 본문은 원본 IndexedDB에, 작은 위치는 localStorage에 저장한다. */
+(function () {
+  'use strict';
+  const CHECKPOINT_KEY = 'ebookViewerBrowserCheckpointV1';
+  function readCheckpoint() {
+    try { return JSON.parse(localStorage.getItem(CHECKPOINT_KEY) || 'null'); }
+    catch { return null; }
+  }
+
+  window.__browserCheckpoint = function (record) {
+    if (restoreInProgress || readerState.initializing) return;
+    try {
+      const open = record ? !!record.isOpen : viewerOverlay.classList.contains('active');
+      localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({
+        recentId: activeRecentId || '', isOpen: open, pageIndex,
+        pageAnchor: pageAnchors.length ? readerAnchor() : 0,
+        pageContext: readerState.context,
+        layoutSignature: pages.length ? readerState.layout : '',
+        updatedAt: Date.now()
+      }));
+    } catch (error) { console.error('Browser checkpoint:', error.message); }
+  };
+
+  window.__browserRecoverReading = async function (reading) {
+    try {
+      const saved = readCheckpoint();
+      if (!saved || !(Number(saved.updatedAt) >= Number(reading?.updatedAt || 0))) return reading;
+      if (!saved.isOpen) return reading ? { ...reading, isOpen: false } : reading;
+      if (!saved.recentId) return reading;
+      const book = await getRecentBook(saved.recentId);
+      if (book && typeof book.text === 'string') return { ...saved, text: book.text };
+    } catch (error) { console.error('Browser position recovery:', error.message); }
+    return reading;
+  };
+
+  window.__browserRecentMeta = function (meta) {
+    const saved = readCheckpoint();
+    if (saved?.recentId === meta.id && Number(saved.updatedAt) >= Number(meta.updatedAt || 0)) {
+      return { ...meta, pageIndex: saved.pageIndex, pageAnchor: saved.pageAnchor,
+        pageContext: saved.pageContext || meta.pageContext,
+        layoutSignature: saved.layoutSignature || meta.layoutSignature };
+    }
+    return meta;
+  };
+
+  window.__browserFlushState = async function () {
+    if (restoreInProgress || readerState.initializing) return;
+    flushReadingSessionSave(viewerOverlay.classList.contains('active'));
+    clearTimeout(recentSaveTimer); recentSaveTimer = 0;
+    await saveActiveRecentPosition();
+    const reading = parseReadingRecord(loadReadingSessionSync());
+    if (reading) await saveReadingSessionDB(reading);
+    await readerState.pendingCache;
+  };
+
+  /* 원본의 네이티브 종료 훅을 브라우저 생명주기 이벤트로 치환한다.
+     비동기 IndexedDB 저장보다 먼저 위 체크포인트가 동기 저장된다. */
+  addEventListener('pagehide', () => { void window.__browserFlushState(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void window.__browserFlushState();
+  });
+
+  /* Android 뒤로가기의 "열린 창 닫기"를 브라우저 뒤로가기/앞으로가기로 치환한다. */
+  document.addEventListener('DOMContentLoaded', () => {
+    readerReady.then(() => {
+      const PANEL_KEY = 'ebookViewerBrowserPanelV1';
+      let traversing = false;
+      const currentPanel = () => viewerOverlay.classList.contains('active') ? 'viewer' :
+        recentOverlay.classList.contains('active') ? 'recent' : '';
+      const markPanel = panel => {
+        try {
+          const state = history.state && typeof history.state === 'object' ? history.state : {};
+          const marked = state[PANEL_KEY] || '';
+          if (panel && marked !== panel) {
+            const next = { ...state, [PANEL_KEY]: panel };
+            marked ? history.replaceState(next, '') : history.pushState(next, '');
+          } else if (!panel && marked) history.back();
+        } catch { /* Escape/닫기 버튼은 History API 제한 시에도 원본대로 동작한다. */ }
+      };
+      /* 이전 세션에서 사용자가 입력을 고쳐 복원을 취소한 경우 오래된 창 표식을 제거한다. */
+      if (!currentPanel() && history.state?.[PANEL_KEY]) {
+        const state = { ...history.state }; delete state[PANEL_KEY];
+        try { history.replaceState(state, ''); } catch {}
+      }
+      markPanel(currentPanel());
+      const observer = new MutationObserver(() => {
+        if (!traversing) markPanel(currentPanel());
+      });
+      observer.observe(viewerOverlay, { attributes: true, attributeFilter: ['class'] });
+      observer.observe(recentOverlay, { attributes: true, attributeFilter: ['class'] });
+      addEventListener('popstate', () => {
+        traversing = true;
+        const target = history.state?.[PANEL_KEY] || '';
+        if (viewerOverlay.classList.contains('active') && target !== 'viewer') closeViewer();
+        if (recentOverlay.classList.contains('active') && target !== 'recent') hideRecentHistory();
+        if (target === 'recent' && !recentOverlay.classList.contains('active')) showRecentHistory();
+        if (target === 'viewer' && !viewerOverlay.classList.contains('active')) {
+          void openViewer().catch(error => setStatus(error.message, true));
+        }
+        queueMicrotask(() => { traversing = false; });
+      });
+    });
+  });
+})();
+
+</script>
+<script>
+/* Durable layout cache and a logical text anchor independent of changing page boundaries. */
+const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',canonical:'',canonicalSource:null,
+  generation:0,fontId:'',fontPromise:Promise.resolve(),memory:new Map(),pendingCache:Promise.resolve(),cancelled:false};
+const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
+let resolveReaderReady;
+const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
+const READER_CACHE_VERSION=4;
+const READER_CACHE_DB='ebookViewerLayoutCacheV1';
+
+function readerCanonical(){
+  if(readerState.canonicalSource!==fullText){
+    getPaginationBlocks(fullText);
+    readerState.canonical=cachedBlockTexts.join('\n');
+    readerState.canonicalSource=fullText;
+  }
+  return readerState.canonical;
+}
+function readerContext(anchor){
+  const text=readerCanonical(),offset=Math.min(text.length,Math.max(0,Number(anchor)||0));
+  return {before:text.slice(Math.max(0,offset-32),offset),after:text.slice(offset,offset+96)};
+}
+function readerAnchor(){
+  return readerState.logicalAnchor===null ? Number(pageAnchors[pageIndex])||0 : readerState.logicalAnchor;
+}
+function readerChooseAnchor(anchor,context){
+  readerState.logicalAnchor=Math.max(0,Number(anchor)||0);
+  readerState.context=context||readerContext(readerState.logicalAnchor);
+}
+function readerResolveAnchor(record){
+  const text=readerCanonical();
+  const original=Math.min(text.length,Math.max(0,Number(record?.pageAnchor)||0));
+  const context=record?.pageContext;
+  if(!context||typeof context.before!=='string'||typeof context.after!=='string')return original;
+  const needle=context.before+context.after;
+  if(!needle||text.slice(Math.max(0,original-context.before.length),original+context.after.length)===needle)return original;
+  let best=original,distance=Infinity;
+  for(let hit=text.indexOf(needle);hit>=0;hit=text.indexOf(needle,hit+1)){
+    const target=hit+context.before.length,delta=Math.abs(target-original);
+    if(delta<distance){best=target;distance=delta;}
+  }
+  return best;
+}
+function readerSetLoading(loading){
+  viewerOverlay.classList.toggle('reader-loading',loading);
+  viewerOverlay.setAttribute('aria-busy',String(loading));
+}
+function readerOversizedParagraph(html,text,box){
+  if(text.length<=4096||!html.startsWith('<p>'))return false;
+  // Shape only a DOM-preserving prefix. A paragraph whose prefix overflows cannot fit whole.
+  const detached=document.createElement('div');detached.innerHTML=html;
+  const paragraph=detached.firstElementChild;
+  const walker=document.createTreeWalker(paragraph,NodeFilter.SHOW_TEXT);
+  let node,left=4096;
+  const range=document.createRange();range.selectNodeContents(paragraph);
+  while((node=walker.nextNode())){
+    if(node.length>=left){range.setEnd(node,left);break;}
+    left-=node.length;
+  }
+  const prefix=paragraph.cloneNode(false);prefix.appendChild(range.cloneContents());
+  box.replaceChildren(prefix);readerStats.measurements++;
+  return box.scrollHeight>box.clientHeight+1;
+}
+function readerCacheDatabase(){
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open(READER_CACHE_DB,1);
+    request.onupgradeneeded=()=>request.result.createObjectStore('pages',{keyPath:'id'});
+    request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
+  });
+}
+async function readerReadCache(id){
+  if(readerState.memory.has(id))return readerState.memory.get(id);
+  try{
+    const db=await readerCacheDatabase();
+    try{return await new Promise((resolve,reject)=>{
+      const request=db.transaction('pages').objectStore('pages').get(id);
+      request.onsuccess=()=>{if(request.result)readerState.memory.set(id,request.result);resolve(request.result);};request.onerror=()=>reject(request.error);
+    });}finally{db.close();}
+  }catch{return null;}
+}
+async function readerStoreCache(record){
+  readerState.memory.delete(record.id);readerState.memory.set(record.id,record);
+  while(readerState.memory.size>RECENT_LIMIT)readerState.memory.delete(readerState.memory.keys().next().value);
+  try{
+    const db=await readerCacheDatabase();
+    try{
+      const tx=db.transaction('pages','readwrite'),store=tx.objectStore('pages');
+      store.put(record);
+      const all=store.getAll();
+      all.onsuccess=()=>{
+        for(const old of all.result.sort((a,b)=>b.updatedAt-a.updatedAt).slice(RECENT_LIMIT))store.delete(old.id);
+      };
+      await transactionDone(tx);
+    }finally{db.close();}
+  }catch{/* A disposable cache failure never deletes or changes book/font data. */}
+}
+async function readerDeleteCache(id){
+  id ? readerState.memory.delete(id) : readerState.memory.clear();
+  try{
+    const db=await readerCacheDatabase();
+    try{const tx=db.transaction('pages','readwrite');id?tx.objectStore('pages').delete(id):tx.objectStore('pages').clear();await transactionDone(tx);}finally{db.close();}
+  }catch{}
+}
+function readerValidCache(cache,signature,source){
+  return cache&&cache.version===READER_CACHE_VERSION&&cache.signature===signature&&cache.length===source.length&&
+    typeof cache.canonical==='string'&&Array.isArray(cache.pages)&&cache.pages.length>0&&
+    Array.isArray(cache.anchors)&&cache.anchors.length===cache.pages.length&&
+    cache.anchors.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0||x>=cache.anchors[i-1]))&&
+    cache.pages.every(x=>typeof x==='string');
+}
+async function readerHydrateReading(record){
+  if(record?.textRef){
+    const book=await getRecentBook(record.textRef).catch(()=>null);
+    if(book)return {...record,text:book.text};
+  }
+  return record;
+}
+async function readerFingerprintFont(record){
+  if(record.fingerprint)return record.fingerprint;
+  if(crypto?.subtle){
+    const digest=await crypto.subtle.digest('SHA-256',record.data);
+    record.fingerprint=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
+  }else{
+    const bytes=new Uint8Array(record.data);let hash=2166136261;
+    for(const byte of bytes)hash=Math.imul(hash^byte,16777619)>>>0;
+    record.fingerprint=bytes.length+':'+hash;
+  }
+  return record.fingerprint;
+}
+async function readerWaitForLayout(){
+  await readerState.fontPromise;
+  const family=getComputedStyle(pageInnerLeft).fontFamily;
+  if(document.fonts){
+    await document.fonts.load(viewerSettings.fontSize+'px '+family,'가나다라마바사 ABC abc 0123456789');
+    await document.fonts.ready;
+  }
+  let previous='',stable=0;
+  while(stable<3){
+    await nextFrame();syncVisualViewport();
+    const current=getLayoutSignature();
+    stable=current===previous?stable+1:0;previous=current;
+  }
+}
+async function readerDisplay(record={pageAnchor:0},generation=++readerState.generation){
+  restoreInProgress=true;readerSetLoading(true);clearTimeout(repaginateTimer);
+  const source=fullText,id=activeRecentId;
+  const started=performance.now();
+  try{
+    let signature;
+    while(generation===readerState.generation){
+      await readerWaitForLayout();
+      if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;
+      signature=getLayoutSignature();
+      const cached=id?await readerReadCache(id):null;
+      if(generation!==readerState.generation)return;
+      if(readerValidCache(cached,signature,source)){
+        pages=cached.pages.slice();pageAnchors=cached.anchors.slice();
+        readerState.canonical=cached.canonical;readerState.canonicalSource=source;readerStats.cacheHits++;
+      }else{
+        pages=splitIntoPages(source);
+        readerCanonical();
+      }
+      // Insets/IME may finish adjusting during calculation. Reveal only the final layout.
+      await nextFrame();await nextFrame();
+      if(generation!==readerState.generation)return;
+      if(signature!==getLayoutSignature())continue;
+      break;
+    }
+    if(generation!==readerState.generation)return;
+    readerState.layout=signature;
+    const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
+    const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
+    readerChooseAnchor(target,readerContext(target));
+    pageIndex=findPageIndexForAnchor(target);
+    restoreInProgress=false;
+    render();readerSetLoading(false);
+    readerStats.lastPaginationMs=performance.now()-started;
+    flushReadingSessionSave(true);flushActiveRecentPositionSave();
+    if(id){
+      const cache={id,version:READER_CACHE_VERSION,signature,length:source.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+        canonical:readerCanonical(),updatedAt:Date.now()};
+      // Do not serialize/rewrite the cache again when the current cache already matches.
+    const current=readerState.memory.get(id);
+      if(!readerValidCache(current,signature,source))readerState.pendingCache=readerStoreCache(cache);
+    }
+  }catch(error){
+    if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message||'전자책을 열지 못했습니다.',true);}
+    throw error;
+  }
+}
+
+/* Display-only breaks. Offsets always refer to the original visible text. */
+function readerBreakKey(){
+  return ['breakSentence','breakQuotes','breakAdverbs'].map(key=>viewerSettings[key]?1:0).join('');
+}
+function readerQuoteRoles(text){
+  const roles=new Map(),stack=[];
+  for(let i=0;i<text.length;i++){
+    const quote=text[i];
+    if(!/["“”＂]/.test(quote))continue;
+    let slash=i-1;while(slash>=0&&text[slash]==='\\')slash--;
+    if((i-1-slash)%2)continue;
+    if(quote==='“'){roles.set(i,'open');stack.push('curly');continue;}
+    if(quote==='”'){
+      roles.set(i,'close');const match=stack.lastIndexOf('curly');if(match>=0)stack.splice(match,1);continue;
+    }
+    const match=stack.lastIndexOf(quote);
+    if(match>=0){roles.set(i,'close');stack.splice(match,1);}
+    else{roles.set(i,'open');stack.push(quote);}
+  }
+  return roles;
+}
+function readerBreakOffsets(text,settings=viewerSettings,quoteRoles=readerQuoteRoles(text),baseOffset=0){
+  const breaks=new Set(),protectedDots=new Set();
+  const add=offset=>{
+    // A sentence-ending break belongs after its closing quote, never between text and quote.
+    let next=offset;
+    while(next<text.length&&/[ \t]/.test(text[next]))next++;
+    while(quoteRoles.get(baseOffset+next)==='close'){
+      offset=++next;
+      while(next<text.length&&/[ \t]/.test(text[next]))next++;
+    }
+    if(offset<=0||offset>=text.length)return;
+    // An existing newline or the start of the block already satisfies the rule.
+    let left=offset-1,right=offset;
+    while(left>=0&&/[ \t]/.test(text[left]))left--;
+    while(right<text.length&&/[ \t]/.test(text[right]))right++;
+    if(left<0||text[left]==='\n'||text[right]==='\n')return;
+    breaks.add(offset);
+  };
+  if(settings.breakSentence){
+    // Protect the whole abbreviation, including its final dot; protect decimals separately.
+    const abbreviations=/(?:\b(?:[A-Za-z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e)\.)/g;
+    for(const match of text.matchAll(abbreviations)){
+      for(let i=0;i<match[0].length;i++)if(match[0][i]==='.')protectedDots.add(match.index+i);
+    }
+    for(let i=0;i<text.length;i++){
+      if(!/[.?!]/.test(text[i]))continue;
+      if(text[i]==='.'&&(protectedDots.has(i)||(/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))))continue;
+      // Keep an ellipsis or a ?! cluster together.
+      if(/[.?!]/.test(text[i+1]||'')&&!protectedDots.has(i+1))continue;
+      add(i+1);
+    }
+    // Korean sentence endings without punctuation. Do not split ordinary nouns ending in 다.
+    const nouns=new Set(['바다','캐나다','소다','마다','저마다','판다','사이다']);
+    const ending=/(?:[가-힣]{2,}다|간다|온다|본다|산다|잔다|된다|한다|같다|좋다|많다|없다|있다|싶다|크다|작다|쉽다|어렵다|맞다|옳다|싫다|[가-힣]+(?:요|죠|습니다|습니까|하자|해라|하라))$/u;
+    for(const match of text.matchAll(/[가-힣]+(?=\s)/gu)){
+      if(!nouns.has(match[0])&&ending.test(match[0]))add(match.index+match[0].length);
+    }
+  }
+  if(settings.breakQuotes){
+    for(let i=0;i<text.length;i++)if(quoteRoles.get(baseOffset+i)==='open')add(i);
+  }
+  if(settings.breakAdverbs){
+    const words=/예를[ \t]+들어|이에[ \t]+따라|그리고|그러나|따라서|또한|즉|왜냐하면|그러므로|반면|한편|그렇다면/gu;
+    for(const match of text.matchAll(words)){
+      const before=text[match.index-1]||'',after=text[match.index+match[0].length]||'';
+      if(!/[\p{L}\p{N}_]/u.test(before)&&!/[\p{L}\p{N}_]/u.test(after))add(match.index);
+    }
+  }
+  const result=[];
+  for(const offset of [...breaks].sort((a,b)=>a-b)){
+    // Two selected rules around the same space represent one line break.
+    if(result.length&&/^[ \t]*$/.test(text.slice(result[result.length-1],offset)))result[result.length-1]=offset;
+    else result.push(offset);
+  }
+  return result;
+}
+function readerApplyBreaks(html,quoteRoles=null,baseOffset=0){
+  if(readerBreakKey()==='000')return html;
+  const root=document.createElement('div');root.innerHTML=html;
+  const starts=new Map(),wholeWalker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  let wholeNode,wholeText='';
+  while((wholeNode=wholeWalker.nextNode())){
+    starts.set(wholeNode,wholeText.length);
+    if(wholeNode.nodeType===Node.TEXT_NODE)wholeText+=wholeNode.data;
+    else if(wholeNode.tagName==='BR')wholeText+='\n';
+  }
+  const roles=quoteRoles||readerQuoteRoles(wholeText);
+  // Each structural row is already a new line. Inline markup remains in place.
+  const groups=root.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,th,td,blockquote,pre');
+  for(const group of groups){
+    const nodes=[],walker=document.createTreeWalker(group,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+    let node,text='';
+    while((node=walker.nextNode())){
+      if(node.nodeType===Node.TEXT_NODE){nodes.push({node,start:text.length});text+=node.data;}
+      else if(node.tagName==='BR')text+='\n';
+    }
+    const offsets=readerBreakOffsets(text,viewerSettings,roles,baseOffset+(starts.get(group)||0));
+    let last=offsets.length-1;
+    for(let i=nodes.length-1;i>=0&&last>=0;i--){
+      const entry=nodes[i],end=entry.start+entry.node.length;
+      while(last>=0&&offsets[last]>=end)last--;
+      while(last>=0&&offsets[last]>=entry.start){
+        const offset=offsets[last--]-entry.start;
+        const tail=entry.node.splitText(offset),br=document.createElement('br');
+        br.setAttribute('data-reader-break','');tail.before(br);
+      }
+    }
+  }
+  return root.innerHTML;
+}
+function readerSafeQuoteCut(text,cut,quoteRoles,baseOffset=0){
+  let next=cut;
+  while(next<text.length&&/[ \t]/.test(text[next]))next++;
+  if(quoteRoles.get(baseOffset+next)!=='close')return cut;
+  // Keep at least the preceding character with the closing quote when a page is full.
+  while(cut>1&&/[ \t]/.test(text[cut-1]))cut--;
+  if(cut>1)cut--;
+  if(cut>1&&/[\uDC00-\uDFFF]/.test(text[cut]))cut--;
+  while(cut>1&&quoteRoles.get(baseOffset+cut)==='close')cut--;
+  return cut;
+}
+function readerBlockSlicer(html){
+  const root=document.createElement('div');root.innerHTML=html;
+  const units=[],walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  let node,length=0;
+  while((node=walker.nextNode())){
+    const size=node.nodeType===Node.TEXT_NODE?node.length:(node.tagName==='BR'&&!node.hasAttribute('data-reader-break')?1:0);
+    if(size){units.push({node,start:length,end:length+size});length+=size;}
+  }
+  function point(offset,end){
+    let lo=0,hi=units.length-1;
+    while(lo<hi){const mid=(lo+hi)>>1;if(units[mid].end<offset||(!end&&units[mid].end===offset))lo=mid+1;else hi=mid;}
+    const entry=units[lo];
+    if(entry.node.nodeType===Node.TEXT_NODE)return [entry.node,Math.min(entry.node.length,Math.max(0,offset-entry.start))];
+    const parent=entry.node.parentNode,index=Array.prototype.indexOf.call(parent.childNodes,entry.node);
+    return [parent,index+(offset>entry.start?1:0)];
+  }
+  return (start,end)=>{
+    if(!units.length)return html;
+    const range=document.createRange();range.setStart(...point(start,false));range.setEnd(...point(end,true));
+    let fragment=range.cloneContents(),ancestor=range.commonAncestorContainer;
+    if(ancestor.nodeType===Node.TEXT_NODE)ancestor=ancestor.parentNode;
+    while(ancestor!==root){const shell=ancestor.cloneNode(false);shell.appendChild(fragment);fragment=shell;ancestor=ancestor.parentNode;}
+    const output=document.createElement('div');output.appendChild(fragment);return output.innerHTML;
+  };
+}
+function readerSyncBreakButtons(){
+  document.querySelectorAll('[data-break-option]').forEach(button=>button.setAttribute('aria-pressed',String(!!viewerSettings[button.dataset.breakOption])));
+}
+
+</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Arial,sans-serif' font-size='34' font-weight='700' fill='%23fff'%3E%EC%B1%85%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -340,6 +790,10 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .app{width:100%;padding:18px 12px;align-items:flex-start}
 .panel{padding:18px 14px;margin-top:max(10px,env(safe-area-inset-top,0px))}
 textarea{min-height:42vh}
+.break-options{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.break-options button{flex:1;min-width:80px;padding:10px 6px;font-size:13px}
+.break-options button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.break-hint{font-size:11px;color:var(--muted,#888);margin-top:7px;line-height:1.5}
 .input-actions{display:flex;gap:8px;margin-top:10px}
 .input-actions button{flex:1}
 .hidden-file-input{display:none}
@@ -460,6 +914,12 @@ textarea{min-height:42vh}
 .recent-actions button{padding:6px 8px;font-size:10px;white-space:nowrap}
 #recentHistoryBtn{font-weight:800}
 
+
+.reader-loading #pageSpread{visibility:hidden}
+.reader-loading .top-page-nav{visibility:hidden}
+.reader-loading #toggleViewerSettings{pointer-events:none}
+.reader-loading::after{content:'불러오는 중…';position:absolute;inset:0;display:grid;place-items:center;
+  pointer-events:none;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -478,6 +938,12 @@ textarea{min-height:42vh}
     </div>
 
     <button class="primary" id="openViewerBtn" type="button">📖 전자책으로 보기</button>
+    <div class="break-options" role="group" aria-label="본문 개행 옵션 (복수 선택 가능)">
+      <button type="button" data-break-option="breakSentence" aria-pressed="false">문장 단위</button>
+      <button type="button" data-break-option="breakQuotes" aria-pressed="false">쌍따옴표</button>
+      <button type="button" data-break-option="breakAdverbs" aria-pressed="false">접속부사</button>
+    </div>
+    <div class="break-hint">복수 선택 가능 · 선택한 조건을 함께 적용합니다.</div>
     <div class="status" id="status"></div>
   </section>
 </div>
@@ -642,8 +1108,10 @@ function parseReadingRecord(raw){
     if(!parsed||typeof parsed!=='object'||typeof parsed.text!=='string')return null;
     return {
       text:parsed.text,
+      textRef:typeof parsed.textRef==='string'?parsed.textRef:'',
+      pageContext:parsed.pageContext||null,
       pageIndex:Number.isFinite(Number(parsed.pageIndex))?Number(parsed.pageIndex):0,
-      pageAnchor:Number.isFinite(Number(parsed.pageAnchor))?Number(parsed.pageAnchor):null,
+      pageAnchor:parsed.pageAnchor!==null&&parsed.pageAnchor!==undefined&&Number.isFinite(Number(parsed.pageAnchor))?Number(parsed.pageAnchor):null,
       layoutSignature:typeof parsed.layoutSignature==='string'?parsed.layoutSignature:'',
       recentId:typeof parsed.recentId==='string'?parsed.recentId:'',
       isOpen:!!parsed.isOpen,
@@ -703,18 +1171,16 @@ async function loadReadingSessionDB(){
   }
 }
 
-async function saveReadingSessionDB(record){
-  try{
+let readingDatabaseWrite=Promise.resolve();
+function saveReadingSessionDB(record){
+  const snapshot={...record};
+  readingDatabaseWrite=readingDatabaseWrite.catch(()=>{}).then(async()=>{
     const db=await openReadingDatabase();
-    await new Promise((resolve,reject)=>{
-      const request=db.transaction(READING_DB_STORE,'readwrite').objectStore(READING_DB_STORE).put(record,'current');
-      request.onsuccess=()=>resolve();
-      request.onerror=()=>reject(request.error||new Error('Reading DB write failed'));
-    });
-    db.close();
-  }catch(e){}
+    try{const tx=db.transaction(READING_DB_STORE,'readwrite');tx.objectStore(READING_DB_STORE).put(snapshot,'current');await transactionDone(tx);}
+    finally{db.close();}
+  }).catch(()=>{});
+  return readingDatabaseWrite;
 }
-
 
 function openRecentDatabase(){
   return new Promise((resolve,reject)=>{
@@ -851,6 +1317,7 @@ async function deleteRecentById(id){
     tx.objectStore(RECENT_META_STORE).delete(id);
     await transactionDone(tx);
   }finally{db.close();}
+  void readerDeleteCache(id);
   if(activeRecentId===id){activeRecentId='';activeRecentMeta=null;}
 }
 
@@ -864,6 +1331,7 @@ async function clearRecentHistory(){
   }finally{db.close();}
   activeRecentId='';
   activeRecentMeta=null;
+  void readerDeleteCache();
 }
 
 async function pruneRecentHistory(){
@@ -877,6 +1345,9 @@ async function upsertRecentText(text,{resetPosition=true}={}){
   let existing=null;
   try{existing=await getRecentMeta(id);}catch(e){}
   const now=Date.now();
+  if(!resetPosition&&existing)existing=window.__browserRecentMeta(existing);
+  const live=!resetPosition&&id===activeRecentId&&text===fullText&&pages.length?currentRecentPositionMeta():null;
+  if(live)existing=live;
   const meta={
     id,
     title:makeRecentTitle(text),
@@ -885,6 +1356,7 @@ async function upsertRecentText(text,{resetPosition=true}={}){
     updatedAt:now,
     pageIndex:resetPosition?0:(Number(existing?.pageIndex)||0),
     pageAnchor:resetPosition?0:(Number(existing?.pageAnchor)||0),
+    pageContext:resetPosition?null:(existing?.pageContext||null),
     layoutSignature:resetPosition?'':(typeof existing?.layoutSignature==='string'?existing.layoutSignature:'')
   };
   await putRecentTextAndMeta(text,meta);
@@ -897,13 +1369,14 @@ async function upsertRecentText(text,{resetPosition=true}={}){
 function currentRecentPositionMeta(){
   if(!activeRecentId||!activeRecentMeta)return null;
   const safeIndex=Math.min(Math.max(0,pageIndex),Math.max(0,pageAnchors.length-1));
-  const anchor=pageAnchors.length?(Number(pageAnchors[safeIndex])||0):0;
+  const anchor=pageAnchors.length?readerAnchor():0;
   return {
     ...activeRecentMeta,
     id:activeRecentId,
     pageIndex,
     pageAnchor:anchor,
-    layoutSignature:pages.length?getLayoutSignature():(activeRecentMeta.layoutSignature||''),
+    pageContext:readerState.context,
+    layoutSignature:pages.length?readerState.layout:(activeRecentMeta.layoutSignature||''),
     updatedAt:Date.now()
   };
 }
@@ -999,21 +1472,13 @@ function hideRecentHistory(){
 }
 
 function getLayoutSignature(){
-  const rect=pageInnerLeft.getBoundingClientRect();
-  return [
-    Math.round(rect.width),
-    Math.round(rect.height),
-    viewerSettings.font,
-    viewerSettings.fontSize,
-    viewerSettings.lineHeight,
-    viewerSettings.padTop,
-    viewerSettings.padBottom,
-    viewerSettings.padLeft,
-    viewerSettings.padRight,
-    customFontReady?'font-ready':'font-fallback'
-  ].join('|');
+  const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
+  return JSON.stringify(['layout-v4',readerBreakKey(),rect.width,rect.height,devicePixelRatio,
+    viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
+    style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
+    viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
+    navigator.userAgent]);
 }
-
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
 
@@ -1034,19 +1499,22 @@ function flushReadingSessionSave(isOpen=viewerOverlay.classList.contains('active
 }
 
 function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
-  if(restoreInProgress)return false;
+  if(restoreInProgress||readerState.initializing)return false;
   const text=isOpen&&fullText!==''?fullText:inputText.value;
   const safeIndex=Math.min(Math.max(0,pageIndex),Math.max(0,pageAnchors.length-1));
-  const pageAnchor=pageAnchors.length?Number(pageAnchors[safeIndex])||0:0;
+  const pageAnchor=pageAnchors.length?readerAnchor():0;
   const record={
-    text,
+    text:activeRecentId&&text===fullText?'':text,
+    textRef:activeRecentId&&text===fullText?activeRecentId:'',
     pageIndex,
     pageAnchor,
-    layoutSignature:isOpen&&pages.length?getLayoutSignature():'',
+    pageContext:readerState.context,
+    layoutSignature:pages.length?readerState.layout:'',
     recentId:activeRecentId||'',
     isOpen,
     updatedAt:Date.now()
   };
+  window.__browserCheckpoint?.(record);
   const raw=JSON.stringify(record);
   let savedSomewhere=false;
   try{ localStorage.setItem(READING_STORAGE,raw); savedSomewhere=true; }catch(e){}
@@ -1086,7 +1554,10 @@ const viewerDefaults={
   padTop:42,
   padBottom:42,
   padLeft:64,
-  padRight:64
+  padRight:64,
+  breakSentence:false,
+  breakQuotes:false,
+  breakAdverbs:false
 };
 let viewerSettings=loadViewerSettings();
 
@@ -1100,6 +1571,7 @@ const viewerControls={
 };
 
 function loadViewerSettings(){
+  /* Android SharedPreferences 설정 읽기는 아래 원본 localStorage 읽기로 대체. */
   try{
     const raw=localStorage.getItem(VIEWER_STORAGE);
     if(raw){
@@ -1111,6 +1583,7 @@ function loadViewerSettings(){
 }
 
 function saveViewerSettings(){
+  /* Android SharedPreferences 설정 쓰기는 아래 원본 localStorage 쓰기로 대체. */
   try{ localStorage.setItem(VIEWER_STORAGE,JSON.stringify(viewerSettings)); }catch(e){}
 }
 
@@ -1190,51 +1663,40 @@ async function deleteSavedFont(){
 
 async function installCustomFont(record,{select=false,repaginateAfter=false}={}){
   if(!record)return false;
-
-  if(customFontFace&&document.fonts?.delete){
-    try{ document.fonts.delete(customFontFace); }catch(e){}
+  const fingerprint=await readerFingerprintFont(record);
+  if(customFontReady&&readerState.fontId===fingerprint){
+    customFontOption.disabled=false;
+    customFontOption.textContent=`${record.name} (업로드)`;
+    if(select){viewerSettings.font='custom';applyViewerSettings(repaginateAfter);}
+    return true;
   }
-  customFontFace=null;
-  customFontReady=false;
-
-  if(customFontUrl)URL.revokeObjectURL(customFontUrl);
-  if(customFontStyle)customFontStyle.remove();
-  customFontUrl='';
-  customFontStyle=null;
-
-  try{
-    /*
-      ArrayBuffer를 FontFace에 직접 전달하면 Blob URL + CSS 재해석 단계를 줄일 수 있다.
-      미지원 브라우저에서는 기존 @font-face 방식으로 자동 fallback한다.
-    */
+  const load=(async()=>{
+    let face=null;
     if('FontFace' in window&&document.fonts){
-      const source=record.data instanceof ArrayBuffer?record.data.slice(0):record.data;
-      const face=new FontFace('UploadedViewerFont',source);
+      // FontFace copies its input internally; avoid another copy of a large CJK font.
+      face=new FontFace('UploadedViewerFont',record.data);
       await face.load();
-      document.fonts.add(face);
-      customFontFace=face;
-    }else{
-      const blob=new Blob([record.data],{type:record.mime||'application/octet-stream'});
-      customFontUrl=URL.createObjectURL(blob);
+    }
+    if(customFontFace&&document.fonts?.delete)document.fonts.delete(customFontFace);
+    if(customFontUrl)URL.revokeObjectURL(customFontUrl);
+    if(customFontStyle)customFontStyle.remove();
+    customFontUrl='';customFontStyle=null;
+    if(face){document.fonts.add(face);customFontFace=face;}
+    else{
+      customFontUrl=URL.createObjectURL(new Blob([record.data],{type:record.mime||'application/octet-stream'}));
       customFontStyle=document.createElement('style');
       customFontStyle.textContent=`@font-face{font-family:"UploadedViewerFont";src:url("${customFontUrl}");font-display:block;}`;
       document.head.appendChild(customFontStyle);
-      if(document.fonts?.load){
-        await document.fonts.load('18px "UploadedViewerFont"');
-      }
+      if(document.fonts?.load)await document.fonts.load('18px "UploadedViewerFont"');
     }
-
-    customFontReady=true;
-    customFontOption.disabled=false;
-    customFontOption.textContent=`${record.name} (업로드)`;
-
+    readerState.fontId=fingerprint;customFontReady=true;
+    customFontOption.disabled=false;customFontOption.textContent=`${record.name} (업로드)`;
     if(select)viewerSettings.font='custom';
     applyViewerSettings(repaginateAfter);
     return true;
-  }catch(error){
-    customFontReady=false;
-    throw error;
-  }
+  })();
+  readerState.fontPromise=load.catch(()=>{});
+  return load;
 }
 
 async function applyCustomFont(record){
@@ -1259,13 +1721,10 @@ fontFile.addEventListener('change',async()=>{
 
   try{
     setFontUploadStatus('글꼴을 저장하고 적용하는 중입니다...');
-    await saveFontRecord({
-      name:file.name,
-      mime:file.type||'application/octet-stream',
-      data:await file.arrayBuffer()
-    });
-    const saved=await getSavedFont();
+    const saved={name:file.name,mime:file.type||'application/octet-stream',data:await file.arrayBuffer()};
+    await readerFingerprintFont(saved);
     await applyCustomFont(saved);
+    await saveFontRecord(saved);
     setFontUploadStatus(`저장됨: ${file.name}`);
   }catch(error){
     setFontUploadStatus(error.message||'글꼴을 저장하지 못했습니다.',true);
@@ -1310,6 +1769,7 @@ function clampValue(key,value){
 }
 
 function applyViewerSettingsVisuals(syncControls=true){
+  readerSyncBreakButtons();
   viewerSettings.fontSize=clampValue('fontSize',viewerSettings.fontSize);
   viewerSettings.lineHeight=clampValue('lineHeight',viewerSettings.lineHeight);
   viewerSettings.padTop=clampValue('padTop',viewerSettings.padTop);
@@ -1469,6 +1929,14 @@ $('#resetViewerSettings').onclick=()=>{
   scheduleRepaginate();
 };
 
+document.querySelectorAll('[data-break-option]').forEach(button=>{
+  button.addEventListener('click',()=>{
+    const key=button.dataset.breakOption;
+    viewerSettings[key]=!viewerSettings[key];
+    readerSyncBreakButtons();saveViewerSettings();scheduleRepaginate();
+  });
+});
+
 /* ---------------- Markdown ---------------- */
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({
@@ -1604,21 +2072,33 @@ function markdownToBlocks(md){
 /* ---------------- 페이지 분할 ---------------- */
 let cachedMarkdownSource=null;
 let cachedMarkdownBlocks=[];
+let cachedOriginalBlocks=[];
+let cachedBreakKey='';
+let cachedQuoteRoles=new Map();
+let cachedBlockStarts=[];
 let cachedBlockTexts=[];
 let paginationMeasureBox=null;
 
 function htmlToStableText(html){
   const tmp=document.createElement('div');
   tmp.innerHTML=html;
-  tmp.querySelectorAll('br').forEach(br=>br.replaceWith('\n'));
+  tmp.querySelectorAll('br').forEach(br=>br.replaceWith(br.hasAttribute('data-reader-break')?'':'\n'));
   return (tmp.textContent||'').replace(/\r/g,'');
 }
 
 function getPaginationBlocks(text){
   if(text!==cachedMarkdownSource){
     cachedMarkdownSource=text;
-    cachedMarkdownBlocks=markdownToBlocks(text);
-    cachedBlockTexts=cachedMarkdownBlocks.map(htmlToStableText);
+    cachedOriginalBlocks=markdownToBlocks(text);
+    cachedBlockTexts=cachedOriginalBlocks.map(htmlToStableText);
+    cachedQuoteRoles=readerQuoteRoles(cachedBlockTexts.join('\n'));
+    let offset=0;cachedBlockStarts=cachedBlockTexts.map(text=>{const start=offset;offset+=text.length+1;return start;});
+    cachedBreakKey='';
+  }
+  const key=readerBreakKey();
+  if(cachedBreakKey!==key){
+    cachedBreakKey=key;
+    cachedMarkdownBlocks=cachedOriginalBlocks.map((html,index)=>readerApplyBreaks(html,cachedQuoteRoles,cachedBlockStarts[index]));
   }
   return cachedMarkdownBlocks;
 }
@@ -1670,7 +2150,9 @@ function splitIntoPages(text){
   let currentStartAnchor=0;
   let anchorCursor=0;
 
+  readerStats.splits++;
   const fits=arr=>{
+    readerStats.measurements++;
     box.innerHTML=arr.join('');
     return box.scrollHeight<=box.clientHeight+1;
   };
@@ -1681,8 +2163,9 @@ function splitIntoPages(text){
     const blockStartAnchor=anchorCursor;
     /* 블록 사이에 가상의 1문자를 둬, 페이지 구조가 바뀌어도 앵커 순서를 안정적으로 유지 */
     const nextBlockAnchor=blockStartAnchor+blockText.length+1;
+    const oversized=readerOversizedParagraph(block,blockText,box);
 
-    if(fits([...current,block])){
+    if(!oversized&&fits([...current,block])){
       if(!current.length)currentStartAnchor=blockStartAnchor;
       current.push(block);
       anchorCursor=nextBlockAnchor;
@@ -1695,7 +2178,7 @@ function splitIntoPages(text){
       current=[];
     }
 
-    if(fits([block])){
+    if(!oversized&&fits([block])){
       current=[block];
       currentStartAnchor=blockStartAnchor;
       anchorCursor=nextBlockAnchor;
@@ -1706,14 +2189,24 @@ function splitIntoPages(text){
       한 블록이 한 페이지보다 큰 경우에만 텍스트 단위로 자른다.
       consumed를 함께 기록해서 페이지 번호 대신 실제 본문 위치를 저장할 수 있다.
     */
+    const sliceBlock=readerBlockSlicer(block);
     let remaining=blockText;
     let consumed=0;
+    let lastBest=512;
 
     while(remaining){
-      let lo=1,hi=remaining.length,best=1;
+      let lo=1,hi=Math.min(remaining.length,Math.max(64,Math.ceil(lastBest*1.4))),best=1;
+      // Probe near one page, rather than repeatedly laying out half the whole remaining book.
+      while(true){
+        const candidate=sliceBlock(consumed,consumed+hi);
+        if(!fits([candidate]))break;
+        best=hi;lo=hi+1;
+        if(hi===remaining.length)break;
+        hi=Math.min(remaining.length,hi*2);
+      }
       while(lo<=hi){
         const mid=(lo+hi)>>1;
-        const candidate=`<p>${inlineMarkdown(remaining.slice(0,mid)).replace(/\n/g,'<br>')}</p>`;
+        const candidate=sliceBlock(consumed,consumed+mid);
         if(fits([candidate])){
           best=mid;
           lo=mid+1;
@@ -1722,6 +2215,7 @@ function splitIntoPages(text){
         }
       }
 
+      lastBest=best;
       let cut=best;
       const probe=remaining.slice(0,cut);
       const nice=Math.max(
@@ -1731,15 +2225,12 @@ function splitIntoPages(text){
         probe.lastIndexOf(' ')
       );
       if(nice>cut*.65)cut=nice+1;
+      cut=readerSafeQuoteCut(remaining,cut,cachedQuoteRoles,blockStartAnchor+consumed);
 
-      const piece=remaining.slice(0,cut).trim();
-      result.push(`<p>${inlineMarkdown(piece).replace(/\n/g,'<br>')}</p>`);
+      result.push(sliceBlock(consumed,consumed+cut));
       anchors.push(blockStartAnchor+consumed);
-
-      const tail=remaining.slice(cut);
-      const trimmedTail=tail.trimStart();
-      consumed+=cut+(tail.length-trimmedTail.length);
-      remaining=trimmedTail;
+      consumed+=cut;
+      remaining=blockText.slice(consumed);
     }
 
     anchorCursor=nextBlockAnchor;
@@ -1767,6 +2258,7 @@ function render(){
     return;
   }
 
+  readerStats.visibleRenders++;
   pageInnerLeft.innerHTML=pages[pageIndex]||'<div class="empty">표시할 내용이 없습니다.</div>';
   pageInnerRight.innerHTML='';
   counter.textContent=`${pageIndex+1} / ${pages.length}`;
@@ -1776,40 +2268,33 @@ function render(){
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
   if(!restoreInProgress){
+    window.__browserCheckpoint?.();
     scheduleReadingSessionSave(true);
     scheduleActiveRecentPositionSave();
   }
 }
 
-function repaginate(){
-  if(!fullText)return;
-
-  /*
-    페이지 번호/비율이 아니라 현재 페이지의 본문 앵커를 보존한다.
-    글꼴·주소창 높이·여백 때문에 전체 페이지 수가 바뀌어도 같은 문장 위치로 복귀한다.
-  */
-  const currentAnchor=pageAnchors.length
-    ? pageAnchors[Math.min(pageIndex,pageAnchors.length-1)]
-    : 0;
-
-  pages=splitIntoPages(fullText);
-  pageIndex=Math.min(
-    Math.max(0,pages.length-1),
-    findPageIndexForAnchor(currentAnchor)
-  );
-  render();
+async function repaginate(){
+  if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
+  if(readerState.layout===getLayoutSignature())return;
+  const position={pageAnchor:readerAnchor(),pageContext:readerState.context,pageIndex};
+  await readerDisplay(position);
 }
 
 function goPrevPage(){
+  if(restoreInProgress)return;
   if(pageIndex>0){
     pageIndex-=1;
+    readerChooseAnchor(pageAnchors[pageIndex]);
     render();
   }
 }
 
 function goNextPage(){
+  if(restoreInProgress)return;
   if(pageIndex+1<pages.length){
     pageIndex+=1;
+    readerChooseAnchor(pageAnchors[pageIndex]);
     render();
   }
 }
@@ -1832,6 +2317,7 @@ $('#pageSpread').addEventListener('click',e=>{
 });
 
 function jumpToPage(){
+  if(restoreInProgress)return;
   if(!pages.length)return;
   const requested=Math.trunc(Number(pageJumpInput.value));
   if(!Number.isFinite(requested)){
@@ -1841,6 +2327,7 @@ function jumpToPage(){
   const target=Math.min(pages.length,Math.max(1,requested));
   pageJumpInput.value=String(target);
   pageIndex=target-1;
+  readerChooseAnchor(pageAnchors[pageIndex]);
   render();
 }
 
@@ -1874,82 +2361,47 @@ txtFileInput.addEventListener('change',async()=>{
 
 /* ---------------- 팝업 열기/닫기 ---------------- */
 async function openViewer(){
+  userEditedAfterRestore=true;
+  await readerReady;
   const text=inputText.value;
-  if(!text.trim()){
-    setStatus('전자책으로 볼 텍스트를 입력하세요.',true);
-    return;
-  }
-  setStatus('');
-
-  /* 버튼을 누르는 순간 최근 내역 저장을 시작한다. 실패해도 독서는 계속 가능하다. */
+  if(!text.trim()){setStatus('전자책으로 볼 텍스트를 입력하세요.',true);return;}
+  const generation=++readerState.generation;
+  setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;
+  let record=text===fullText&&pages.length?{pageAnchor:readerAnchor(),pageContext:readerState.context}: {pageAnchor:0};
   try{
-    await upsertRecentText(text,{resetPosition:true});
-  }catch(error){
-    activeRecentId='';
-    activeRecentMeta=null;
-    setStatus('최근 내역 저장에는 실패했지만 전자책 보기는 계속할 수 있습니다.',true);
-  }
-
+    record=await upsertRecentText(text,{resetPosition:false});
+  }catch(error){activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
+  if(generation!==readerState.generation)return;
   fullText=text;
-  viewerOverlay.classList.add('active');
-  await waitForViewerLayout();
-  pageIndex=0;
-  pages=splitIntoPages(fullText);
-  render();
-  flushReadingSessionSave(true);
-  flushActiveRecentPositionSave();
+  $('#viewerSettings').classList.remove('open');
+  await readerDisplay(record,generation);
 }
 
 function closeViewer(){
+  readerState.cancelled=true;readerState.generation++;
+  clearTimeout(repaginateTimer);
+  restoreInProgress=false;
   flushActiveRecentPositionSave();
-  viewerOverlay.classList.remove('active');
+  viewerOverlay.classList.remove('active');readerSetLoading(false);
+  $('#viewerSettings').classList.remove('open');
   flushReadingSessionSave(false);
 }
 
-
 async function openRecentBook(id){
+  userEditedAfterRestore=true;
+  await readerReady;
+  const generation=++readerState.generation;
   try{
     const bookRecord=await getRecentBook(id);
-    if(!bookRecord||typeof bookRecord.text!=='string'){
-      setStatus('해당 최근 내역을 찾을 수 없습니다.',true);
-      await renderRecentHistory();
-      return;
-    }
-
-    const meta=bookRecord.meta||{id};
-    activeRecentId=id;
-    activeRecentMeta=meta;
-    inputText.value=bookRecord.text;
-    fullText=bookRecord.text;
-    userEditedAfterRestore=false;
-    hideRecentHistory();
-    setStatus('');
-    restoreInProgress=true;
+    if(generation!==readerState.generation)return;
+    if(!bookRecord){setStatus('해당 최근 내역을 찾을 수 없습니다.',true);return;}
+    const meta=window.__browserRecentMeta(bookRecord.meta||{id});
+    activeRecentId=id;activeRecentMeta=meta;
+    inputText.value=bookRecord.text;fullText=bookRecord.text;
+    hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
     viewerOverlay.classList.add('active');
-
-    await waitForViewerLayout();
-    pages=splitIntoPages(fullText);
-
-    const savedIndex=Number.isFinite(Number(meta.pageIndex))?Number(meta.pageIndex):0;
-    const currentLayoutSignature=getLayoutSignature();
-    if(meta.layoutSignature&&meta.layoutSignature===currentLayoutSignature&&savedIndex>=0&&savedIndex<pages.length){
-      pageIndex=savedIndex;
-    }else if(Number.isFinite(Number(meta.pageAnchor))){
-      pageIndex=findPageIndexForAnchor(Number(meta.pageAnchor));
-    }else{
-      pageIndex=Math.min(Math.max(0,pages.length-1),Math.max(0,Math.floor(savedIndex)));
-    }
-
-    restoreInProgress=false;
-    render();
-    /* 다시 연 항목을 최신 순으로 올리고 현재 위치를 확정 저장 */
-    activeRecentMeta={...activeRecentMeta,updatedAt:Date.now()};
-    flushReadingSessionSave(true);
-    flushActiveRecentPositionSave();
-  }catch(error){
-    restoreInProgress=false;
-    setStatus(error.message||'최근 내역을 열지 못했습니다.',true);
-  }
+    await readerDisplay(meta,generation);
+  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message,true);}}
 }
 
 $('#recentHistoryBtn').onclick=showRecentHistory;
@@ -2020,12 +2472,7 @@ function nextFrame(){
   return new Promise(resolve=>requestAnimationFrame(()=>resolve()));
 }
 
-async function waitForViewerLayout(){
-  syncVisualViewport();
-  await nextFrame();
-  syncVisualViewport();
-  await nextFrame();
-}
+function waitForViewerLayout(){return readerWaitForLayout();}
 
 function applyReadingRecordToInput(reading){
   if(!reading||typeof reading.text!=='string')return;
@@ -2037,108 +2484,46 @@ async function restoreReadingSession(reading){
   if(!reading||typeof reading.text!=='string')return;
   applyReadingRecordToInput(reading);
   await activateRecentFromReading(reading);
-
   if(reading.isOpen&&reading.text.trim()){
-    restoreInProgress=true;
-    fullText=reading.text;
-    setStatus('');
-    viewerOverlay.classList.add('active');
-
-    await waitForViewerLayout();
-
-    pages=splitIntoPages(fullText);
-
-    const savedIndex=Number.isFinite(Number(reading.pageIndex))?Number(reading.pageIndex):0;
-    const currentLayoutSignature=getLayoutSignature();
-
-    /*
-      글꼴/viewport/설정이 완전히 같으면 저장된 페이지 번호를 그대로 복원한다.
-      하나라도 달라졌으면 본문 앵커로 찾아가 같은 문장 위치를 보존한다.
-    */
-    if(
-      reading.layoutSignature&&
-      reading.layoutSignature===currentLayoutSignature&&
-      savedIndex>=0&&savedIndex<pages.length
-    ){
-      pageIndex=savedIndex;
-    }else if(Number.isFinite(Number(reading.pageAnchor))){
-      pageIndex=findPageIndexForAnchor(Number(reading.pageAnchor));
-    }else{
-      pageIndex=Math.min(
-        Math.max(0,pages.length-1),
-        Math.max(0,Math.floor(savedIndex))
-      );
-    }
-
-    restoreInProgress=false;
-    render();
-    flushReadingSessionSave(true);
+    fullText=reading.text;setStatus('');viewerOverlay.classList.add('active');
+    await readerDisplay(reading);
   }else{
-    viewerOverlay.classList.remove('active');
-    fullText='';
-    pages=[];
-    pageAnchors=[];
-    pageIndex=0;
-    render();
+    viewerOverlay.classList.remove('active');readerSetLoading(false);
+    fullText='';pages=[];pageAnchors=[];pageIndex=0;readerState.logicalAnchor=null;render();
   }
 }
 
-/*
-  시작 순서가 중요하다.
-  1) 동기 저장소의 텍스트는 즉시 입력칸에 복원
-  2) 사용자 글꼴이 선택돼 있으면 글꼴을 먼저 완전히 로드
-  3) 최종 글꼴 + 최종 viewport에서 단 한 번 페이지 분할
-  기존처럼 fallback 글꼴로 먼저 나눈 뒤 다시 나누지 않는다.
-*/
 const syncReading=loadReadingSessionSync();
-if(syncReading)applyReadingRecordToInput(syncReading);
-
+if(syncReading){
+  applyReadingRecordToInput(syncReading);
+  if(syncReading.isOpen){viewerOverlay.classList.add('active');readerSetLoading(true);}
+}
 (async()=>{
-  const [dbReading,savedFont]=await Promise.all([
-    loadReadingSessionDB(),
-    getSavedFont().catch(()=>null)
-  ]);
-
-  const reading=(
-    dbReading&&
-    !userEditedAfterRestore&&
-    (Number(dbReading.updatedAt)||0)>(Number(syncReading?.updatedAt)||0)
-  )?dbReading:syncReading;
-
-  if(reading)applyReadingRecordToInput(reading);
-
-  if(savedFont){
-    try{
-      /*
-        현재 설정이 custom이면 첫 페이지 계산 전에 await한다.
-        다른 글꼴을 쓰는 중이면 화면 시작을 막지 않고 등록만 준비한다.
-      */
+  try{
+    const [dbReading,savedFont]=await Promise.all([loadReadingSessionDB(),getSavedFont().catch(()=>null)]);
+    let reading=newestReadingRecord([syncReading,dbReading]);
+    reading=await readerHydrateReading(reading);
+    reading=await window.__browserRecoverReading(reading);
+    if(!userEditedAfterRestore&&reading)applyReadingRecordToInput(reading);
+    if(savedFont){
       if(viewerSettings.font==='custom'){
-        await installCustomFont(savedFont,{select:false,repaginateAfter:false});
-        setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
+        try{
+          const oldFingerprint=savedFont.fingerprint;
+          await installCustomFont(savedFont,{select:false,repaginateAfter:false});
+          if(!oldFingerprint)void saveFontRecord(savedFont);
+          setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
+        }catch(error){viewerSettings.font='serif';saveViewerSettings();setFontUploadStatus(error.message,true);}
       }else{
-        void installCustomFont(savedFont,{select:false,repaginateAfter:false})
-          .then(()=>setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`))
-          .catch(error=>setFontUploadStatus(error.message||'저장된 글꼴을 불러오지 못했습니다.',true));
+        // Registration is deferred until initialization finishes, and cannot trigger a reflow.
+        void installCustomFont(savedFont,{select:false,repaginateAfter:false}).catch(error=>setFontUploadStatus(error.message,true));
       }
-    }catch(error){
-      if(viewerSettings.font==='custom'){
-        viewerSettings.font='serif';
-        saveViewerSettings();
-      }
-      setFontUploadStatus(error.message||'저장된 글꼴을 불러오지 못했습니다.',true);
-    }
-  }else if(viewerSettings.font==='custom'){
-    viewerSettings.font='serif';
-    saveViewerSettings();
-  }
-
-  applyViewerSettings(false);
-  render();
-
-  if(reading&&!userEditedAfterRestore){
-    await restoreReadingSession(reading);
-  }
+    }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
+    applyViewerSettings(false);
+    readerState.initializing=false;
+    if(reading&&!userEditedAfterRestore&&!readerState.cancelled)await restoreReadingSession(reading);
+    else readerSetLoading(false);
+  }catch(error){readerSetLoading(false);restoreInProgress=false;setStatus(error.message,true);}
+  finally{readerState.initializing=false;resolveReaderReady();}
 })();
 </script>
 </body>
