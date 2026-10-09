@@ -255,6 +255,7 @@ async function readerWaitForLayout(){
   }
 }
 async function readerDisplay(record={pageAnchor:0},generation=++readerState.generation){
+  updateViewerCharacterCount();
   restoreInProgress=true;readerSetLoading(true);clearTimeout(repaginateTimer);
   const source=fullText,id=activeRecentId;
   const started=performance.now();
@@ -535,6 +536,7 @@ label{
   font-size:13px;
   font-weight:800;
 }
+.character-count{margin-left:6px;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 textarea{
   width:100%;
   min-height:320px;
@@ -929,7 +931,7 @@ textarea{min-height:42vh}
     <h1>전자책으로 보기</h1>
     <div class="sub">텍스트를 입력하고 버튼을 누르면, 입력한 내용을 페이지 단위로 넘겨볼 수 있는 전자책 뷰어 팝업이 열립니다.</div>
 
-    <label for="inputText">텍스트 입력</label>
+    <label for="inputText">텍스트 입력 <span id="inputCharCount" class="character-count" title="공백·줄바꿈 포함">0자</span></label>
     <textarea id="inputText" placeholder="여기에 텍스트(마크다운 서식 가능)를 입력하거나 붙여넣으세요."></textarea>
     <div class="input-actions">
       <button class="secondary" id="chooseTxtBtn" type="button">TXT 파일 선택</button>
@@ -966,7 +968,7 @@ textarea{min-height:42vh}
 <div class="modal-overlay" id="viewerOverlay">
   <section class="book" id="book">
     <div class="bookhead">
-      <div class="booktitle">전자책 보기</div>
+      <div class="booktitle" id="viewerCharCount" title="전체 본문 글자수 (공백·줄바꿈 포함)">0자</div>
       <div class="top-page-nav" aria-label="페이지 이동">
         <div class="counter" id="counter">0 / 0</div>
         <div class="page-jump">
@@ -1055,6 +1057,22 @@ textarea{min-height:42vh}
 const $=s=>document.querySelector(s);
 
 const inputText=$('#inputText');
+let characterCountSource=null,characterCountLabel='0자';
+const characterCountFormat=new Intl.NumberFormat('ko-KR');
+function formatCharacterCount(text){
+  if(text!==characterCountSource){
+    characterCountSource=text;
+    let count=0;for(const character of text)count++;
+    characterCountLabel=characterCountFormat.format(count)+'자';
+  }
+  return characterCountLabel;
+}
+function updateInputCharacterCount(){
+  $('#inputCharCount').textContent=formatCharacterCount(inputText.value);
+}
+function updateViewerCharacterCount(){
+  $('#viewerCharCount').textContent=formatCharacterCount(fullText);
+}
 const statusEl=$('#status');
 const openViewerBtn=$('#openViewerBtn');
 const viewerOverlay=$('#viewerOverlay');
@@ -1531,6 +1549,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
 }
 
 inputText.addEventListener('input',()=>{
+  updateInputCharacterCount();
   userEditedAfterRestore=true;
   scheduleReadingSessionSave(false,180);
 });
@@ -2352,6 +2371,7 @@ txtFileInput.addEventListener('change',async()=>{
   try{
     const text=await file.text();
     inputText.value=text.replace(/^\uFEFF/,'');
+    updateInputCharacterCount();
     flushReadingSessionSave(false);
     setStatus(`불러옴: ${file.name}`);
   }catch(error){
@@ -2364,6 +2384,7 @@ async function openViewer(){
   userEditedAfterRestore=true;
   await readerReady;
   const text=inputText.value;
+  updateInputCharacterCount();
   if(!text.trim()){setStatus('전자책으로 볼 텍스트를 입력하세요.',true);return;}
   const generation=++readerState.generation;
   setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;
@@ -2398,6 +2419,7 @@ async function openRecentBook(id){
     const meta=window.__browserRecentMeta(bookRecord.meta||{id});
     activeRecentId=id;activeRecentMeta=meta;
     inputText.value=bookRecord.text;fullText=bookRecord.text;
+    updateInputCharacterCount();
     hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
     viewerOverlay.classList.add('active');
     await readerDisplay(meta,generation);
@@ -2478,6 +2500,7 @@ function applyReadingRecordToInput(reading){
   if(!reading||typeof reading.text!=='string')return;
   restoredSessionUpdatedAt=Math.max(restoredSessionUpdatedAt,Number(reading.updatedAt)||0);
   inputText.value=reading.text;
+  updateInputCharacterCount();
 }
 
 async function restoreReadingSession(reading){
