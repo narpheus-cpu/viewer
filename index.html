@@ -35,7 +35,7 @@
       if (!saved.isOpen) return reading ? { ...reading, isOpen: false } : reading;
       if (!saved.recentId) return reading;
       const book = await getRecentBook(saved.recentId);
-      if (book && typeof book.text === 'string') return { ...saved, text: book.text };
+      if (book && typeof book.text === 'string') return { ...saved, text: book.text, fileName: book.meta?.fileName || '' };
     } catch (error) { console.error('Browser position recovery:', error.message); }
     return reading;
   };
@@ -118,7 +118,7 @@ const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',c
 const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
-const READER_CACHE_VERSION=4;
+const READER_CACHE_VERSION=5;
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
 function readerCanonical(){
@@ -224,7 +224,7 @@ function readerValidCache(cache,signature,source){
 async function readerHydrateReading(record){
   if(record?.textRef){
     const book=await getRecentBook(record.textRef).catch(()=>null);
-    if(book)return {...record,text:book.text};
+    if(book)return {...record,text:book.text,fileName:record.fileName??book.meta?.fileName??''};
   }
   return record;
 }
@@ -344,7 +344,7 @@ function readerBreakOffsets(text,settings=viewerSettings,quoteRoles=readerQuoteR
   };
   if(settings.breakSentence){
     // Protect the whole abbreviation, including its final dot; protect decimals separately.
-    const abbreviations=/(?:\b(?:[A-Za-z]\.){2,}|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e)\.)/g;
+    const abbreviations=/(?:\b(?:[A-Za-z]\.[ \t]*){2,}|\b(?:Ph\.D\.|B\.Sc\.|M\.Sc\.|D\.Phil\.)|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Rev|Fr|Hon|Gen|Capt|Col|Sgt|Lt|Dept|Corp|Inc|Ltd|Co|vs|etc|approx|Fig|e\.g|i\.e)\.|\b[A-Z]\.(?=[ \t]+[A-Z][a-z])|\bNo\.(?=[ \t]*\d))/gi;
     for(const match of text.matchAll(abbreviations)){
       for(let i=0;i<match[0].length;i++)if(match[0][i]==='.')protectedDots.add(match.index+i);
     }
@@ -911,6 +911,7 @@ textarea{min-height:42vh}
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.recent-file-title{margin-top:4px;font-size:11px;line-height:1.4;overflow-wrap:anywhere;color:var(--muted)}
 .recent-meta{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.3}
 .recent-actions{display:flex;gap:5px;align-items:center}
 .recent-actions button{padding:6px 8px;font-size:10px;white-space:nowrap}
@@ -953,7 +954,7 @@ textarea{min-height:42vh}
 <div class="recent-overlay" id="recentOverlay" aria-hidden="true">
   <section class="recent-panel" role="dialog" aria-modal="true" aria-labelledby="recentTitle">
     <div class="recent-head">
-      <strong id="recentTitle">최근 내역 · 최대 5개</strong>
+      <strong id="recentTitle">최근 내역 · 최대 7개</strong>
       <div class="recent-head-actions">
         <button class="secondary" id="clearRecentHistory" type="button">전체 삭제</button>
         <button class="secondary" id="closeRecentHistory" type="button">닫기</button>
@@ -1104,12 +1105,13 @@ const READING_DB_STORE='sessions';
 let restoredSessionUpdatedAt=0;
 let userEditedAfterRestore=false;
 
-/* 최근 5개 본문은 IndexedDB에 저장하고, 페이지 이동 시에는 작은 메타데이터만 갱신한다. */
+/* 최근 7개 본문은 IndexedDB에 저장하고, 페이지 이동 시에는 작은 메타데이터만 갱신한다. */
 const RECENT_DB_NAME='ebookViewerRecentHistoryV1';
 const RECENT_DB_VERSION=1;
 const RECENT_TEXT_STORE='texts';
 const RECENT_META_STORE='meta';
-const RECENT_LIMIT=5;
+const RECENT_LIMIT=7;
+let inputFileName='';
 let activeRecentId='';
 let activeRecentMeta=null;
 let recentSaveTimer=0;
@@ -1127,6 +1129,7 @@ function parseReadingRecord(raw){
     return {
       text:parsed.text,
       textRef:typeof parsed.textRef==='string'?parsed.textRef:'',
+      fileName:typeof parsed.fileName==='string'?parsed.fileName:null,
       pageContext:parsed.pageContext||null,
       pageIndex:Number.isFinite(Number(parsed.pageIndex))?Number(parsed.pageIndex):0,
       pageAnchor:parsed.pageAnchor!==null&&parsed.pageAnchor!==undefined&&Number.isFinite(Number(parsed.pageAnchor))?Number(parsed.pageAnchor):null,
@@ -1358,7 +1361,7 @@ async function pruneRecentHistory(){
   for(const meta of metas.slice(RECENT_LIMIT))await deleteRecentById(meta.id);
 }
 
-async function upsertRecentText(text,{resetPosition=true}={}){
+async function upsertRecentText(text,{resetPosition=true,fileName}={}){
   const id=await digestTextId(text);
   let existing=null;
   try{existing=await getRecentMeta(id);}catch(e){}
@@ -1369,6 +1372,7 @@ async function upsertRecentText(text,{resetPosition=true}={}){
   const meta={
     id,
     title:makeRecentTitle(text),
+    fileName:typeof fileName==='string'?fileName:(existing?.fileName||''),
     length:String(text).length,
     createdAt:Number(existing?.createdAt)||now,
     updatedAt:now,
@@ -1453,7 +1457,10 @@ async function renderRecentHistory(){
       const sub=document.createElement('div');
       sub.className='recent-meta';
       sub.textContent=`${formatRecentTime(meta.updatedAt)} · ${formatTextLength(meta.length)} · ${Math.max(1,(Number(meta.pageIndex)||0)+1)}쪽에서 읽음`;
-      main.append(title,sub);
+      const fileTitle=document.createElement('div');
+      fileTitle.className='recent-file-title';
+      fileTitle.textContent=meta.fileName||'파일제목 없음';
+      main.append(title,fileTitle,sub);
       const actions=document.createElement('div');
       actions.className='recent-actions';
       const open=document.createElement('button');
@@ -1491,7 +1498,7 @@ function hideRecentHistory(){
 
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
-  return JSON.stringify(['layout-v4',readerBreakKey(),rect.width,rect.height,devicePixelRatio,
+  return JSON.stringify(['layout-v5',readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
@@ -1524,6 +1531,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
   const record={
     text:activeRecentId&&text===fullText?'':text,
     textRef:activeRecentId&&text===fullText?activeRecentId:'',
+    fileName:isOpen?(activeRecentMeta?.fileName||''):inputFileName,
     pageIndex,
     pageAnchor,
     pageContext:readerState.context,
@@ -1549,6 +1557,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
 }
 
 inputText.addEventListener('input',()=>{
+  inputFileName='';
   updateInputCharacterCount();
   userEditedAfterRestore=true;
   scheduleReadingSessionSave(false,180);
@@ -1825,6 +1834,32 @@ function applyViewerSettingsVisuals(syncControls=true){
 
 let liveSettingFrame=0;
 let repaginateTimer;
+let pageJumpEditing=false,pageJumpSettling=false,pageJumpSettleTimer=0;
+let pageJumpViewport=null,lastVisualViewport=null;
+function pageJumpLayoutLocked(){return pageJumpEditing||pageJumpSettling;}
+function beginPageJumpEdit(){
+  clearTimeout(pageJumpSettleTimer);clearTimeout(repaginateTimer);
+  if(!pageJumpLayoutLocked())pageJumpViewport=lastVisualViewport?{...lastVisualViewport}:null;
+  pageJumpEditing=true;pageJumpSettling=false;
+}
+function settlePageJumpEdit(){
+  clearTimeout(pageJumpSettleTimer);
+  pageJumpSettleTimer=setTimeout(()=>{
+    if(pageJumpEditing)return;
+    pageJumpSettling=false;pageJumpViewport=null;
+    syncVisualViewport();scheduleRepaginate(0);
+  },220);
+}
+function endPageJumpEdit(){
+  pageJumpEditing=false;pageJumpSettling=true;settlePageJumpEdit();
+}
+function cancelPageJumpEdit(){
+  clearTimeout(pageJumpSettleTimer);pageJumpEditing=false;pageJumpSettling=false;pageJumpViewport=null;
+  syncVisualViewport();
+}
+pageJumpInput.addEventListener('focus',beginPageJumpEdit);
+pageJumpInput.addEventListener('blur',endPageJumpEdit);
+
 let repaginateDeferredBySettings=false;
 
 function settingsPanelIsOpen(){
@@ -1838,6 +1873,7 @@ function settingsPanelIsOpen(){
 */
 function scheduleRepaginate(delay=90){
   if(!viewerOverlay.classList.contains('active'))return;
+  if(pageJumpLayoutLocked()){clearTimeout(repaginateTimer);return;}
   if(restoreInProgress){
     clearTimeout(repaginateTimer);
     return;
@@ -2294,6 +2330,7 @@ function render(){
 }
 
 async function repaginate(){
+  if(pageJumpLayoutLocked())return;
   if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
   if(readerState.layout===getLayoutSignature())return;
   const position={pageAnchor:readerAnchor(),pageContext:readerState.context,pageIndex};
@@ -2338,8 +2375,9 @@ $('#pageSpread').addEventListener('click',e=>{
 function jumpToPage(){
   if(restoreInProgress)return;
   if(!pages.length)return;
-  const requested=Math.trunc(Number(pageJumpInput.value));
-  if(!Number.isFinite(requested)){
+  const raw=pageJumpInput.value.trim();
+  const requested=Number(raw);
+  if(!/^\d+$/.test(raw)||!Number.isSafeInteger(requested)){
     pageJumpInput.focus();
     return;
   }
@@ -2348,6 +2386,7 @@ function jumpToPage(){
   pageIndex=target-1;
   readerChooseAnchor(pageAnchors[pageIndex]);
   render();
+  pageJumpInput.blur();
 }
 
 $('#pageJumpBtn').onclick=jumpToPage;
@@ -2371,6 +2410,7 @@ txtFileInput.addEventListener('change',async()=>{
   try{
     const text=await file.text();
     inputText.value=text.replace(/^\uFEFF/,'');
+    inputFileName=file.name;
     updateInputCharacterCount();
     flushReadingSessionSave(false);
     setStatus(`불러옴: ${file.name}`);
@@ -2390,7 +2430,7 @@ async function openViewer(){
   setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;
   let record=text===fullText&&pages.length?{pageAnchor:readerAnchor(),pageContext:readerState.context}: {pageAnchor:0};
   try{
-    record=await upsertRecentText(text,{resetPosition:false});
+    record=await upsertRecentText(text,{resetPosition:false,fileName:inputFileName});
   }catch(error){activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
   if(generation!==readerState.generation)return;
   fullText=text;
@@ -2399,6 +2439,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  pageJumpInput.blur();cancelPageJumpEdit();
   readerState.cancelled=true;readerState.generation++;
   clearTimeout(repaginateTimer);
   restoreInProgress=false;
@@ -2419,6 +2460,7 @@ async function openRecentBook(id){
     const meta=window.__browserRecentMeta(bookRecord.meta||{id});
     activeRecentId=id;activeRecentMeta=meta;
     inputText.value=bookRecord.text;fullText=bookRecord.text;
+    inputFileName=meta.fileName||'';
     updateInputCharacterCount();
     hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
     viewerOverlay.classList.add('active');
@@ -2429,7 +2471,7 @@ async function openRecentBook(id){
 $('#recentHistoryBtn').onclick=showRecentHistory;
 $('#closeRecentHistory').onclick=hideRecentHistory;
 $('#clearRecentHistory').onclick=async()=>{
-  if(!confirm('최근 내역 5개를 모두 삭제할까요?'))return;
+  if(!confirm('최근 내역 7개를 모두 삭제할까요?'))return;
   try{
     await clearRecentHistory();
     await renderRecentHistory();
@@ -2463,20 +2505,25 @@ function syncVisualViewport(){
   const left=vv?Math.max(0,vv.offsetLeft):0;
   const width=vv?vv.width:window.innerWidth;
   const height=vv?vv.height:window.innerHeight;
+  let viewport={top,left,width,height};
+  if(pageJumpLayoutLocked()&&pageJumpViewport)viewport=pageJumpViewport;
+  else lastVisualViewport=viewport;
   const root=document.documentElement;
-  root.style.setProperty('--visual-viewport-top',top+'px');
-  root.style.setProperty('--visual-viewport-left',left+'px');
-  root.style.setProperty('--visual-viewport-width',Math.max(1,width)+'px');
-  root.style.setProperty('--visual-viewport-height',Math.max(1,height)+'px');
+  root.style.setProperty('--visual-viewport-top',viewport.top+'px');
+  root.style.setProperty('--visual-viewport-left',viewport.left+'px');
+  root.style.setProperty('--visual-viewport-width',Math.max(1,viewport.width)+'px');
+  root.style.setProperty('--visual-viewport-height',Math.max(1,viewport.height)+'px');
 }
 
 syncVisualViewport();
 addEventListener('resize',()=>{
+  if(pageJumpSettling)settlePageJumpEdit();
   syncVisualViewport();
   scheduleRepaginate();
 });
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',()=>{
+    if(pageJumpSettling)settlePageJumpEdit();
     syncVisualViewport();
     scheduleRepaginate();
   });
@@ -2500,6 +2547,7 @@ function applyReadingRecordToInput(reading){
   if(!reading||typeof reading.text!=='string')return;
   restoredSessionUpdatedAt=Math.max(restoredSessionUpdatedAt,Number(reading.updatedAt)||0);
   inputText.value=reading.text;
+  inputFileName=reading.fileName||'';
   updateInputCharacterCount();
 }
 
