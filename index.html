@@ -594,6 +594,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 }
 .modal-overlay.active{display:flex}
 .book{
+  position:relative;
   width:100%;
   min-width:0;
   height:100%;
@@ -828,11 +829,16 @@ textarea{min-height:42vh}
 .page-spread{
   grid-template-columns:1fr;
   cursor:pointer;
-  touch-action:manipulation;
+  touch-action:pan-y pinch-zoom;
   -webkit-tap-highlight-color:transparent;
   tap-highlight-color:transparent;
 }
 .page,.page-inner{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent}
+.reader-document-title{position:absolute;left:12px;right:12px;bottom:calc(4px + env(safe-area-inset-bottom,0px));
+  font-size:12px;line-height:18px;font-weight:600;text-align:center;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;user-select:none}
+.page{padding-bottom:max(var(--viewer-pad-bottom),calc(26px + env(safe-area-inset-bottom,0px)))}
+@media(max-width:360px){.reader-document-title{font-size:11px}}
 .page-right{display:none}
 .page + .page{border-left:0}
 .page{--viewer-pad-right:18px;--viewer-pad-left:18px}
@@ -1050,6 +1056,7 @@ textarea{min-height:42vh}
         </div>
       </div>
     </div>
+    <div class="reader-document-title" id="readerDocumentTitle" aria-label="현재 문서 제목"></div>
 
   </section>
 </div>
@@ -1073,6 +1080,12 @@ function updateInputCharacterCount(){
 }
 function updateViewerCharacterCount(){
   $('#viewerCharCount').textContent=formatCharacterCount(fullText);
+  // Title is display metadata only; the original text and pagination anchors stay unchanged.
+  const fileName=activeRecentMeta?.fileName||inputFileName;
+  const firstLine=fileName?'':fullText.trimStart().split(/[\r\n]/,1)[0].trim();
+  const title=fileName||Array.from(firstLine).slice(0,80).join('');
+  $('#readerDocumentTitle').textContent=title;
+  $('#readerDocumentTitle').title=title;
 }
 const statusEl=$('#status');
 const openViewerBtn=$('#openViewerBtn');
@@ -2355,8 +2368,54 @@ function goNextPage(){
   }
 }
 
+/* One horizontal gesture turns one page; its following synthetic click never turns again. */
+const pageGestureSurface=$('#pageSpread');
+let pageGesture=null,pageGesturePointers=new Set(),pageGestureSuppressUntil=0;
+function pageGestureSelection(){return !!String(window.getSelection?.()||'').trim();}
+function resetPageGesture(){pageGesture=null;pageGesturePointers.clear();pageGestureSuppressUntil=0;}
+pageGestureSurface.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse')return;
+  pageGesturePointers.add(e.pointerId);
+  if(pageGesturePointers.size!==1||!e.isPrimary){pageGesture=null;pageGestureSuppressUntil=performance.now()+800;return;}
+  pageGestureSuppressUntil=0;
+  if(restoreInProgress||!pages.length||settingsPanelIsOpen()||pageGestureSelection()||
+    e.target.closest('a,button,input,select,textarea,label'))return;
+  pageGesture={id:e.pointerId,x:e.clientX,y:e.clientY,vertical:0,moved:0,
+    time:performance.now(),generation:readerState.generation};
+  pageGestureSurface.setPointerCapture?.(e.pointerId);
+});
+pageGestureSurface.addEventListener('pointermove',e=>{
+  if(!pageGesture||pageGesture.id!==e.pointerId)return;
+  pageGesture.vertical=Math.max(pageGesture.vertical,Math.abs(e.clientY-pageGesture.y));
+  pageGesture.moved=Math.max(pageGesture.moved,Math.hypot(e.clientX-pageGesture.x,e.clientY-pageGesture.y));
+});
+pageGestureSurface.addEventListener('pointerup',e=>{
+  pageGesturePointers.delete(e.pointerId);
+  const gesture=pageGesture;if(!gesture||gesture.id!==e.pointerId)return;
+  pageGesture=null;
+  const dx=e.clientX-gesture.x,dy=Math.max(gesture.vertical,Math.abs(e.clientY-gesture.y));
+  const elapsed=performance.now()-gesture.time,moved=Math.max(gesture.moved,Math.hypot(dx,dy));
+  if(moved>10||elapsed>1000)pageGestureSuppressUntil=performance.now()+800;
+  if(elapsed>1000||pageGestureSelection()||pageGesturePointers.size||restoreInProgress||
+    gesture.generation!==readerState.generation)return;
+  if(moved<=10){
+    pageGestureSuppressUntil=performance.now()+800;
+    const rect=pageGestureSurface.getBoundingClientRect();
+    e.clientX-rect.left<rect.width/2?goPrevPage():goNextPage();
+    return;
+  }
+  if(Math.abs(dx)>=40&&Math.abs(dx)>=dy*1.35)dx<0?goNextPage():goPrevPage();
+});
+pageGestureSurface.addEventListener('pointercancel',e=>{
+  pageGesturePointers.delete(e.pointerId);pageGesture=null;pageGestureSuppressUntil=performance.now()+800;
+});
+pageGestureSurface.addEventListener('lostpointercapture',e=>{
+  if(pageGesture?.id===e.pointerId){pageGesturePointers.delete(e.pointerId);pageGesture=null;pageGestureSuppressUntil=performance.now()+800;}
+});
+
 /* 모바일 본문 탭 이동: 왼쪽 절반=이전, 오른쪽 절반=다음 */
 $('#pageSpread').addEventListener('click',e=>{
+  if(e.detail!==0&&performance.now()<pageGestureSuppressUntil){e.preventDefault();return;}
   if(!pages.length)return;
 
   /* 링크 등 실제 조작 요소를 누른 경우에는 페이지 이동하지 않음 */
@@ -2439,6 +2498,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  resetPageGesture();
   pageJumpInput.blur();cancelPageJumpEdit();
   readerState.cancelled=true;readerState.generation++;
   clearTimeout(repaginateTimer);
