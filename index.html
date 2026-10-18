@@ -840,6 +840,13 @@ textarea{min-height:42vh}
 .page{padding-bottom:max(var(--viewer-pad-bottom),calc(26px + env(safe-area-inset-bottom,0px)))}
 @media(max-width:360px){.reader-document-title{font-size:11px}}
 .page-right{display:none}
+/* Wide screens show a spread; equal column widths share the same pagination measure. */
+@media(min-width:1024px){
+  .page-spread{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1px;background:var(--line)}
+  .page-right{display:block}
+  .page-spread>.page{--viewer-pad-left:inherit;--viewer-pad-right:inherit}
+}
+
 .page + .page{border-left:0}
 .page{--viewer-pad-right:18px;--viewer-pad-left:18px}
 .page-inner{font-size:var(--viewer-font-size)}
@@ -1509,13 +1516,15 @@ function hideRecentHistory(){
   recentOverlay.setAttribute('aria-hidden','true');
 }
 
+function visiblePageCount(){return getComputedStyle(pageInnerRight.parentElement).display==='none'?1:2;}
+
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
   return JSON.stringify(['layout-v5',readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
-    navigator.userAgent]);
+    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent]);
 }
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
@@ -2327,9 +2336,14 @@ function render(){
   }
 
   readerStats.visibleRenders++;
+  const count=visiblePageCount();
+  // Keep the logical reading anchor even when its page is on the right of the spread.
+  if(count===2)pageIndex-=pageIndex%2;
   pageInnerLeft.innerHTML=pages[pageIndex]||'<div class="empty">표시할 내용이 없습니다.</div>';
-  pageInnerRight.innerHTML='';
-  counter.textContent=`${pageIndex+1} / ${pages.length}`;
+  pageInnerRight.innerHTML=count===2?(pages[pageIndex+1]||''):'';
+  pageInnerRight.parentElement.setAttribute('aria-hidden',String(count===1||!pages[pageIndex+1]));
+  const end=Math.min(pages.length,pageIndex+count);
+  counter.textContent=`${end>pageIndex+1?(pageIndex+1)+'–'+end:pageIndex+1} / ${pages.length}`;
   pageJumpInput.max=String(pages.length);
   pageJumpInput.disabled=false;
   $('#pageJumpBtn').disabled=false;
@@ -2353,7 +2367,7 @@ async function repaginate(){
 function goPrevPage(){
   if(restoreInProgress)return;
   if(pageIndex>0){
-    pageIndex-=1;
+    pageIndex=Math.max(0,pageIndex-visiblePageCount());
     readerChooseAnchor(pageAnchors[pageIndex]);
     render();
   }
@@ -2361,8 +2375,9 @@ function goPrevPage(){
 
 function goNextPage(){
   if(restoreInProgress)return;
-  if(pageIndex+1<pages.length){
-    pageIndex+=1;
+  const count=visiblePageCount();
+  if(pageIndex+count<pages.length){
+    pageIndex+=count;
     readerChooseAnchor(pageAnchors[pageIndex]);
     render();
   }
