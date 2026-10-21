@@ -750,10 +750,13 @@ textarea{min-height:42vh}
   tap-highlight-color:transparent;
 }
 .page,.page-inner{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent}
+.reader-chapter-page-count{position:absolute;left:12px;right:12px;bottom:calc(22px + env(safe-area-inset-bottom,0px));
+  font-size:12px;line-height:18px;font-weight:600;text-align:center;color:var(--muted);
+  white-space:nowrap;pointer-events:none;user-select:none}
 .reader-document-title{position:absolute;left:12px;right:12px;bottom:calc(4px + env(safe-area-inset-bottom,0px));
   font-size:12px;line-height:18px;font-weight:600;text-align:center;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;user-select:none}
-.page{padding-bottom:max(var(--viewer-pad-bottom),calc(26px + env(safe-area-inset-bottom,0px)))}
+.page{padding-bottom:max(var(--viewer-pad-bottom),calc(44px + env(safe-area-inset-bottom,0px)))}
 @media(max-width:360px){.reader-document-title{font-size:11px}}
 .page-right{display:none}
 /* Wide screens show a spread; equal column widths share the same pagination measure. */
@@ -964,6 +967,26 @@ function readerChapterBlocks(text){
     for(const html of content)anchor+=htmlToStableText(html).length+1;
   });
   return blocks;
+}
+// Rebuild chapter page ordinals only when pagination or chapter boundaries change.
+let chapterPageSource=null,chapterPageStarts=null,chapterPageEntries=[],chapterPageTotals=[];
+function readerUpdateChapterPageCount(){
+  if(chapterPageSource!==pages||chapterPageStarts!==chapterCanonicalStarts){
+    chapterPageSource=pages;chapterPageStarts=chapterCanonicalStarts;
+    chapterPageEntries=[];chapterPageTotals=Array(Math.max(1,bookChapters.length)).fill(0);
+    let chapter=0;
+    pages.forEach((html,index)=>{
+      while(chapter+1<chapterCanonicalStarts.length&&chapterCanonicalStarts[chapter+1]<=pageAnchors[index])chapter++;
+      // A blank right-hand page aligns the next chapter; it is not a chapter page.
+      if(html.includes('class="chapter-spacer"'))return;
+      chapterPageEntries[index]={chapter,page:++chapterPageTotals[chapter]};
+    });
+  }
+  let index=pageIndex;
+  while(index>0&&!chapterPageEntries[index])index--;
+  const entry=chapterPageEntries[index];
+  const current=entry?.page??0,total=entry?chapterPageTotals[entry.chapter]:0;
+  document.getElementById('chapterPageCount').textContent=`[${current} / ${total}]`;
 }
 function readerCurrentChapter(){
   const anchor=Number(pageAnchors[pageIndex])||0;
@@ -1450,7 +1473,7 @@ function setupReaderTools(){
 <div class="modal-overlay" id="viewerOverlay">
   <section class="book" id="book">
     <div class="bookhead">
-      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·줄바꿈 포함)" aria-label="현재 챕터 글자수/전체 글자수">0/0</div>
+      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·줄바꿈 포함)" aria-label="현재 챕터 글자수/전체 글자수">0/0자</div>
       <div class="top-page-nav" aria-label="페이지 이동">
         <div class="counter" id="counter">0 / 0</div>
         <div class="page-jump">
@@ -1549,6 +1572,7 @@ function setupReaderTools(){
         </div>
       </div>
     </div>
+    <div class="reader-chapter-page-count" id="chapterPageCount" aria-label="현재 챕터의 현재 페이지 / 전체 페이지">[0 / 0]</div>
     <div class="reader-document-title" id="readerDocumentTitle" aria-label="현재 문서 제목"></div>
 
   </section>
@@ -1587,7 +1611,7 @@ function updateViewerCountLabel(){
   }
   const current=bookChapters.length?readerCurrentChapter():0;
   const chapterCount=viewerChapterCounts[current]??0;
-  $('#viewerCharCount').textContent=characterCountFormat.format(chapterCount)+'/'+characterCountFormat.format(viewerTotalCount);
+  $('#viewerCharCount').textContent=characterCountFormat.format(chapterCount)+'/'+characterCountFormat.format(viewerTotalCount)+'자';
 }
 function updateViewerCharacterCount(){
   updateViewerCountLabel();
@@ -2733,6 +2757,7 @@ function render(){
     pageInnerLeft.innerHTML='<div class="empty">표시할 내용이 없습니다.</div>';
     pageInnerRight.innerHTML='';
     counter.textContent='0 / 0';
+    readerUpdateChapterPageCount();
     pageJumpInput.value='';
     pageJumpInput.max='0';
     pageJumpInput.disabled=true;
@@ -2753,6 +2778,7 @@ function render(){
   pageJumpInput.disabled=false;
   $('#pageJumpBtn').disabled=false;
 
+  readerUpdateChapterPageCount();
   readerPaintSearch();
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
