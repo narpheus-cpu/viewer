@@ -1,6 +1,6 @@
 {
   "name": "ebook-viewer",
   "private": true,
-  "scripts": { "test": "node tests/reader.cjs" },
+  "scripts": { "test": "node tests/reader.cjs && node tests/reader-tools.cjs" },
   "devDependencies": { "jszip": "3.10.2", "playwright": "1.64.1" }
 }

@@ -118,7 +118,7 @@ const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',c
 const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
-const READER_CACHE_VERSION=6;
+const READER_CACHE_VERSION=7;
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
 function readerCanonical(){
@@ -159,7 +159,7 @@ function readerSetLoading(loading){
   viewerOverlay.setAttribute('aria-busy',String(loading));
 }
 function readerOversizedParagraph(html,text,box){
-  if(text.length<=4096||!html.startsWith('<p>'))return false;
+  if(text.length<=4096||!/^<p(?:\s|>)/i.test(html))return false;
   // Shape only a DOM-preserving prefix. A paragraph whose prefix overflows cannot fit whole.
   const detached=document.createElement('div');detached.innerHTML=html;
   const paragraph=detached.firstElementChild;
@@ -308,7 +308,7 @@ async function readerDisplay(record={pageAnchor:0},generation=++readerState.gene
 
 /* Display-only breaks. Offsets always refer to the original visible text. */
 function readerBreakKey(){
-  return ['breakSentence','breakQuotes','breakAdverbs'].map(key=>viewerSettings[key]?1:0).join('');
+  return ['breakSentence','breakQuotes','breakAdverbs','sentenceSpacing'].map(key=>viewerSettings[key]?1:0).join('');
 }
 function readerQuoteRoles(text){
   const roles=new Map(),stack=[];
@@ -327,96 +327,8 @@ function readerQuoteRoles(text){
   }
   return roles;
 }
-function readerBreakOffsets(text,settings=viewerSettings,quoteRoles=readerQuoteRoles(text),baseOffset=0){
-  const breaks=new Set(),protectedDots=new Set();
-  const add=offset=>{
-    // A sentence-ending break belongs after its closing quote, never between text and quote.
-    let next=offset;
-    while(next<text.length&&/[ \t]/.test(text[next]))next++;
-    while(quoteRoles.get(baseOffset+next)==='close'){
-      offset=++next;
-      while(next<text.length&&/[ \t]/.test(text[next]))next++;
-    }
-    if(offset<=0||offset>=text.length)return;
-    // An existing newline or the start of the block already satisfies the rule.
-    let left=offset-1,right=offset;
-    while(left>=0&&/[ \t]/.test(text[left]))left--;
-    while(right<text.length&&/[ \t]/.test(text[right]))right++;
-    if(left<0||text[left]==='\n'||text[right]==='\n')return;
-    breaks.add(offset);
-  };
-  if(settings.breakSentence){
-    // Protect the whole abbreviation, including its final dot; protect decimals separately.
-    const abbreviations=/(?:\b(?:[A-Za-z]\.[ \t]*){2,}|\b(?:Ph\.D\.|B\.Sc\.|M\.Sc\.|D\.Phil\.)|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Rev|Fr|Hon|Gen|Capt|Col|Sgt|Lt|Dept|Corp|Inc|Ltd|Co|vs|etc|approx|Fig|e\.g|i\.e)\.|\b[A-Z]\.(?=[ \t]+[A-Z][a-z])|\bNo\.(?=[ \t]*\d))/gi;
-    for(const match of text.matchAll(abbreviations)){
-      for(let i=0;i<match[0].length;i++)if(match[0][i]==='.')protectedDots.add(match.index+i);
-    }
-    for(let i=0;i<text.length;i++){
-      if(!/[.?!]/.test(text[i]))continue;
-      if(text[i]==='.'&&(protectedDots.has(i)||(/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))))continue;
-      // Keep an ellipsis or a ?! cluster together.
-      if(/[.?!]/.test(text[i+1]||'')&&!protectedDots.has(i+1))continue;
-      add(i+1);
-    }
-    // Korean sentence endings without punctuation. Do not split ordinary nouns ending in 다.
-    const nouns=new Set(['바다','캐나다','소다','마다','저마다','판다','사이다']);
-    const ending=/(?:[가-힣]{2,}다|간다|온다|본다|산다|잔다|된다|한다|같다|좋다|많다|없다|있다|싶다|크다|작다|쉽다|어렵다|맞다|옳다|싫다|[가-힣]+(?:요|죠|습니다|습니까|하자|해라|하라))$/u;
-    for(const match of text.matchAll(/[가-힣]+(?=\s)/gu)){
-      if(!nouns.has(match[0])&&ending.test(match[0]))add(match.index+match[0].length);
-    }
-  }
-  if(settings.breakQuotes){
-    for(let i=0;i<text.length;i++)if(quoteRoles.get(baseOffset+i)==='open')add(i);
-  }
-  if(settings.breakAdverbs){
-    const words=/예를[ \t]+들어|이에[ \t]+따라|그리고|그러나|따라서|또한|즉|왜냐하면|그러므로|반면|한편|그렇다면/gu;
-    for(const match of text.matchAll(words)){
-      const before=text[match.index-1]||'',after=text[match.index+match[0].length]||'';
-      if(!/[\p{L}\p{N}_]/u.test(before)&&!/[\p{L}\p{N}_]/u.test(after))add(match.index);
-    }
-  }
-  const result=[];
-  for(const offset of [...breaks].sort((a,b)=>a-b)){
-    // Two selected rules around the same space represent one line break.
-    if(result.length&&/^[ \t]*$/.test(text.slice(result[result.length-1],offset)))result[result.length-1]=offset;
-    else result.push(offset);
-  }
-  return result;
-}
-function readerApplyBreaks(html,quoteRoles=null,baseOffset=0){
-  if(readerBreakKey()==='000')return html;
-  const root=document.createElement('div');root.innerHTML=html;
-  const starts=new Map(),wholeWalker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
-  let wholeNode,wholeText='';
-  while((wholeNode=wholeWalker.nextNode())){
-    starts.set(wholeNode,wholeText.length);
-    if(wholeNode.nodeType===Node.TEXT_NODE)wholeText+=wholeNode.data;
-    else if(wholeNode.tagName==='BR')wholeText+='\n';
-  }
-  const roles=quoteRoles||readerQuoteRoles(wholeText);
-  // Each structural row is already a new line. Inline markup remains in place.
-  const groups=root.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,th,td,blockquote,pre');
-  for(const group of groups){
-    const nodes=[],walker=document.createTreeWalker(group,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
-    let node,text='';
-    while((node=walker.nextNode())){
-      if(node.nodeType===Node.TEXT_NODE){nodes.push({node,start:text.length});text+=node.data;}
-      else if(node.tagName==='BR')text+='\n';
-    }
-    const offsets=readerBreakOffsets(text,viewerSettings,roles,baseOffset+(starts.get(group)||0));
-    let last=offsets.length-1;
-    for(let i=nodes.length-1;i>=0&&last>=0;i--){
-      const entry=nodes[i],end=entry.start+entry.node.length;
-      while(last>=0&&offsets[last]>=end)last--;
-      while(last>=0&&offsets[last]>=entry.start){
-        const offset=offsets[last--]-entry.start;
-        const tail=entry.node.splitText(offset),br=document.createElement('br');
-        br.setAttribute('data-reader-break','');tail.before(br);
-      }
-    }
-  }
-  return root.innerHTML;
-}
+function readerBreakOffsets(text,settings=viewerSettings,quoteRoles=readerQuoteRoles(text),baseOffset=0){return readerBreakOffsetsV18(text,settings,quoteRoles,baseOffset);}
+function readerApplyBreaks(html,quoteRoles=null,baseOffset=0){return readerApplyBreaksV18(html,quoteRoles,baseOffset);}
 function readerSafeQuoteCut(text,cut,quoteRoles,baseOffset=0){
   let next=cut;
   while(next<text.length&&/[ \t]/.test(text[next]))next++;
@@ -454,6 +366,7 @@ function readerBlockSlicer(html){
   };
 }
 function readerSyncBreakButtons(){
+  const spacing=document.getElementById('sentenceSpacing');if(spacing)spacing.checked=!!viewerSettings.sentenceSpacing;
   document.querySelectorAll('[data-break-option]').forEach(button=>button.setAttribute('aria-pressed',String(!!viewerSettings[button.dataset.breakOption])));
 }
 
@@ -948,6 +861,22 @@ textarea{min-height:42vh}
 .chapter-progress{font-size:10px;color:var(--muted);white-space:nowrap}
 .page-inner .epub-image{margin:0;text-indent:0;display:flex;justify-content:center}
 .page-inner .epub-image img{max-width:100%;max-height:var(--reader-image-height,calc(var(--visual-viewport-height,100vh) - 200px));object-fit:contain;display:block}
+
+.reader-sentence-spaced{margin-top:1em!important;margin-top:1lh!important;margin-bottom:1em!important;margin-bottom:1lh!important}
+.reader-search-panel{position:absolute;top:42px;left:6px;right:6px;z-index:50;max-height:72%;display:flex;flex-direction:column;gap:8px;padding:10px;background:var(--paper);border:1px solid var(--line);border-radius:7px;box-shadow:0 5px 24px #0003}
+.reader-search-panel[hidden]{display:none}
+.reader-search-form{display:flex;gap:5px;align-items:center}
+.reader-search-form input{min-width:0;flex:1;border:1px solid var(--line);border-radius:4px;padding:9px 7px;font:inherit;font-size:14px;color:var(--ink);background:var(--paper)}
+.reader-search-form button{white-space:nowrap;padding:8px;font-size:12px}
+.reader-search-count{font-size:12px;color:var(--muted)}
+.reader-search-results{overflow:auto;min-height:0;overscroll-behavior:contain;display:flex;flex-direction:column;gap:6px}
+.reader-search-result{display:block;width:100%;padding:10px;text-align:left;border:1px solid var(--line);border-radius:4px;white-space:normal;font-size:13px;line-height:1.55}
+.reader-search-result-label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+.reader-search-snippet{display:block;overflow-wrap:anywhere;white-space:pre-line}
+.reader-search-panel mark,.reader-search-hit{background:#ffe49a;color:#111;padding:0;font:inherit;line-height:inherit}
+.reader-spacing-option{display:block;margin:10px 0;font-size:13px;line-height:1.5}
+.reader-spacing-option small{display:block;margin-left:23px;color:var(--muted);font-size:11px}
+@media(max-width:480px){.bookhead{gap:4px}.book-actions{gap:4px}.book-actions button{font-size:10px;padding:5px}.top-page-nav{gap:4px}}
 </style>
 <script>
 /*!
@@ -1211,6 +1140,270 @@ async function loadReaderFile(file){
 }
 
 </script>
+<script>
+/* Visible-text offsets are shared by pagination, search and saved reading positions. */
+function readerSentenceEnds(text,roles=readerQuoteRoles(text),base=0){
+  const protectedDots=new Set();
+  const abbreviations=/(?:\b(?:[A-Za-z]\.[ \t]*){2,}|\b(?:Ph\.D\.|B\.Sc\.|M\.Sc\.|D\.Phil\.)|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Rev|Fr|Hon|Gen|Capt|Col|Sgt|Lt|Dept|Corp|Inc|Ltd|Co|vs|etc|approx|Fig|e\.g|i\.e)\.|\b[A-Z]\.(?=[ \t]+[A-Z][a-z])|\bNo\.(?=[ \t]*\d))/gi;
+  for(const m of text.matchAll(abbreviations))for(let j=0;j<m[0].length;j++)if(m[0][j]==='.')protectedDots.add(m.index+j);
+  const ends=[];
+  for(let i=0;i<text.length;i++){
+    if(!/[.?!。！？]/.test(text[i]))continue;
+    if(text[i]==='.'&&(protectedDots.has(i)||(/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))))continue;
+    if(/[.?!。！？]/.test(text[i+1]||'')&&!protectedDots.has(i+1))continue;
+    let end=i+1,probe=end;
+    while(probe<text.length&&/[ \t]/.test(text[probe]))probe++;
+    while(roles.get(base+probe)==='close'||/[”’」』）)\]}]/.test(text[probe]||'')){
+      end=++probe;while(probe<text.length&&/[ \t]/.test(text[probe]))probe++;
+    }
+    if(!ends.length||end>ends[ends.length-1])ends.push(end);
+  }
+  return ends;
+}
+
+function readerBreakOffsetsV18(text,settings=viewerSettings,roles=readerQuoteRoles(text),base=0){
+  const breaks=new Set();
+  const add=offset=>{
+    if(offset<=0||offset>=text.length)return;
+    let left=offset-1,right=offset;
+    while(left>=0&&/[ \t]/.test(text[left]))left--;
+    while(right<text.length&&/[ \t]/.test(text[right]))right++;
+    if(left>=0&&text[left]!=='\n'&&text[right]!=='\n')breaks.add(offset);
+  };
+  // Only written punctuation ends a sentence. Korean word endings never imply a boundary.
+  if(settings.breakSentence)readerSentenceEnds(text,roles,base).forEach(add);
+  if(settings.breakQuotes)for(let i=0;i<text.length;i++)if(roles.get(base+i)==='open')add(i);
+  if(settings.breakAdverbs){
+    const words=/예를[ \t]+들어|이와[ \t]+같이|그리고|그러나|하지만|또한|즉|왜냐하면|그러므로|반면|따라서|그렇다면/gu;
+    for(const m of text.matchAll(words))if(!/[\p{L}\p{N}_]/u.test(text[m.index-1]||'')&&!/[\p{L}\p{N}_]/u.test(text[m.index+m[0].length]||''))add(m.index);
+  }
+  const result=[];
+  for(const offset of [...breaks].sort((a,b)=>a-b)){
+    if(result.length&&/^[ \t]*$/.test(text.slice(result[result.length-1],offset)))result[result.length-1]=offset;
+    else result.push(offset);
+  }
+  return result;
+}
+
+function readerApplyBreaksV18(html,quoteRoles=null,baseOffset=0){
+  if(readerBreakKey()==='0000')return html;
+  const root=document.createElement('div');root.innerHTML=html;
+  const starts=new Map();let whole='';
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  let node;
+  while((node=walker.nextNode())){
+    starts.set(node,whole.length);
+    if(node.nodeType===Node.TEXT_NODE)whole+=node.data;
+    else if(node.tagName==='BR'&&!node.hasAttribute('data-reader-break'))whole+='\n';
+  }
+  const roles=quoteRoles||readerQuoteRoles(whole);
+  const selector='p,h1,h2,h3,h4,h5,h6,li,th,td,blockquote';
+  for(const group of root.querySelectorAll(selector)){
+    if(group.closest('pre')||group.querySelector(selector))continue;
+    const units=[];let text='';
+    const walk=document.createTreeWalker(group,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+    while((node=walk.nextNode())){
+      if(node.nodeType===Node.TEXT_NODE){units.push({node,start:text.length});text+=node.data;}
+      else if(node.tagName==='BR'&&!node.hasAttribute('data-reader-break'))text+='\n';
+    }
+    const base=baseOffset+(starts.get(group)||0),insertions=new Map();
+    for(const offset of readerBreakOffsetsV18(text,viewerSettings,roles,base))insertions.set(offset,1);
+    if(viewerSettings.sentenceSpacing&&text.trim()){
+      group.classList.add('reader-sentence-spaced');
+      const nextStarts=new Set();
+      for(const end of readerSentenceEnds(text,roles,base)){
+        let next=end;while(next<text.length&&/\s/.test(text[next]))next++;
+        if(next<text.length)nextStarts.add(next);
+      }
+      // A pre-existing single line break also needs one empty line, regardless of punctuation.
+      for(const match of text.matchAll(/\n[\s]*/g))if(match.index+match[0].length<text.length)nextStarts.add(match.index+match[0].length);
+      for(const start of nextStarts){
+        let before=start;while(before>0&&/\s/.test(text[before-1]))before--;
+        const newlines=(text.slice(before,start).match(/\n/g)||[]).length;
+        // Merge another selected break rule in the same whitespace interval; do not stack gaps.
+        for(const offset of [...insertions.keys()])if(offset>=before&&offset<=start)insertions.delete(offset);
+        if(newlines<2)insertions.set(start,2-newlines);
+      }
+    }
+    const offsets=[...insertions.keys()].sort((a,b)=>b-a);
+    for(const offset of offsets){
+      const entry=[...units].reverse().find(u=>offset>=u.start&&offset<=u.start+u.node.length);
+      if(!entry)continue;
+      const tail=entry.node.splitText(offset-entry.start);
+      for(let i=0;i<insertions.get(offset);i++){
+        const br=document.createElement('br');br.setAttribute('data-reader-break','');
+        if(viewerSettings.sentenceSpacing)br.setAttribute('data-reader-gap','');
+        tail.before(br);
+      }
+    }
+  }
+  return root.innerHTML;
+}
+
+function readerPaginateV18(text){
+  const box=ensurePaginationMeasureBox(),blocks=getPaginationBlocks(text),texts=cachedBlockTexts;
+  const result=[],anchors=[];let current=[],currentAnchor=0,base=0;
+  readerStats.splits++;
+  const fits=items=>{readerStats.measurements++;box.innerHTML=items.join('');return box.scrollHeight<=box.clientHeight+1;};
+  const flush=()=>{if(current.length){result.push(current.join(''));anchors.push(currentAnchor);current=[];}};
+  for(let bi=0;bi<blocks.length;bi++){
+    if(bi>0&&chapterBlockBoundaries.has(bi)){
+      flush();
+      if(readerVisiblePageCount()===2&&result.length%2){result.push('<div class="chapter-spacer" aria-hidden="true"></div>');anchors.push(Math.max(0,base-1));}
+    }
+    const html=blocks[bi],plain=texts[bi]||'',nextBase=base+plain.length+1;
+    const oversized=readerOversizedParagraph(html,plain,box);
+    if(!oversized&&fits([...current,html])){
+      if(!current.length)currentAnchor=base;current.push(html);base=nextBase;continue;
+    }
+    if(!oversized&&fits([html])){
+      flush();current=[html];currentAnchor=base;base=nextBase;continue;
+    }
+    const slice=readerBlockSlicer(html);
+    const sentenceEnds=readerSentenceEnds(plain,cachedQuoteRoles,base);
+    if(sentenceEnds[sentenceEnds.length-1]!==plain.length)sentenceEnds.push(plain.length);
+    if(!plain.length){flush();current=[html];currentAnchor=base;base=nextBase;continue;}
+    let start=0,lastBest=512;
+    while(start<plain.length){
+      const length=plain.length-start;
+      let lo=1,hi=Math.min(length,Math.max(64,Math.ceil(lastBest*1.4))),best=0;
+      while(true){
+        if(!fits([...current,slice(start,start+hi)]))break;
+        best=hi;lo=hi+1;if(hi===length)break;hi=Math.min(length,hi*2);
+      }
+      while(lo<=hi){
+        const mid=(lo+hi)>>1;
+        if(fits([...current,slice(start,start+mid)])){best=mid;lo=mid+1;}else hi=mid-1;
+      }
+      if(!best&&current.length){flush();continue;}
+      if(!best)best=1; // An extreme font/margin combination must still make progress.
+      lastBest=best;
+      // A complete fitting remainder stays whole, and its spare space remains available to the next paragraph.
+      if(best===length){if(!current.length)currentAnchor=base+start;current.push(slice(start,plain.length));start=plain.length;break;}
+      let cut=start+best;
+      let previousEnd=0,followingEnd=plain.length;
+      for(const end of sentenceEnds){if(end<=cut)previousEnd=end;else{followingEnd=end;break;}}
+      let sentenceStart=previousEnd;while(sentenceStart<plain.length&&/\s/.test(plain[sentenceStart]))sentenceStart++;
+      if(sentenceStart<=cut&&sentenceStart>=start&&followingEnd-sentenceStart<=Math.max(4096,best*2)&&fits([slice(sentenceStart,followingEnd)])){
+        // Move an interrupted sentence intact to the next page when it fits a fresh page.
+        if(sentenceStart===start&&current.length){flush();continue;}
+        if(sentenceStart>start)cut=sentenceStart;
+      }
+      if(cut===start+best){
+        if(previousEnd>start+best*.6)cut=previousEnd;
+        else{
+          const prefix=plain.slice(start,cut),space=prefix.search(/\s+\S*$/);
+          if(space>best*.65)cut=start+space+1;
+          // A sentence longer than a whole page can split, but should not leave a one-word final page.
+          const minimumTail=Math.min(80,Math.max(24,Math.floor(best*.12)));
+          if(plain.length-cut<minimumTail&&length>minimumTail*2){
+            const target=Math.max(start+1,plain.length-minimumTail),part=plain.slice(start,target);
+            const boundary=part.search(/\s+\S*$/);cut=boundary>best*.5?start+boundary+1:target;
+          }
+        }
+      }
+      cut=readerSafeQuoteCut(plain,cut,cachedQuoteRoles,base);
+      if(cut>start&&/[\uDC00-\uDFFF]/.test(plain[cut]||''))cut--;
+      if(cut<=start)cut=start+((/[\uD800-\uDBFF]/.test(plain[start])&&start+1<plain.length)?2:1);
+      if(!current.length)currentAnchor=base+start;
+      current.push(slice(start,cut));start=cut;flush();
+    }
+    base=nextBase;
+  }
+  flush();pageAnchors=anchors;box.innerHTML='';return result;
+}
+
+let readerSearchSource=null,readerSearchMatches=[],readerSearchSelected=-1,readerSearchQuery='',readerSearchTimer=0,readerSearchShown=0;
+function readerSearchIsOpen(){return !!document.getElementById('readerSearchPanel')&&!document.getElementById('readerSearchPanel').hidden;}
+function readerResetSearchForBook(){
+  if(readerSearchSource===fullText)return;
+  readerSearchSource=fullText;readerSearchMatches=[];readerSearchSelected=-1;readerSearchQuery='';
+  const input=document.getElementById('readerSearchInput');if(input)input.value='';
+  if(document.getElementById('readerSearchResults'))readerShowSearchResults(true);
+}
+function readerShowSearch(){
+  readerResetSearchForBook();document.getElementById('readerSearchPanel').hidden=false;
+  document.getElementById('readerSearchInput').focus();
+}
+function readerHideSearch(){
+  const panel=document.getElementById('readerSearchPanel');if(panel)panel.hidden=true;
+  document.getElementById('readerSearchInput')?.blur();
+}
+function readerFindInBook(){
+  clearTimeout(readerSearchTimer);
+  readerResetSearchForBook();readerSearchQuery=document.getElementById('readerSearchInput').value.trim();
+  readerSearchMatches=[];readerSearchSelected=-1;
+  if(readerSearchQuery){
+    const literal=readerSearchQuery.split(/\s+/).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s+');
+    const pattern=new RegExp(literal,'giu'),text=readerCanonical();
+    for(const match of text.matchAll(pattern))readerSearchMatches.push({start:match.index,end:match.index+match[0].length});
+  }
+  readerShowSearchResults(true);readerPaintSearch();
+}
+function readerShowSearchResults(reset=false){
+  const list=document.getElementById('readerSearchResults'),count=document.getElementById('readerSearchCount');
+  if(!list)return;
+  if(reset){list.replaceChildren();readerSearchShown=0;}
+  count.textContent=readerSearchQuery?`${readerSearchMatches.length.toLocaleString()}개 검색 결과`:'검색어를 입력하세요.';
+  const text=readerCanonical(),end=Math.min(readerSearchMatches.length,readerSearchShown+100);
+  list.querySelector('.search-more')?.remove();
+  for(let i=readerSearchShown;i<end;i++){
+    const match=readerSearchMatches[i],button=document.createElement('button');button.type='button';button.className='reader-search-result';
+    button.dataset.result=String(i);
+    const label=document.createElement('span');label.className='reader-search-result-label';
+    let chapter=0;for(let c=1;c<chapterCanonicalStarts.length;c++){if(chapterCanonicalStarts[c]>match.start)break;chapter=c;}
+    label.textContent=`${i+1}${bookChapters.length?' · '+bookChapters[chapter].title:''}`;
+    const snippet=document.createElement('span');snippet.className='reader-search-snippet';
+    const mark=document.createElement('mark');mark.textContent=text.slice(match.start,match.end);
+    snippet.append(text.slice(Math.max(0,match.start-40),match.start),mark,text.slice(match.end,match.end+70));
+    button.append(label,snippet);button.onclick=()=>readerGoSearchResult(i);list.appendChild(button);
+  }
+  readerSearchShown=end;
+  if(end<readerSearchMatches.length){const more=document.createElement('button');more.type='button';more.className='search-more';more.textContent='결과 더 보기';more.onclick=()=>readerShowSearchResults(false);list.appendChild(more);}
+}
+function readerGoSearchResult(index){
+  if(restoreInProgress||!readerSearchMatches[index])return;
+  readerSearchSelected=index;const match=readerSearchMatches[index];
+  readerChooseAnchor(match.start);pageIndex=findPageIndexForAnchor(match.start);render();
+  readerHideSearch();
+}
+function readerPaintSearch(){
+  const active=readerSearchMatches[readerSearchSelected];
+  for(const host of [pageInnerLeft,pageInnerRight]){
+    host.querySelectorAll('mark.reader-search-hit').forEach(mark=>mark.replaceWith(...mark.childNodes));host.normalize();
+    if(host===pageInnerRight&&readerVisiblePageCount()===1)continue;
+    if(!active)continue;
+    const index=pageIndex+(host===pageInnerRight?1:0);let offset=Number(pageAnchors[index])||0;
+    for(const block of [...host.children]){
+      const length=htmlToStableText(block.outerHTML).length;
+      if(active.start<offset+length&&active.end>offset){
+        const units=[],walker=document.createTreeWalker(block,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);let node,cursor=offset;
+        while((node=walker.nextNode())){
+          if(node.nodeType===Node.TEXT_NODE){units.push({node,start:cursor});cursor+=node.length;}
+          else if(node.tagName==='BR'&&!node.hasAttribute('data-reader-break'))cursor++;
+        }
+        for(const unit of units.reverse()){
+          const lo=Math.max(0,active.start-unit.start),hi=Math.min(unit.node.length,active.end-unit.start);
+          if(lo>=hi)continue;
+          unit.node.splitText(hi);const selected=unit.node.splitText(lo),mark=document.createElement('mark');mark.className='reader-search-hit';selected.replaceWith(mark);mark.appendChild(selected);
+        }
+      }
+      offset+=length+1;
+    }
+  }
+}
+function setupReaderTools(){
+  document.getElementById('openReaderSearch').onclick=readerShowSearch;
+  document.getElementById('closeReaderSearch').onclick=readerHideSearch;
+  document.getElementById('readerSearchForm').onsubmit=e=>{e.preventDefault();readerFindInBook();};
+  document.getElementById('readerSearchInput').addEventListener('input',()=>{clearTimeout(readerSearchTimer);readerSearchTimer=setTimeout(readerFindInBook,180);});
+  document.getElementById('sentenceSpacing').onchange=e=>{
+    viewerSettings.sentenceSpacing=e.target.checked;repaginateDeferredBySettings=true;
+    saveViewerSettings();scheduleRepaginate();
+  };
+}
+
+</script>
 </head>
 <body>
 
@@ -1265,6 +1458,7 @@ async function loadReaderFile(file){
         </div>
       </div>
       <div class="book-actions">
+        <button class="secondary" id="openReaderSearch" type="button" title="본문 검색">찾기</button>
         <button class="secondary" id="toggleViewerSettings" type="button">설정</button>
         <button class="secondary" id="closeViewer" type="button">닫기</button>
       </div>
@@ -1287,6 +1481,9 @@ async function loadReaderFile(file){
         <div class="font-upload-status" id="fontUploadStatus">TTF, OTF, WOFF, WOFF2 파일을 업로드하면 저장 후 적용됩니다.</div>
       </div>
 
+      <label class="reader-spacing-option"><input id="sentenceSpacing" type="checkbox"> 문장 위에 빈줄 추가
+        <small>이미 빈줄이 있으면 더 늘리지 않습니다.</small>
+      </label>
       <div class="settings-grid">
         <div class="setting-row">
           <span class="setting-label">글꼴 크기 (px)</span>
@@ -1331,6 +1528,14 @@ async function loadReaderFile(file){
       <span id="chapterProgress" class="chapter-progress"></span>
       <button id="nextChapter" type="button" aria-label="다음 챕터">다음 장</button>
     </nav>
+    <section class="reader-search-panel" id="readerSearchPanel" aria-label="본문 검색" hidden>
+      <form id="readerSearchForm" class="reader-search-form" role="search">
+        <input id="readerSearchInput" type="search" placeholder="본문 검색" aria-label="본문 검색어" autocomplete="off">
+        <button type="submit">검색</button><button id="closeReaderSearch" type="button">닫기</button>
+      </form>
+      <div id="readerSearchCount" class="reader-search-count" role="status" aria-live="polite">검색어를 입력하세요.</div>
+      <div id="readerSearchResults" class="reader-search-results"></div>
+    </section>
     <div class="page-spread" id="pageSpread">
       <div class="page page-left">
         <div class="page-inner" id="pageInnerLeft">
@@ -1802,7 +2007,7 @@ function visiblePageCount(){return getComputedStyle(pageInnerRight.parentElement
 
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
-  return JSON.stringify(['layout-v6-chapters',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
+  return JSON.stringify(['layout-v7-search-sentences',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
@@ -1890,7 +2095,8 @@ const viewerDefaults={
   padRight:64,
   breakSentence:false,
   breakQuotes:false,
-  breakAdverbs:false
+  breakAdverbs:false,
+  sentenceSpacing:false
 };
 let viewerSettings=loadViewerSettings();
 
@@ -2500,119 +2706,10 @@ function findPageIndexForAnchor(anchor){
   return best;
 }
 
-function splitIntoPages(text){
-  const box=ensurePaginationMeasureBox();
-  const blocks=getPaginationBlocks(text);
-  const blockTexts=cachedBlockTexts;
-  const result=[];
-  const anchors=[];
-  let current=[];
-  let currentStartAnchor=0;
-  let anchorCursor=0;
-
-  readerStats.splits++;
-  const fits=arr=>{
-    readerStats.measurements++;
-    box.innerHTML=arr.join('');
-    return box.scrollHeight<=box.clientHeight+1;
-  };
-
-  for(let blockIndex=0;blockIndex<blocks.length;blockIndex++){
-    if(blockIndex>0&&chapterBlockBoundaries.has(blockIndex)){
-      if(current.length){result.push(current.join(''));anchors.push(currentStartAnchor);current=[];}
-      // In a two-page spread each chapter begins on the left, with no text from the previous chapter.
-      if(readerVisiblePageCount()===2&&result.length%2){result.push('<div class="chapter-spacer" aria-hidden="true"></div>');anchors.push(Math.max(0,anchorCursor-1));}
-    }
-    const block=blocks[blockIndex];
-    const blockText=blockTexts[blockIndex]||'';
-    const blockStartAnchor=anchorCursor;
-    /* 블록 사이에 가상의 1문자를 둬, 페이지 구조가 바뀌어도 앵커 순서를 안정적으로 유지 */
-    const nextBlockAnchor=blockStartAnchor+blockText.length+1;
-    const oversized=readerOversizedParagraph(block,blockText,box);
-
-    if(!oversized&&fits([...current,block])){
-      if(!current.length)currentStartAnchor=blockStartAnchor;
-      current.push(block);
-      anchorCursor=nextBlockAnchor;
-      continue;
-    }
-
-    if(current.length){
-      result.push(current.join(''));
-      anchors.push(currentStartAnchor);
-      current=[];
-    }
-
-    if(!oversized&&fits([block])){
-      current=[block];
-      currentStartAnchor=blockStartAnchor;
-      anchorCursor=nextBlockAnchor;
-      continue;
-    }
-
-    /*
-      한 블록이 한 페이지보다 큰 경우에만 텍스트 단위로 자른다.
-      consumed를 함께 기록해서 페이지 번호 대신 실제 본문 위치를 저장할 수 있다.
-    */
-    const sliceBlock=readerBlockSlicer(block);
-    let remaining=blockText;
-    let consumed=0;
-    let lastBest=512;
-
-    while(remaining){
-      let lo=1,hi=Math.min(remaining.length,Math.max(64,Math.ceil(lastBest*1.4))),best=1;
-      // Probe near one page, rather than repeatedly laying out half the whole remaining book.
-      while(true){
-        const candidate=sliceBlock(consumed,consumed+hi);
-        if(!fits([candidate]))break;
-        best=hi;lo=hi+1;
-        if(hi===remaining.length)break;
-        hi=Math.min(remaining.length,hi*2);
-      }
-      while(lo<=hi){
-        const mid=(lo+hi)>>1;
-        const candidate=sliceBlock(consumed,consumed+mid);
-        if(fits([candidate])){
-          best=mid;
-          lo=mid+1;
-        }else{
-          hi=mid-1;
-        }
-      }
-
-      lastBest=best;
-      let cut=best;
-      const probe=remaining.slice(0,cut);
-      const nice=Math.max(
-        probe.lastIndexOf('\n'),
-        probe.lastIndexOf('. '),
-        probe.lastIndexOf('다. '),
-        probe.lastIndexOf(' ')
-      );
-      if(nice>cut*.65)cut=nice+1;
-      cut=readerSafeQuoteCut(remaining,cut,cachedQuoteRoles,blockStartAnchor+consumed);
-
-      result.push(sliceBlock(consumed,consumed+cut));
-      anchors.push(blockStartAnchor+consumed);
-      consumed+=cut;
-      remaining=blockText.slice(consumed);
-    }
-
-    anchorCursor=nextBlockAnchor;
-  }
-
-  if(current.length){
-    result.push(current.join(''));
-    anchors.push(currentStartAnchor);
-  }
-
-  pageAnchors=anchors;
-  box.innerHTML='';
-  return result.filter(Boolean);
-}
-
+function splitIntoPages(text){return readerPaginateV18(text);}
 function render(){
   readerUpdateChapterNav();
+  readerResetSearchForBook();
   if(!pages.length){
     pageInnerLeft.innerHTML='<div class="empty">표시할 내용이 없습니다.</div>';
     pageInnerRight.innerHTML='';
@@ -2636,6 +2733,8 @@ function render(){
   pageJumpInput.max=String(pages.length);
   pageJumpInput.disabled=false;
   $('#pageJumpBtn').disabled=false;
+
+  readerPaintSearch();
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
   if(!restoreInProgress){
@@ -2791,6 +2890,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  readerHideSearch();
   resetPageGesture();
   pageJumpInput.blur();cancelPageJumpEdit();
   readerState.cancelled=true;readerState.generation++;
@@ -2839,6 +2939,8 @@ viewerOverlay.addEventListener('click',e=>{
 });
 
 document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'&&viewerOverlay.classList.contains('active')){e.preventDefault();readerShowSearch();return;}
+  if(e.key==='Escape'&&readerSearchIsOpen()){readerHideSearch();return;}
   if(e.key==='Escape'&&recentOverlay.classList.contains('active')){hideRecentHistory();return;}
   if(e.key==='Escape'&&viewerOverlay.classList.contains('active')){
     closeViewer();
@@ -2918,6 +3020,7 @@ async function restoreReadingSession(reading){
 }
 
 setupChapterNavigation();
+setupReaderTools();
 const syncReading=loadReadingSessionSync();
 if(syncReading){
   applyReadingRecordToInput(syncReading);
