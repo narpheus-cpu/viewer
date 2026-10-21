@@ -118,7 +118,7 @@ const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',c
 const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
-const READER_CACHE_VERSION=7;
+const READER_CACHE_VERSION=8;
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
 function readerCanonical(){
@@ -1173,7 +1173,7 @@ function readerSentenceEnds(text,roles=readerQuoteRoles(text),base=0){
   const ends=[];
   for(let i=0;i<text.length;i++){
     if(!/[.?!。！？]/.test(text[i]))continue;
-    if(text[i]==='.'&&(protectedDots.has(i)||(/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))))continue;
+    if(text[i]==='.'&&(/[A-Z]/.test(text[i-1]||'')||protectedDots.has(i)||(/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))))continue;
     if(/[.?!。！？]/.test(text[i+1]||'')&&!protectedDots.has(i+1))continue;
     let end=i+1,probe=end;
     while(probe<text.length&&/[ \t]/.test(text[probe]))probe++;
@@ -2050,7 +2050,7 @@ function visiblePageCount(){return getComputedStyle(pageInnerRight.parentElement
 
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
-  return JSON.stringify(['layout-v7-search-sentences',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
+  return JSON.stringify(['layout-v8-uppercase-periods',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
