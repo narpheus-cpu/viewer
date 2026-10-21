@@ -974,6 +974,7 @@ function readerCurrentChapter(){
   return current;
 }
 function readerUpdateChapterNav(){
+  updateViewerCountLabel();
   if(!bookChapters.length)return;
   const current=readerCurrentChapter();
   document.getElementById('chapterSelect').value=String(current);
@@ -1449,7 +1450,7 @@ function setupReaderTools(){
 <div class="modal-overlay" id="viewerOverlay">
   <section class="book" id="book">
     <div class="bookhead">
-      <div class="booktitle" id="viewerCharCount" title="전체 본문 글자수 (공백·줄바꿈 포함)">0자</div>
+      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·줄바꿈 포함)" aria-label="현재 챕터 글자수/전체 글자수">0/0</div>
       <div class="top-page-nav" aria-label="페이지 이동">
         <div class="counter" id="counter">0 / 0</div>
         <div class="page-jump">
@@ -1570,8 +1571,26 @@ function formatCharacterCount(text){
 function updateInputCharacterCount(){
   $('#inputCharCount').textContent=formatCharacterCount(inputText.value);
 }
+// Cache raw-text counts once per book/chapter configuration, including whitespace.
+let viewerCountSource=null,viewerCountSignature=null,viewerChapterCounts=[],viewerTotalCount=0;
+function updateViewerCountLabel(){
+  if(viewerCountSource!==fullText||viewerCountSignature!==chapterSignature){
+    viewerCountSource=fullText;viewerCountSignature=chapterSignature;
+    const starts=bookChapters.length?bookChapters.map(chapter=>chapter.start):[0];
+    viewerTotalCount=0;
+    viewerChapterCounts=starts.map((start,index)=>{
+      let count=0;
+      for(const character of fullText.slice(start,starts[index+1]??fullText.length))count++;
+      viewerTotalCount+=count;
+      return count;
+    });
+  }
+  const current=bookChapters.length?readerCurrentChapter():0;
+  const chapterCount=viewerChapterCounts[current]??0;
+  $('#viewerCharCount').textContent=characterCountFormat.format(chapterCount)+'/'+characterCountFormat.format(viewerTotalCount);
+}
 function updateViewerCharacterCount(){
-  $('#viewerCharCount').textContent=formatCharacterCount(fullText);
+  updateViewerCountLabel();
   // Title is display metadata only; the original text and pagination anchors stay unchanged.
   const fileName=activeRecentMeta?.fileName||inputFileName;
   const firstLine=fileName?'':fullText.trimStart().split(/[\r\n]/,1)[0].trim();
