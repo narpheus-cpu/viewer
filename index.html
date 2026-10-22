@@ -34,7 +34,8 @@
       if (!saved || !(Number(saved.updatedAt) >= Number(reading?.updatedAt || 0))) return reading;
       if (!saved.isOpen) return reading ? { ...reading, isOpen: false } : reading;
       if (!saved.recentId) return reading;
-      const book = await getRecentBook(saved.recentId);
+      const book = readerState.hydratedBook?.id === saved.recentId ? readerState.hydratedBook.book : await getRecentBook(saved.recentId);
+      if (book) readerState.hydratedBook = { id: saved.recentId, book };
       if (book && typeof book.text === 'string') return { ...saved, text: book.text, chapters: book.meta?.chapters || [], fileName: book.meta?.fileName || '' };
     } catch (error) { console.error('Browser position recovery:', error.message); }
     return reading;
@@ -176,10 +177,19 @@ function readerOversizedParagraph(html,text,box){
 }
 function readerCacheDatabase(){
   return new Promise((resolve,reject)=>{
-    const request=indexedDB.open(READER_CACHE_DB,1);
-    request.onupgradeneeded=()=>request.result.createObjectStore('pages',{keyPath:'id'});
+    const request=indexedDB.open(READER_CACHE_DB,2);
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      const store=db.objectStoreNames.contains('pages')?request.transaction.objectStore('pages'):db.createObjectStore('pages',{keyPath:'id'});
+      if(!store.indexNames.contains('updatedAt'))store.createIndex('updatedAt','updatedAt');
+    };
     request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
   });
+}
+function readerRememberCache(record){
+  readerState.memory.delete(record.id);readerState.memory.set(record.id,record);
+  // Disk retains recent books; small-memory readers need only a few live layouts.
+  while(readerState.memory.size>3)readerState.memory.delete(readerState.memory.keys().next().value);
 }
 async function readerReadCache(id){
   if(readerState.memory.has(id))return readerState.memory.get(id);
@@ -187,22 +197,20 @@ async function readerReadCache(id){
     const db=await readerCacheDatabase();
     try{return await new Promise((resolve,reject)=>{
       const request=db.transaction('pages').objectStore('pages').get(id);
-      request.onsuccess=()=>{if(request.result)readerState.memory.set(id,request.result);resolve(request.result);};request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{if(request.result)readerRememberCache(request.result);resolve(request.result);};request.onerror=()=>reject(request.error);
     });}finally{db.close();}
   }catch{return null;}
 }
 async function readerStoreCache(record){
-  readerState.memory.delete(record.id);readerState.memory.set(record.id,record);
-  while(readerState.memory.size>RECENT_LIMIT)readerState.memory.delete(readerState.memory.keys().next().value);
+  readerRememberCache(record);
   try{
     const db=await readerCacheDatabase();
     try{
       const tx=db.transaction('pages','readwrite'),store=tx.objectStore('pages');
       store.put(record);
-      const all=store.getAll();
-      all.onsuccess=()=>{
-        for(const old of all.result.sort((a,b)=>b.updatedAt-a.updatedAt).slice(RECENT_LIMIT))store.delete(old.id);
-      };
+      // Keys and timestamps are sufficient for pruning; never load every book's page HTML.
+      let count=0;const cursor=store.index('updatedAt').openKeyCursor(null,'prev');
+      cursor.onsuccess=()=>{const entry=cursor.result;if(!entry)return;if(++count>RECENT_LIMIT)store.delete(entry.primaryKey);entry.continue();};
       await transactionDone(tx);
     }finally{db.close();}
   }catch{/* A disposable cache failure never deletes or changes book/font data. */}
@@ -214,17 +222,64 @@ async function readerDeleteCache(id){
     try{const tx=db.transaction('pages','readwrite');id?tx.objectStore('pages').delete(id):tx.objectStore('pages').clear();await transactionDone(tx);}finally{db.close();}
   }catch{}
 }
-function readerValidCache(cache,signature,source){
-  return cache&&cache.version===READER_CACHE_VERSION&&cache.signature===signature&&cache.length===source.length&&
-    typeof cache.canonical==='string'&&Array.isArray(cache.pages)&&cache.pages.length>0&&
-    Array.isArray(cache.anchors)&&cache.anchors.length===cache.pages.length&&
-    cache.anchors.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0||x>=cache.anchors[i-1]))&&
-    cache.pages.every(x=>typeof x==='string');
+function readerCacheBodyValid(cache,source){
+  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string');
 }
+function readerSameLayout(cache,signature){
+  if(cache.signature===signature)return true;
+  try{
+    const before=JSON.parse(cache.signature),after=JSON.parse(signature);
+    if(!Array.isArray(before)||!Array.isArray(after)||before.length!==after.length)return false;
+    // Only a small height change is compatible, and only when the original fit is safe.
+    const required=Number.isFinite(cache.fitHeight)?cache.fitHeight:before[4];
+    if(!Number.isFinite(before[4])||!Number.isFinite(after[4])||!Number.isFinite(required)||
+      required<=0||required>before[4]||Math.abs(before[4]-after[4])>4||after[4]<required)return false;
+    return before.every((value,index)=>index===4||value===after[index]);
+  }catch{return false;}
+}
+function readerValidCache(cache,signature,source){
+  return readerCacheBodyValid(cache,source)&&readerSameLayout(cache,signature)&&
+    Array.isArray(cache.pages)&&cache.pages.length>0&&Array.isArray(cache.anchors)&&cache.anchors.length===cache.pages.length&&
+    cache.anchors.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0||x>=cache.anchors[i-1]))&&cache.pages.every(x=>typeof x==='string');
+}
+function readerFindCachedLayout(cache,signature,source){
+  if(!readerCacheBodyValid(cache,source))return null;
+  const candidates=[cache,...(Array.isArray(cache.layouts)?cache.layouts.map(layout=>({...cache,...layout})):[])];
+  // Prefer an exact layout over a compatible one retained for another window height.
+  for(const exact of [true,false])for(const candidate of candidates){
+    if((candidate.signature===signature)===exact&&readerValidCache(candidate,signature,source))return candidate;
+  }
+  return null;
+}
+function readerCacheStructureValid(cache){
+  return readerCacheBodyValid(cache,fullText)&&cache.chapterSignature===chapterSignature&&
+    Array.isArray(cache.chapterStarts)&&cache.chapterStarts.length===bookChapters.length&&
+    cache.chapterStarts.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0?x===0:x>=cache.chapterStarts[i-1]));
+}
+function readerRestoreCountCache(cache){
+  if(!readerCacheStructureValid(cache)||!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
+    !cache.chapterCounts.every(Number.isSafeInteger)||cache.chapterCounts.some(x=>x<0)||
+    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount)return;
+  viewerCountSource=fullText;viewerCountSignature=chapterSignature;
+  viewerChapterCounts=cache.chapterCounts.slice();viewerTotalCount=cache.totalCount;
+}
+function readerCreatePageCache(id,signature,previous,used){
+  const layouts=[];
+  if(readerCacheBodyValid(previous,fullText))for(const layout of [previous,...(Array.isArray(previous.layouts)?previous.layouts:[])]){
+    if(layout.signature===signature||layouts.some(item=>item.signature===layout.signature))continue;
+    layouts.push({signature:layout.signature,fitHeight:layout.fitHeight,pages:layout.pages,anchors:layout.anchors});
+    if(layouts.length===1)break;
+  }
+  return {id,version:READER_CACHE_VERSION,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+    fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
+    canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
+    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,layouts,updatedAt:Date.now()};
+}
+
 async function readerHydrateReading(record){
   if(record?.textRef){
     const book=await getRecentBook(record.textRef).catch(()=>null);
-    if(book)return {...record,text:book.text,chapters:book.meta?.chapters||[],fileName:record.fileName??book.meta?.fileName??''};
+    if(book){readerState.hydratedBook={id:record.textRef,book};return {...record,text:book.text,chapters:book.meta?.chapters||[],fileName:record.fileName??book.meta?.fileName??''};}
   }
   return record;
 }
@@ -257,27 +312,31 @@ async function readerWaitForLayout(){
   document.documentElement.style.setProperty('--reader-image-height',Math.max(1,pageInnerLeft.clientHeight-parseFloat(getComputedStyle(pageInnerLeft).lineHeight)*2)+'px');
 }
 async function readerDisplay(record={pageAnchor:0},generation=++readerState.generation){
-  readerConfigureChapters(record);
-  updateViewerCharacterCount();
+  const started=performance.now(),source=fullText,id=activeRecentId;
   restoreInProgress=true;readerSetLoading(true);clearTimeout(repaginateTimer);
-  const source=fullText,id=activeRecentId;
-  const started=performance.now();
+  readerStats.lastCacheReason='not-checked';
   try{
-    let signature;
+    // Read the stored layout before touching the book's paragraph DOM.
+    const cached=id?await readerReadCache(id):null;
+    if(generation!==readerState.generation)return;
+    readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();
+    if(readerCacheBodyValid(cached,source)){readerState.canonical=cached.canonical;readerState.canonicalSource=source;}
+    let signature,used=null,built=null;
     while(generation===readerState.generation){
       await readerWaitForLayout();
       if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;
-      signature=getLayoutSignature();
-      const cached=id?await readerReadCache(id):null;
-      if(generation!==readerState.generation)return;
-      if(readerValidCache(cached,signature,source)){
-        pages=cached.pages.slice();pageAnchors=cached.anchors.slice();
-        readerState.canonical=cached.canonical;readerState.canonicalSource=source;readerStats.cacheHits++;
+      signature=getLayoutSignature();used=readerFindCachedLayout(built,signature,source)||readerFindCachedLayout(cached,signature,source);
+      if(used){
+        pages=used.pages.slice();pageAnchors=used.anchors.slice();
+        readerState.canonical=used.canonical;readerState.canonicalSource=source;readerStats.cacheHits++;
+        readerStats.lastCacheReason=used===built?'reflow-reused':used.signature===signature?'exact':'safe-height';
       }else{
-        pages=splitIntoPages(source);
-        readerCanonical();
+        readerStats.lastCacheReason=!cached?'missing':!readerCacheBodyValid(cached,source)?'version-or-source':'layout-changed';
+        await readerPrepareChapterImages();
+        if(generation!==readerState.generation)return;
+        signature=getLayoutSignature();pages=splitIntoPages(source);readerCanonical();
+        built=readerCreatePageCache(id,signature,cached,null);
       }
-      // Insets/IME may finish adjusting during calculation. Reveal only the final layout.
       await nextFrame();await nextFrame();
       if(generation!==readerState.generation)return;
       if(signature!==getLayoutSignature())continue;
@@ -287,18 +346,15 @@ async function readerDisplay(record={pageAnchor:0},generation=++readerState.gene
     readerState.layout=signature;
     const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
     const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
-    readerChooseAnchor(target,readerContext(target));
-    pageIndex=findPageIndexForAnchor(target);
-    restoreInProgress=false;
-    render();readerSetLoading(false);
+    readerChooseAnchor(target,readerContext(target));pageIndex=findPageIndexForAnchor(target);
+    restoreInProgress=false;render();readerSetLoading(false);
+    if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();
     readerStats.lastPaginationMs=performance.now()-started;
     flushReadingSessionSave(true);flushActiveRecentPositionSave();
-    if(id){
-      const cache={id,version:READER_CACHE_VERSION,signature,length:source.length,pages:pages.slice(),anchors:pageAnchors.slice(),
-        canonical:readerCanonical(),updatedAt:Date.now()};
-      // Do not serialize/rewrite the cache again when the current cache already matches.
-    const current=readerState.memory.get(id);
-      if(!readerValidCache(current,signature,source))readerState.pendingCache=readerStoreCache(cache);
+    // Upgrade old cache metadata without invalidating its already correct page breaks.
+    if(id&&(built||!used||!readerCacheStructureValid(cached)||!Array.isArray(cached.chapterCounts))){
+      const cache=readerCreatePageCache(id,signature,cached,used);
+      readerState.pendingCache=readerStoreCache(cache);
     }
   }catch(error){
     if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message||'전자책을 열지 못했습니다.',true);}
@@ -903,6 +959,7 @@ let bookChapters=[];
 let chapterBlockBoundaries=new Set();
 let chapterCanonicalStarts=[];
 let chapterSource=null;
+let chapterBookId=null;
 let chapterSignature='';
 let chapterImagesReady=Promise.resolve();
 function readerVisiblePageCount(){return typeof visiblePageCount==='function'?visiblePageCount():1;}
@@ -927,23 +984,15 @@ function detectTextChapters(text){
   else chapters[0].start=0;
   return chapters;
 }
-function readerConfigureChapters(record={}){
+function readerConfigureChapters(record={},cache=null){
   const explicit=record.chapters||activeRecentMeta?.chapters||inputBookChapters;
   const chapters=normalizeBookChapters(explicit,fullText);
   const next=chapters.length?chapters:detectTextChapters(fullText);
   const signature=JSON.stringify(next.map(c=>[c.start,c.title,!!c.blocks]));
-  if(chapterSource!==fullText||signature!==chapterSignature){
-    chapterSource=fullText;chapterSignature=signature;bookChapters=next;
+  if(chapterSource!==fullText||signature!==chapterSignature||chapterBookId!==activeRecentId){
+    chapterSource=fullText;chapterBookId=activeRecentId;chapterSignature=signature;bookChapters=next;
     cachedMarkdownSource=null;readerState.canonicalSource=null;
-    const sources=new Set();
-    for(const chapter of bookChapters)for(const block of chapter.blocks||[]){
-      const host=document.createElement('div');host.innerHTML=block;
-      host.querySelectorAll('img').forEach(img=>sources.add(img.src));
-    }
-    chapterImagesReady=Promise.all([...sources].map(src=>new Promise(resolve=>{
-      const image=new Image();image.onload=resolve;image.onerror=resolve;image.src=src;
-      if(image.complete)resolve();
-    })));
+    chapterImagesReady=Promise.resolve();chapterImageSource=null;
   }
   const select=document.getElementById('chapterSelect');
   select.replaceChildren();
@@ -952,8 +1001,23 @@ function readerConfigureChapters(record={}){
     option.textContent=`${index+1}. ${chapter.title}`;select.appendChild(option);
   });
   document.getElementById('chapterNav').hidden=!bookChapters.length;
-  // Build canonical chapter positions even when the page cache is reused.
-  getPaginationBlocks(fullText);
+  if(readerCacheStructureValid(cache))chapterCanonicalStarts=cache.chapterStarts.slice();
+  else getPaginationBlocks(fullText);
+}
+let chapterImageSource=null;
+function readerPrepareChapterImages(){
+  if(chapterImageSource===fullText)return chapterImagesReady;
+  chapterImageSource=fullText;
+  const sources=new Set();
+  for(const chapter of bookChapters)for(const block of chapter.blocks||[]){
+    const host=document.createElement('div');host.innerHTML=block;
+    host.querySelectorAll('img').forEach(img=>sources.add(img.src));
+  }
+  chapterImagesReady=Promise.all([...sources].map(src=>new Promise(resolve=>{
+    const image=new Image();image.onload=resolve;image.onerror=resolve;image.src=src;
+    if(image.complete)resolve();
+  })));
+  return chapterImagesReady;
 }
 function readerChapterBlocks(text){
   chapterBlockBoundaries=new Set();chapterCanonicalStarts=[];
@@ -1911,6 +1975,12 @@ async function pruneRecentHistory(){
 }
 
 async function upsertRecentText(text,{resetPosition=true,fileName}={}){
+  if(!resetPosition&&activeRecentId&&activeRecentMeta&&text===fullText&&
+    (inputBookChapters===activeRecentMeta.chapters||(!inputBookChapters.length&&!activeRecentMeta.chapters?.length))){
+    const meta=currentRecentPositionMeta();
+    if(typeof fileName==='string')meta.fileName=fileName;
+    activeRecentMeta=meta;await putRecentMeta(meta);return meta;
+  }
   const id=await digestTextId(text+(inputBookChapters.length?'\0epub\0'+JSON.stringify(inputBookChapters):''));
   let existing=null;
   try{existing=await getRecentMeta(id);}catch(e){}
@@ -1980,7 +2050,7 @@ async function activateRecentFromReading(reading){
   const id=typeof reading?.recentId==='string'?reading.recentId:'';
   if(!id)return;
   try{
-    const book=await getRecentBook(id);
+    const book=readerState.hydratedBook?.id===id?readerState.hydratedBook.book:await getRecentBook(id);
     if(book?.meta){activeRecentId=id;activeRecentMeta=book.meta;}
   }catch(e){}
 }
@@ -2723,7 +2793,8 @@ function ensurePaginationMeasureBox(){
   const rect=pageInnerLeft.getBoundingClientRect();
   const cs=getComputedStyle(pageInnerLeft);
   paginationMeasureBox.style.width=Math.max(1,rect.width)+'px';
-  paginationMeasureBox.style.height=Math.max(1,rect.height)+'px';
+  // A small measured reserve permits safe reuse after tiny viewport-height changes.
+  paginationMeasureBox.style.height=Math.max(1,rect.height-4)+'px';
   paginationMeasureBox.style.fontFamily=cs.fontFamily;
   paginationMeasureBox.style.fontSize=cs.fontSize;
   paginationMeasureBox.style.lineHeight=cs.lineHeight;
@@ -3046,7 +3117,7 @@ function waitForViewerLayout(){return readerWaitForLayout();}
 function applyReadingRecordToInput(reading){
   if(!reading||typeof reading.text!=='string')return;
   restoredSessionUpdatedAt=Math.max(restoredSessionUpdatedAt,Number(reading.updatedAt)||0);
-  inputText.value=reading.text;
+  if(inputText.value!==reading.text)inputText.value=reading.text;
   inputFileName=reading.fileName||'';inputBookChapters=reading.chapters||[];
   updateInputCharacterCount();
 }
@@ -3096,7 +3167,7 @@ if(syncReading){
     if(reading&&!userEditedAfterRestore&&!readerState.cancelled)await restoreReadingSession(reading);
     else readerSetLoading(false);
   }catch(error){readerSetLoading(false);restoreInProgress=false;setStatus(error.message,true);}
-  finally{readerState.initializing=false;resolveReaderReady();}
+  finally{readerState.hydratedBook=null;readerState.initializing=false;resolveReaderReady();}
 })();
 </script>
 </body>
