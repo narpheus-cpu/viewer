@@ -574,6 +574,110 @@ function setupReaderNotes(){
   window.visualViewport?.addEventListener('resize',readerNoteUpdateViewport);window.visualViewport?.addEventListener('scroll',readerNoteUpdateViewport);
 }
 </script>
+<script>
+/* Selection-to-ChatGPT UI. OAuth credentials stay in the native/PC runtime. */
+const READER_GPT_PREFS='readerChatGPTPreferencesV1',READER_GPT_LOCAL='http://127.0.0.1:17173';
+let readerGPTLayer=null,readerGPTMenu=null,readerGPTSelection='',readerGPTBusy=false,readerGPTJob='',readerGPTPoll=0,readerGPTAuthPoll=0,readerGPTEpoch=0;
+let readerGPTAccount='',readerGPTConnected=false,readerGPTPreviousFocus=null,readerGPTBodyOverflow='',readerGPTRootOverflow='',readerGPTPreviousAria=null;
+let readerGPTPairWindow=null,readerGPTRpcId=0;const readerGPTRpcPending=new Map();
+let readerGPTPrefs={prompt:'선택한 본문의 의미를 쉬운 한국어로 설명해 줘. 필요한 배경과 핵심 개념을 짚어 줘.',model:'',updatedAt:0};
+try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatGPT?.readPreferences?.()].map(raw=>{try{return JSON.parse(raw||'null');}catch{return null;}}).filter(x=>x&&typeof x.prompt==='string');if(candidates.length)readerGPTPrefs=candidates.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];}catch{}
+window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
+function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
+async function readerGPTRpc(action,params={}){
+  if(readerGPTNative())return new Promise((resolve,reject)=>{const id=String(++readerGPTRpcId),timer=setTimeout(()=>{readerGPTRpcPending.delete(id);reject(Error('연결 응답이 없습니다. 다시 시도해 주세요.'));},60000);readerGPTRpcPending.set(id,{resolve,reject,timer});try{AndroidChatGPT.request(id,action,JSON.stringify(params));}catch(error){clearTimeout(timer);readerGPTRpcPending.delete(id);reject(error);}});
+  const key=sessionStorage.getItem('readerGPTLocalKey')||'';if(!key)throw Error('PC 연결 프로그램을 실행한 뒤 [PC 연결]을 눌러 주세요.');
+  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),60000);
+  try{const response=await fetch(READER_GPT_LOCAL+'/rpc',{method:'POST',headers:{'Content-Type':'application/json','X-Reader-Key':key},body:JSON.stringify({action,params}),signal:abort.signal});const result=await response.json();if(!response.ok||result.error)throw Error(result.error||'PC 연결에 실패했습니다.');return result;}
+  catch(error){if(error instanceof TypeError||error.name==='AbortError')throw Error('PC 연결 프로그램을 확인해 주세요. 브라우저에서 로컬 네트워크 연결 권한을 물으면 허용해 주세요.');throw error;}finally{clearTimeout(timer);}
+}
+function readerGPTIsOpen(){return !!readerGPTLayer&&!readerGPTLayer.hidden;}
+function readerGPTStatus(message){document.getElementById('readerGPTStatus').textContent=message;}
+function readerGPTSavePreferences(){
+  readerGPTPrefs={prompt:document.getElementById('readerGPTPrompt').value,model:document.getElementById('readerGPTModel').value||readerGPTPrefs.model||'',updatedAt:Date.now()};let saved=false;
+  try{localStorage.setItem(READER_GPT_PREFS,JSON.stringify(readerGPTPrefs));saved=true;}catch{}
+  try{if(window.AndroidChatGPT?.savePreferences?.(JSON.stringify(readerGPTPrefs)))saved=true;}catch{}
+  document.getElementById('readerGPTSaved').textContent=saved?'프롬프트 자동 저장됨 · 다음 선택에도 적용':'저장에 실패했습니다. 저장 공간을 확인해 주세요.';
+}
+function readerGPTViewport(){
+  if(!readerGPTLayer)return;const v=window.visualViewport;
+  Object.assign(readerGPTLayer.style,{left:(v?.offsetLeft||0)+'px',top:(v?.offsetTop||0)+'px',width:(v?.width||innerWidth)+'px',height:(v?.height||innerHeight)+'px'});
+}
+function readerGPTGetSelection(){
+  const selection=getSelection();if(!selection||selection.isCollapsed||!selection.rangeCount)return '';
+  const range=selection.getRangeAt(0),inside=node=>pageGestureSurface.contains(node)&&!!(node.nodeType===1?node:node.parentElement)?.closest('.page-inner');
+  return inside(range.startContainer)&&inside(range.endContainer)?selection.toString().trim():'';
+}
+function readerGPTUpdateSelection(){
+  if(!readerGPTMenu)return;const text=readerGPTGetSelection();
+  if(!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||readerNoteIsOpen()||readerGPTIsOpen()||settingsPanelIsOpen()){readerGPTMenu.hidden=true;return;}
+  readerGPTSelection=text;readerGPTMenu.hidden=false;const r=getSelection().getRangeAt(0).getBoundingClientRect(),v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
+  const w=readerGPTMenu.offsetWidth,h=readerGPTMenu.offsetHeight,left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
+  readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=Math.max(v.offsetTop+6,Math.min(bottom+h<=v.offsetTop+v.height-6?bottom:r.top-h-8,v.offsetTop+v.height-h-6))+'px';
+}
+function readerGPTSetBusy(busy){readerGPTBusy=busy;for(const id of ['readerGPTSend','readerGPTConnect','readerGPTAccounts','readerGPTModel','readerGPTDisconnect'])document.getElementById(id).disabled=busy;document.getElementById('readerGPTStop').hidden=!busy;}
+async function readerGPTRefresh(){
+  const epoch=readerGPTEpoch;
+  try{
+    const status=await readerGPTRpc('status');if(epoch!==readerGPTEpoch||!readerGPTIsOpen())return;
+    const select=document.getElementById('readerGPTAccounts');select.replaceChildren();
+    for(const account of status.accounts||[]){const option=document.createElement('option');option.value=account.id;option.textContent=account.label;select.appendChild(option);}const add=document.createElement('option');add.value='';add.textContent='다른 계정 연결';select.appendChild(add);select.value=status.active||'';
+    readerGPTConnected=!!status.connected;document.getElementById('readerGPTAccountLabel').textContent=status.connected?(status.label+' · '+(status.plan?'ChatGPT 구독 연결됨':'구독 사용 권한 필요')):'ChatGPT 계정을 연결해 주세요.';
+    if(status.error)readerGPTStatus(status.error);else if(status.pending)readerGPTStatus('브라우저에서 ChatGPT 로그인과 사용 권한 승인을 마쳐 주세요.');
+    if(status.connected&&status.plan&&readerGPTAccount!==status.active){
+      const catalog=await readerGPTRpc('models');if(epoch!==readerGPTEpoch||!readerGPTIsOpen())return;
+      const models=document.getElementById('readerGPTModel');models.replaceChildren();for(const model of catalog.models||[]){const option=document.createElement('option');option.value=model.slug;option.textContent=model.display_name;models.appendChild(option);}if([...models.options].some(x=>x.value===readerGPTPrefs.model))models.value=readerGPTPrefs.model;
+      readerGPTAccount=status.active;readerGPTStatus(models.options.length?'모델과 프롬프트를 확인한 뒤 [질문 보내기]를 눌러 주세요.':'이 계정에서 사용할 수 있는 모델이 없습니다.');
+    }
+    if(!status.connected){readerGPTAccount='';document.getElementById('readerGPTModel').replaceChildren();}
+    clearTimeout(readerGPTAuthPoll);if(status.pending)readerGPTAuthPoll=setTimeout(readerGPTRefresh,1500);
+  }catch(error){if(epoch===readerGPTEpoch&&readerGPTIsOpen())readerGPTStatus(error.message);}
+}
+function readerOpenSelectedChatGPT(){const selected=readerGPTGetSelection()||readerGPTSelection;if(selected)readerOpenChatGPT(selected);}
+function readerOpenChatGPT(text=''){
+  if(!viewerOverlay.classList.contains('active'))return;readerCloseNote();readerHideSearch();
+  if(readerGPTIsOpen())return;readerGPTEpoch++;readerGPTPreviousFocus=document.activeElement;readerGPTBodyOverflow=document.body.style.overflow;readerGPTRootOverflow=document.documentElement.style.overflow;readerGPTPreviousAria=viewerOverlay.getAttribute('aria-hidden');
+  readerGPTSelection=String(text).trim();readerGPTMenu.hidden=true;readerGPTLayer.hidden=false;readerGPTViewport();
+  document.getElementById('readerGPTSelected').value=readerGPTSelection;document.getElementById('readerGPTPrompt').value=readerGPTPrefs.prompt;document.getElementById('readerGPTAnswer').textContent='';document.getElementById('readerGPTSaved').textContent='프롬프트는 수정할 때까지 계속 적용됩니다.';
+  document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';viewerOverlay.setAttribute('aria-hidden','true');getSelection()?.removeAllRanges();resetPageGesture();readerGPTSetBusy(false);document.getElementById('closeReaderGPT').focus({preventScroll:true});
+  readerGPTStatus(readerGPTSelection?'선택한 본문만 질문에 포함됩니다.':'연결·프롬프트 설정입니다. 질문하려면 본문을 드래그해 선택해 주세요.');void readerGPTRefresh();
+}
+function readerGPTClose(){
+  if(!readerGPTIsOpen())return;readerGPTSavePreferences();void readerGPTCancel();readerGPTEpoch++;clearTimeout(readerGPTAuthPoll);readerGPTLayer.hidden=true;
+  document.body.style.overflow=readerGPTBodyOverflow;document.documentElement.style.overflow=readerGPTRootOverflow;if(readerGPTPreviousAria===null)viewerOverlay.removeAttribute('aria-hidden');else viewerOverlay.setAttribute('aria-hidden',readerGPTPreviousAria);
+  readerGPTSelection='';readerGPTMenu.hidden=true;if(readerGPTPreviousFocus?.isConnected)readerGPTPreviousFocus.focus({preventScroll:true});resetPageGesture();pageGestureSuppressUntil=performance.now()+800;syncVisualViewport();scheduleRepaginate();
+}
+async function readerGPTCancel(){clearTimeout(readerGPTPoll);const job=readerGPTJob;readerGPTJob='';readerGPTSetBusy(false);if(job)try{await readerGPTRpc('cancel',{id:job});}catch{};}
+async function readerGPTSend(){
+  if(readerGPTBusy)return;readerGPTSavePreferences();const text=document.getElementById('readerGPTSelected').value,model=document.getElementById('readerGPTModel').value;
+  if(!text.trim()){readerGPTStatus('본문에서 질문할 문장을 먼저 선택해 주세요.');return;}if(!readerGPTConnected||!model){readerGPTStatus('ChatGPT 계정과 모델을 먼저 연결해 주세요.');return;}
+  const epoch=readerGPTEpoch;readerGPTSetBusy(true);document.getElementById('readerGPTAnswer').textContent='';readerGPTStatus('답변을 기다리는 중…');
+  try{const job=await readerGPTRpc('ask',{text,prompt:readerGPTPrefs.prompt,model});if(epoch!==readerGPTEpoch){void readerGPTRpc('cancel',{id:job.id}).catch(()=>{});return;}readerGPTJob=job.id;
+    const poll=async()=>{if(readerGPTJob!==job.id||epoch!==readerGPTEpoch)return;try{const result=await readerGPTRpc('poll',{id:job.id});if(readerGPTJob!==job.id||epoch!==readerGPTEpoch)return;document.getElementById('readerGPTAnswer').textContent=result.text||'';if(result.done){readerGPTJob='';readerGPTSetBusy(false);readerGPTStatus(result.error||'답변 완료');return;}readerGPTPoll=setTimeout(poll,400);}catch(error){if(epoch===readerGPTEpoch){readerGPTJob='';readerGPTSetBusy(false);readerGPTStatus(error.message);}}};void poll();
+  }catch(error){if(epoch===readerGPTEpoch){readerGPTSetBusy(false);readerGPTStatus(error.message);}}
+}
+function setupReaderChatGPT(){
+  try{const key=new URLSearchParams(location.hash.slice(1)).get('reader-connect');if(key&&/^[A-Za-z0-9_-]{40,100}$/.test(key)){sessionStorage.setItem('readerGPTLocalKey',key);history.replaceState(null,'',location.pathname+location.search);}}catch{}
+  readerGPTMenu=document.createElement('button');readerGPTMenu.id='readerGPTSelectionMenu';readerGPTMenu.type='button';readerGPTMenu.textContent='ChatGPT연결';readerGPTMenu.hidden=true;document.body.appendChild(readerGPTMenu);
+  for(const type of ['pointerdown','mousedown','touchstart'])readerGPTMenu.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});readerGPTMenu.onclick=()=>readerOpenSelectedChatGPT();
+  readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
+  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT연결</h2><button id="closeReaderGPT" type="button">닫기</button></header><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small><p id="readerGPTStatus" role="status" aria-live="polite"></p><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변"></div></div><footer class="reader-gpt-footer"><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button><button id="readerGPTUsage" type="button">사용량 관리</button></footer></section>';
+  document.body.appendChild(readerGPTLayer);document.getElementById('readerGPTPc').hidden=readerGPTNative();document.getElementById('closeReaderGPT').onclick=readerGPTClose;document.getElementById('readerGPTSend').onclick=readerGPTSend;document.getElementById('readerGPTStop').onclick=()=>{void readerGPTCancel();readerGPTStatus('질문을 중지했습니다.');};
+  document.getElementById('readerGPTConnect').onclick=async()=>{try{readerGPTStatus('로그인 창을 여는 중…');await readerGPTRpc('signin',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
+  document.getElementById('readerGPTAccounts').onchange=async()=>{try{await readerGPTRpc('switch',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
+  document.getElementById('readerGPTDisconnect').onclick=async()=>{try{const result=await readerGPTRpc('signout');readerGPTAccount='';await readerGPTRefresh();readerGPTStatus(result.warning||'로그아웃했습니다.');}catch(e){readerGPTStatus(e.message);}};
+  document.getElementById('readerGPTUsage').onclick=()=>{if(readerGPTNative())void readerGPTRpc('usage').catch(e=>readerGPTStatus(e.message));else window.open('https://chatgpt.com/#settings/Usage','_blank','noopener');};
+  document.getElementById('readerGPTPair').onclick=()=>{readerGPTPairWindow=window.open(READER_GPT_LOCAL+'/pair','readerChatGPTPair','popup,width=460,height=480');readerGPTStatus('연결 창에서 [연결]을 눌러 주세요. 창이 열리지 않으면 PC 연결 프로그램을 확인해 주세요.');};
+  addEventListener('message',event=>{if(event.origin===READER_GPT_LOCAL&&event.source===readerGPTPairWindow&&/^[A-Za-z0-9_-]{40,100}$/.test(event.data?.readerKey||'')){sessionStorage.setItem('readerGPTLocalKey',event.data.readerKey);readerGPTPairWindow=null;void readerGPTRefresh();}});
+  document.getElementById('readerGPTPrompt').addEventListener('input',readerGPTSavePreferences);document.getElementById('readerGPTModel').onchange=readerGPTSavePreferences;
+  const settings=document.createElement('button');settings.type='button';settings.className='reader-gpt-settings';settings.textContent='ChatGPT 연결·프롬프트 설정';settings.onclick=()=>readerOpenChatGPT();document.getElementById('viewerSettings').appendChild(settings);
+  let frame=0;document.addEventListener('selectionchange',()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;readerGPTUpdateSelection();});});
+  readerGPTLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerGPTLayer)readerGPTClose();});for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerGPTLayer.addEventListener(type,e=>e.stopPropagation(),{passive:true});
+  document.addEventListener('keydown',e=>{if(!readerGPTIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerGPTClose();}else if(e.key==='Tab'){const items=[...readerGPTLayer.querySelectorAll('button,select,textarea,[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
+  addEventListener('resize',()=>{readerGPTViewport();readerGPTUpdateSelection();});window.visualViewport?.addEventListener('resize',readerGPTViewport);window.visualViewport?.addEventListener('scroll',readerGPTViewport);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&readerGPTIsOpen())void readerGPTRefresh();});
+}
+
+</script>
 <style>
 :root{
   --bg:#fff;
@@ -1100,6 +1204,20 @@ textarea{min-height:42vh}
 .reader-note-header button{flex:0 0 auto;min-width:52px;min-height:40px;padding:6px 8px;font-size:14px;line-height:1.3}
 .reader-note-content{flex:1 1 auto;min-width:0;min-height:0;padding:12px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   touch-action:pan-y;-webkit-overflow-scrolling:touch;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;text-align:left}
+
+#readerGPTSelectionMenu{position:fixed;z-index:2147483050;background:var(--paper,#fff);color:var(--ink,#000);border:1px solid currentColor;border-radius:5px;padding:9px 12px;font-size:14px;box-shadow:0 2px 8px #0003}
+#readerGPTSelectionMenu[hidden],.reader-gpt-layer[hidden]{display:none!important}
+.reader-gpt-layer{position:fixed;z-index:2147483100;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:8px;background:#0007;overscroll-behavior:contain}
+.reader-gpt-dialog{display:flex;flex-direction:column;width:100%;max-width:760px;max-height:100%;min-width:0;min-height:0;background:var(--paper,#fff);color:var(--ink,#000);border:1px solid currentColor;border-radius:8px;overflow:hidden;font-size:14px;line-height:1.5}
+.reader-gpt-header,.reader-gpt-footer{display:flex;align-items:center;gap:6px;flex:0 0 auto;padding:6px 8px;flex-wrap:wrap}
+.reader-gpt-header{border-bottom:1px solid var(--line,#bbb)}.reader-gpt-header h2{flex:1;min-width:0;margin:0;font-size:18px}.reader-gpt-header button{min-width:52px;min-height:40px}
+.reader-gpt-footer{border-top:1px solid var(--line,#bbb)}.reader-gpt-dialog button{font-size:13px;padding:7px 9px;min-height:36px}
+.reader-gpt-scroll{flex:1;min-height:0;min-width:0;overflow:auto;padding:10px;overscroll-behavior:contain;touch-action:pan-y}
+.reader-gpt-scroll p{margin:5px 0 9px}.reader-gpt-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.reader-gpt-row select{flex:1;min-width:0;max-width:100%}
+.reader-gpt-dialog textarea,.reader-gpt-dialog select{width:100%;box-sizing:border-box;background:var(--paper,#fff);color:var(--ink,#000);border:1px solid var(--line,#aaa);border-radius:4px;font:inherit;padding:6px;min-width:0}
+.reader-gpt-dialog textarea{resize:vertical}.reader-gpt-field{display:flex;flex-direction:column;gap:4px;margin-top:10px}.reader-gpt-dialog small{display:block;font-size:11px;margin-top:5px;color:var(--muted,#666)}
+#readerGPTPc{margin-top:8px}#readerGPTAnswer{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.7;margin-top:10px;user-select:text;-webkit-user-select:text}
+.reader-gpt-settings{display:block;width:100%;margin-top:10px}
 
 </style>
 <script>
@@ -3026,7 +3144,7 @@ function render(){
 }
 
 async function repaginate(){
-  if(readerNoteIsOpen())return;
+  if(readerNoteIsOpen()||readerGPTIsOpen())return;
   if(pageGesture){pageGestureLayoutDeferred=true;return;}
   if(pageJumpLayoutLocked())return;
   if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
@@ -3072,7 +3190,7 @@ function beginPageGesture(point,event){
   if(pageGesturePointers.size!==1||!point.primary){cancelPageNoteHold();pageGesture=null;pageGestureSuppressUntil=performance.now()+800;finishPageGestureLayout();return;}
   pageGestureSuppressUntil=0;
   const note=event.target.closest?.('[data-reader-note]');
-  if(restoreInProgress||!pages.length||!viewerOverlay.classList.contains('active')||readerNoteIsOpen()||settingsPanelIsOpen()||
+  if(restoreInProgress||!pages.length||!viewerOverlay.classList.contains('active')||readerNoteIsOpen()||readerGPTIsOpen()||settingsPanelIsOpen()||
     (!note&&pageGestureSelection())||(!note&&event.target.closest?.('a,button,input,select,textarea,label')))return;
   const gesture=pageGesture={id:point.id,x:point.x,y:point.y,vertical:0,moved:0,time:performance.now(),generation:readerState.generation,note};
   if(note)pageGestureNoteTimer=setTimeout(()=>pageGestureShowNote(gesture),READER_NOTE_HOLD_MS);
@@ -3135,7 +3253,7 @@ if(window.PointerEvent){
 addEventListener('blur',()=>{if(pageGesture)cancelPageGesture(pageGesture.id);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&pageGesture)cancelPageGesture(pageGesture.id);});
 pageGestureSurface.addEventListener('click',e=>{
-  if(readerNoteIsOpen()||(e.detail!==0&&performance.now()<pageGestureSuppressUntil)){e.preventDefault();return;}
+  if(readerNoteIsOpen()||readerGPTIsOpen()||(e.detail!==0&&performance.now()<pageGestureSuppressUntil)){e.preventDefault();return;}
   if(!pages.length||restoreInProgress||settingsPanelIsOpen())return;
   if(!e.target.closest('[data-reader-note]')&&e.target.closest('a,button,input,select,textarea,label'))return;
   if(pageGestureSelection())return;
@@ -3198,6 +3316,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  readerGPTClose();if(readerGPTMenu)readerGPTMenu.hidden=true;
   readerCloseNote();
   readerHideSearch();
   resetPageGesture();
@@ -3329,6 +3448,7 @@ async function restoreReadingSession(reading){
 }
 
 setupReaderNotes();
+setupReaderChatGPT();
 setupChapterNavigation();
 setupReaderTools();
 const syncReading=loadReadingSessionSync();
