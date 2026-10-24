@@ -156,7 +156,7 @@ function setupReaderNotes(){
 /* Selection-to-ChatGPT UI. OAuth credentials stay in the native/PC runtime. */
 const READER_GPT_PREFS='readerChatGPTPreferencesV1',READER_GPT_LOCAL='http://127.0.0.1:17173';
 let readerGPTLayer=null,readerGPTMenu=null,readerGPTSelection='',readerGPTBusy=false,readerGPTJob='',readerGPTPoll=0,readerGPTAuthPoll=0,readerGPTEpoch=0;
-let readerGPTAccount='',readerGPTConnected=false,readerGPTPreviousFocus=null,readerGPTBodyOverflow='',readerGPTRootOverflow='',readerGPTPreviousAria=null;
+let readerGPTAccount='',readerGPTConnected=false,readerGPTRefreshId=0,readerGPTPreviousFocus=null,readerGPTBodyOverflow='',readerGPTRootOverflow='',readerGPTPreviousAria=null;
 let readerGPTPairWindow=null,readerGPTRpcId=0;const readerGPTRpcPending=new Map();
 let readerGPTPrefs={prompt:'선택한 본문의 의미를 쉬운 한국어로 설명해 줘. 필요한 배경과 핵심 개념을 짚어 줘.',model:'',updatedAt:0};
 try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatGPT?.readPreferences?.()].map(raw=>{try{return JSON.parse(raw||'null');}catch{return null;}}).filter(x=>x&&typeof x.prompt==='string');if(candidates.length)readerGPTPrefs=candidates.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];}catch{}
@@ -188,28 +188,28 @@ function readerGPTGetSelection(){
 }
 function readerGPTUpdateSelection(){
   if(!readerGPTMenu)return;const text=readerGPTGetSelection();
-  if(!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||readerNoteIsOpen()||readerGPTIsOpen()||settingsPanelIsOpen()){readerGPTMenu.hidden=true;return;}
+  if(!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||readerNoteIsOpen()||settingsPanelIsOpen()){readerGPTMenu.hidden=true;return;}
   readerGPTSelection=text;readerGPTMenu.hidden=false;const r=getSelection().getRangeAt(0).getBoundingClientRect(),v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
   const w=readerGPTMenu.offsetWidth,h=readerGPTMenu.offsetHeight,left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
   readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=Math.max(v.offsetTop+6,Math.min(bottom+h<=v.offsetTop+v.height-6?bottom:r.top-h-8,v.offsetTop+v.height-h-6))+'px';
 }
 function readerGPTSetBusy(busy){readerGPTBusy=busy;for(const id of ['readerGPTSend','readerGPTConnect','readerGPTAccounts','readerGPTModel','readerGPTDisconnect'])document.getElementById(id).disabled=busy;document.getElementById('readerGPTStop').hidden=!busy;}
 async function readerGPTRefresh(){
-  const epoch=readerGPTEpoch;
+  const epoch=readerGPTEpoch,revision=++readerGPTRefreshId;
   try{
-    const status=await readerGPTRpc('status');if(epoch!==readerGPTEpoch||!readerGPTIsOpen())return;
+    const status=await readerGPTRpc('status');if(epoch!==readerGPTEpoch||revision!==readerGPTRefreshId||!readerGPTIsOpen())return;
     const select=document.getElementById('readerGPTAccounts');select.replaceChildren();
     for(const account of status.accounts||[]){const option=document.createElement('option');option.value=account.id;option.textContent=account.label;select.appendChild(option);}const add=document.createElement('option');add.value='';add.textContent='다른 계정 연결';select.appendChild(add);select.value=status.active||'';
     readerGPTConnected=!!status.connected;document.getElementById('readerGPTAccountLabel').textContent=status.connected?(status.label+' · '+(status.plan?'ChatGPT 구독 연결됨':'구독 사용 권한 필요')):'ChatGPT 계정을 연결해 주세요.';
     if(status.error)readerGPTStatus(status.error);else if(status.pending)readerGPTStatus('브라우저에서 ChatGPT 로그인과 사용 권한 승인을 마쳐 주세요.');
     if(status.connected&&status.plan&&readerGPTAccount!==status.active){
-      const catalog=await readerGPTRpc('models');if(epoch!==readerGPTEpoch||!readerGPTIsOpen())return;
+      const catalog=await readerGPTRpc('models');if(epoch!==readerGPTEpoch||revision!==readerGPTRefreshId||!readerGPTIsOpen())return;
       const models=document.getElementById('readerGPTModel');models.replaceChildren();for(const model of catalog.models||[]){const option=document.createElement('option');option.value=model.slug;option.textContent=model.display_name;models.appendChild(option);}if([...models.options].some(x=>x.value===readerGPTPrefs.model))models.value=readerGPTPrefs.model;
       readerGPTAccount=status.active;readerGPTStatus(models.options.length?'모델과 프롬프트를 확인한 뒤 [질문 보내기]를 눌러 주세요.':'이 계정에서 사용할 수 있는 모델이 없습니다.');
     }
     if(!status.connected){readerGPTAccount='';document.getElementById('readerGPTModel').replaceChildren();}
     clearTimeout(readerGPTAuthPoll);if(status.pending)readerGPTAuthPoll=setTimeout(readerGPTRefresh,1500);
-  }catch(error){if(epoch===readerGPTEpoch&&readerGPTIsOpen())readerGPTStatus(error.message);}
+  }catch(error){if(epoch===readerGPTEpoch&&revision===readerGPTRefreshId&&readerGPTIsOpen())readerGPTStatus(error.message);}
 }
 function readerOpenSelectedChatGPT(){const selected=readerGPTGetSelection()||readerGPTSelection;if(selected)readerOpenChatGPT(selected);}
 function readerOpenChatGPT(text=''){
