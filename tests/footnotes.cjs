@@ -4,6 +4,10 @@ const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'))
 const sample='지금까지 발견된 가장 유명한 화석 가운데 하나인 루시〔인물 각주: 1974년 에티오피아에서 발견된 약 320만 년 전 오스트랄로피테쿠스 화석 개체의 이름〕는 오스트랄로피테쿠스 아파렌시스Australopithecus afarensis의 머리뼈 화석이다. 1974년〔연도 비교 각주: 대한민국은 유신체제와 그 종식을 겪던 시기〕에 에티오피아〔지명 각주: 오늘날 아프리카 동북부의 고원 국가〕에서 발견된 루시는 320만 년 전에 살았고 직립보행에 적응한 발을 가진 원시인류였다.';
 const visible=sample.replace(/〔[^〕]*〕/g,'');
 let checks=0;
+async function hold(page,locator){
+ const box=await locator.boundingBox(),x=box.x+Math.min(box.width/2,15),y=box.y+box.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
+}
 async function epub(){
  const zip=new JSZip();zip.file('mimetype','application/epub+zip');zip.file('META-INF/container.xml','<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>');
  zip.file('book.opf','<package version="3.0"><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/><item id="b" href="b.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/></spine></package>');
@@ -22,7 +26,7 @@ async function epub(){
   async function open(text){await page.locator('#inputText').fill(text);await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length&&!restoreInProgress);}
   async function note(title){
    await page.evaluate(title=>{const i=pages.findIndex(html=>{const root=document.createElement('div');root.innerHTML=html;return [...root.querySelectorAll('[data-reader-note]')].some(el=>el.getAttribute('data-reader-note-title')===title);});if(i<0)throw Error('Missing note '+title);pageIndex=i;readerChooseAnchor(pageAnchors[i]);render();},title);
-   const actual=page.locator('#pageSpread [data-reader-note-title="'+title+'"]').first();await actual.tap();
+   const actual=page.locator('#pageSpread [data-reader-note-title="'+title+'"]').first();await hold(page,actual);
    await page.waitForFunction(()=>readerNoteIsOpen());return actual;
   }
   async function bounds(){
@@ -58,7 +62,7 @@ async function epub(){
   await page.locator('#openReaderSearch').click();await page.locator('#readerSearchInput').fill('에티오피아');await page.locator('#readerSearchForm').evaluate(form=>form.requestSubmit());
   await page.waitForFunction(()=>readerSearchMatches.length===1&&(typeof readerSearchBusy==='undefined'||!readerSearchBusy));
   await page.locator('.reader-search-result').first().click();assert.equal(await page.evaluate(()=>readerAnchor()),expectedSearch);checks++;
-  await page.locator('#pageSpread [data-reader-note-title="에티오피아"]').first().tap();await page.locator('#closeReaderNote').tap();
+  await hold(page,page.locator('#pageSpread [data-reader-note-title="에티오피아"]').first());await page.locator('#closeReaderNote').tap();
   assert.equal(await page.evaluate(()=>readerAnchor()),expectedSearch);checks++;
   await page.locator('#openReaderSearch').click();await page.locator('#readerSearchInput').fill('유신체제');await page.locator('#readerSearchForm').evaluate(form=>form.requestSubmit());
   await page.waitForFunction(()=>readerSearchMatches.length===0&&(typeof readerSearchBusy==='undefined'||!readerSearchBusy));
