@@ -20,9 +20,9 @@ const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'))
   async function down(p){if(mode==='mouse'){await page.mouse.move(p.x,p.y);await page.mouse.down();}else await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});}
   async function up(){if(mode==='mouse')await page.mouse.up();else await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(90);}
   async function tap(p){await down(p);await page.waitForTimeout(50);await up();}
-  let p=await atNote();const colors=await page.locator('#pageSpread [data-reader-note]').first().evaluate(el=>({color:getComputedStyle(el).color,italic:getComputedStyle(el).fontStyle,select:getComputedStyle(el).userSelect}));
-  assert.deepEqual(colors,{color:'rgb(102, 102, 102)',italic:'italic',select:'none'});checks++;
-  await page.emulateMedia({colorScheme:'dark'});assert.equal(await page.locator('#pageSpread [data-reader-note]').first().evaluate(el=>getComputedStyle(el).color),'rgb(170, 170, 170)');checks++;
+  let p=await atNote();const colors=await page.locator('#pageSpread [data-reader-note]').first().evaluate(el=>({color:getComputedStyle(el).color,background:getComputedStyle(el).backgroundColor,underline:getComputedStyle(el).textDecorationLine,style:getComputedStyle(el).textDecorationStyle,italic:getComputedStyle(el).fontStyle,select:getComputedStyle(el).userSelect}));
+  assert.deepEqual(colors,{color:'rgb(0, 0, 0)',background:'rgb(229, 229, 229)',underline:'underline',style:'dotted',italic:'italic',select:'none'});checks++;
+  await page.emulateMedia({colorScheme:'dark'});assert.deepEqual(await page.locator('#pageSpread [data-reader-note]').first().evaluate(el=>({color:getComputedStyle(el).color,background:getComputedStyle(el).backgroundColor})),{color:'rgb(0, 0, 0)',background:'rgb(229, 229, 229)'});checks++;
   await page.emulateMedia({colorScheme:'light'});
   const prevented=await page.locator('#pageSpread [data-reader-note]').first().evaluate(el=>!el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true})));
   assert.equal(prevented,true);checks++;
