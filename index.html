@@ -223,7 +223,7 @@ async function readerDeleteCache(id){
   }catch{}
 }
 function readerCacheBodyValid(cache,source){
-  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string');
+  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1));
 }
 function readerSameLayout(cache,signature){
   if(cache.signature===signature)return true;
@@ -270,7 +270,7 @@ function readerCreatePageCache(id,signature,previous,used){
     layouts.push({signature:layout.signature,fitHeight:layout.fitHeight,pages:layout.pages,anchors:layout.anchors});
     if(layouts.length===1)break;
   }
-  return {id,version:READER_CACHE_VERSION,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+  return {id,version:READER_CACHE_VERSION,noteVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
     fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
     canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
     chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,layouts,updatedAt:Date.now()};
@@ -344,6 +344,7 @@ async function readerDisplay(record={pageAnchor:0},generation=++readerState.gene
     }
     if(generation!==readerState.generation)return;
     readerState.layout=signature;
+    record=readerMigrateNotePosition(record,cached);
     const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
     const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
     readerChooseAnchor(target,readerContext(target));pageIndex=findPageIndexForAnchor(target);
@@ -428,6 +429,152 @@ function readerSyncBreakButtons(){
 
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Arial,sans-serif' font-size='34' font-weight='700' fill='%23fff'%3E%EC%B1%85%3C/text%3E%3C/svg%3E">
+<script>
+/* Inline notes are stored on their trigger, never as hidden paginated body text. */
+let readerNoteSource=null,readerNoteRangesCache=[];
+function readerFindNoteRanges(text){
+  const ranges=[];let at=0;
+  while((at=text.indexOf('〔',at))>=0){
+    let depth=1,end=at+1;
+    for(;end<text.length&&depth;end++){if(text[end]==='〔')depth++;else if(text[end]==='〕')depth--;}
+    if(depth)break;
+    const content=text.slice(at+1,end-1);
+    if(content.trim())ranges.push({start:at,end,content});
+    at=end;
+  }
+  return ranges;
+}
+function readerSourceNotes(text){
+  if(readerNoteSource!==text){readerNoteSource=text;readerNoteRangesCache=readerFindNoteRanges(text);}
+  return readerNoteRangesCache;
+}
+function readerSourceHasNotes(text){return readerSourceNotes(text).length>0;}
+function readerNoteContainsOffset(text,offset){
+  const ranges=readerSourceNotes(text);let lo=0,hi=ranges.length-1;
+  while(lo<=hi){const mid=(lo+hi)>>1,r=ranges[mid];if(offset<r.start)hi=mid-1;else if(offset>=r.end)lo=mid+1;else return true;}
+  return false;
+}
+function readerMarkdownNoteBlocks(text){
+  const notes=readerFindNoteRanges(text);
+  if(!notes.length)return markdownToBlocks(text);
+  let prefix='\uE000readerNote';while(text.includes(prefix))prefix+='\uE000';
+  let protectedText='',at=0;
+  notes.forEach((note,index)=>{protectedText+=text.slice(at,note.start)+prefix+index+'\uE001';at=note.end;});
+  protectedText+=text.slice(at);
+  return markdownToBlocks(protectedText).map(html=>readerFootnoteHTML(html,{notes,prefix}));
+}
+function readerFootnoteHTML(html,protectedNotes=null){
+  if(!protectedNotes&&!html.includes('〔'))return html;
+  const root=document.createElement('div');root.innerHTML=html;
+  const units=[],walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);let node,text='';
+  while((node=walker.nextNode())){
+    if(node.nodeType===Node.TEXT_NODE){units.push({node,start:text.length,end:text.length+node.length});text+=node.data;}
+    else if(node.tagName==='BR'){units.push({node,start:text.length,end:text.length+1});text+='\n';}
+  }
+  let notes;
+  if(protectedNotes){
+    const pattern=new RegExp(protectedNotes.prefix+'(\\d+)\uE001','g');
+    notes=[...text.matchAll(pattern)].map(match=>({start:match.index,end:match.index+match[0].length,content:protectedNotes.notes[Number(match[1])]?.content||''}));
+  }else notes=readerFindNoteRanges(text);
+  function point(offset,end=false){
+    const entry=units.find(unit=>end?offset>unit.start&&offset<=unit.end:offset>=unit.start&&offset<unit.end)||units[units.length-1];
+    if(entry.node.nodeType===Node.TEXT_NODE)return [entry.node,Math.max(0,Math.min(entry.node.length,offset-entry.start))];
+    const index=Array.prototype.indexOf.call(entry.node.parentNode.childNodes,entry.node);
+    return [entry.node.parentNode,index+(offset>entry.start?1:0)];
+  }
+  function range(start,end){const result=document.createRange();result.setStart(...point(start));result.setEnd(...point(end,true));return result;}
+  for(const note of notes.reverse()){
+    const container=point(note.start)[0],element=container.nodeType===Node.ELEMENT_NODE?container:container.parentElement;
+    if(element.closest('pre,code,[data-reader-note]')){
+      if(protectedNotes){const literal=range(note.start,note.end);literal.deleteContents();literal.insertNode(document.createTextNode('〔'+note.content+'〕'));}
+      continue;
+    }
+    const before=text.slice(0,note.start),tail=before.match(/[\t "'’”)\]}」』]*$/u)[0];
+    const end=before.length-tail.length,word=before.slice(0,end).match(/[\p{L}\p{N}\p{M}_]+(?:[·.'’/\-][\p{L}\p{N}\p{M}_]+)*\.?$/u);
+    const removal=range(note.start,note.end);removal.deleteContents();
+    const trigger=document.createElement('span');trigger.className='reader-note';trigger.tabIndex=0;trigger.setAttribute('role','button');
+    trigger.setAttribute('data-reader-note',note.content.trim());trigger.setAttribute('aria-haspopup','dialog');
+    trigger.setAttribute('data-reader-note-title',word?.[0]||'각주');trigger.setAttribute('aria-label',(word?.[0]||'각주')+' 각주 열기');
+    if(word){const label=range(end-word[0].length,end);trigger.appendChild(label.extractContents());label.insertNode(trigger);}
+    else{trigger.textContent='※';removal.insertNode(trigger);}
+  }
+  return root.innerHTML;
+}
+function readerMigrateNotePosition(record,cache){
+  if(!readerSourceHasNotes(fullText)||cache?.noteVersion===1||typeof cache?.canonical!=='string'||
+    String(record.layoutSignature||'').includes('"footnotes-v1"')||!Number.isFinite(Number(record.pageAnchor)))return record;
+  const old=cache.canonical,ranges=readerFindNoteRanges(old);if(!ranges.length)return record;
+  let visible='',at=0;for(const note of ranges){visible+=old.slice(at,note.start);at=note.end;}visible+=old.slice(at);
+  if(visible!==readerCanonical())return record;
+  const original=Math.max(0,Math.min(old.length,Number(record.pageAnchor)));let removed=0;
+  for(const note of ranges){if(note.start>=original)break;removed+=Math.min(original,note.end)-note.start;}
+  const anchor=original-removed;return {...record,pageAnchor:anchor,pageContext:readerContext(anchor)};
+}
+
+let readerNoteLayer=null,readerNoteTrigger=null,readerNoteBodyOverflow='',readerNoteRootOverflow='',readerNotePreviousAria=null;
+function readerNoteIsOpen(){return !!readerNoteLayer&&!readerNoteLayer.hidden;}
+function readerNoteUpdateViewport(){
+  if(!readerNoteLayer)return;
+  const vv=window.visualViewport,width=Math.max(1,vv?.width||innerWidth),height=Math.max(1,vv?.height||innerHeight);
+  const style=readerNoteLayer.style;
+  style.left=Math.max(0,vv?.offsetLeft||0)+'px';style.top=Math.max(0,vv?.offsetTop||0)+'px';style.width=width+'px';style.height=height+'px';
+  style.setProperty('--note-gap',Math.max(2,Math.min(12,width*.03,height*.03))+'px');
+}
+function readerOpenNote(trigger){
+  if(!readerNoteLayer||!viewerOverlay.classList.contains('active'))return;
+  if(!readerNoteIsOpen()){
+    readerNoteBodyOverflow=document.body.style.overflow;readerNoteRootOverflow=document.documentElement.style.overflow;
+    readerNotePreviousAria=viewerOverlay.getAttribute('aria-hidden');
+  }
+  readerNoteTrigger=trigger;resetPageGesture();
+  const content=document.getElementById('readerNoteContent'),style=getComputedStyle(pageInnerLeft);
+  document.getElementById('readerNoteTitle').textContent=trigger.getAttribute('data-reader-note-title')||'각주';
+  content.textContent=trigger.getAttribute('data-reader-note')||'';
+  for(const property of ['fontFamily','fontSize','lineHeight','letterSpacing'])content.style[property]=style[property];
+  content.scrollTop=0;readerNoteUpdateViewport();readerNoteLayer.hidden=false;
+  document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';viewerOverlay.setAttribute('aria-hidden','true');
+  document.getElementById('closeReaderNote').focus({preventScroll:true});
+}
+function readerCloseNote(){
+  if(!readerNoteIsOpen())return;
+  readerNoteLayer.hidden=true;document.getElementById('readerNoteContent').textContent='';
+  document.body.style.overflow=readerNoteBodyOverflow;document.documentElement.style.overflow=readerNoteRootOverflow;
+  if(readerNotePreviousAria===null)viewerOverlay.removeAttribute('aria-hidden');else viewerOverlay.setAttribute('aria-hidden',readerNotePreviousAria);
+  if(readerNoteTrigger?.isConnected)readerNoteTrigger.focus({preventScroll:true});readerNoteTrigger=null;
+  resetPageGesture();pageGestureSuppressUntil=performance.now()+400;
+  syncVisualViewport();scheduleRepaginate();
+}
+function setupReaderNotes(){
+  readerNoteLayer=document.createElement('div');readerNoteLayer.id='readerNoteLayer';readerNoteLayer.className='reader-note-layer';readerNoteLayer.hidden=true;
+  readerNoteLayer.innerHTML='<section class="reader-note-dialog" role="dialog" aria-modal="true" aria-labelledby="readerNoteTitle"><header class="reader-note-header"><h2 id="readerNoteTitle"></h2><button id="closeReaderNote" type="button" aria-label="각주 닫기">닫기</button></header><div id="readerNoteContent" class="reader-note-content" tabindex="0" role="document"></div></section>';
+  document.body.appendChild(readerNoteLayer);document.getElementById('closeReaderNote').onclick=readerCloseNote;
+  readerNoteLayer.addEventListener('click',event=>{event.stopPropagation();if(event.target===readerNoteLayer)readerCloseNote();});
+  for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerNoteLayer.addEventListener(type,event=>event.stopPropagation(),{passive:true});
+  for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchend'])document.addEventListener(type,event=>{
+    if(event.target.closest?.('[data-reader-note]'))event.stopPropagation();
+  },true);
+  document.addEventListener('click',event=>{
+    const trigger=event.target.closest?.('[data-reader-note]');
+    if(trigger&&viewerOverlay.classList.contains('active')){event.preventDefault();event.stopImmediatePropagation();readerOpenNote(trigger);}
+  },true);
+  document.addEventListener('keydown',event=>{
+    if(readerNoteIsOpen()){
+      event.stopImmediatePropagation();
+      if(event.key==='Escape'){event.preventDefault();readerCloseNote();return;}
+      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){event.preventDefault();return;}
+      if(event.key==='Tab'){
+        event.preventDefault();const close=document.getElementById('closeReaderNote'),content=document.getElementById('readerNoteContent');
+        (document.activeElement===close?content:close).focus({preventScroll:true});
+      }
+      return;
+    }
+    const trigger=event.target.closest?.('[data-reader-note]');
+    if(trigger&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.stopImmediatePropagation();readerOpenNote(trigger);}
+  },true);
+  addEventListener('resize',readerNoteUpdateViewport);
+  window.visualViewport?.addEventListener('resize',readerNoteUpdateViewport);window.visualViewport?.addEventListener('scroll',readerNoteUpdateViewport);
+}
+</script>
 <style>
 :root{
   --bg:#fff;
@@ -936,6 +1083,21 @@ textarea{min-height:42vh}
 .reader-spacing-option{display:block;margin:10px 0;font-size:13px;line-height:1.5}
 .reader-spacing-option small{display:block;margin-left:23px;color:var(--muted);font-size:11px}
 @media(max-width:480px){.bookhead{gap:4px}.book-actions{gap:4px}.book-actions button{font-size:10px;padding:5px}.top-page-nav{gap:4px}}
+.page-inner .reader-note{font-style:italic;cursor:pointer;border:0;background:none;color:inherit;padding:0;margin:0;border-radius:0}
+.reader-note:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.reader-note-layer{position:fixed;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+  padding:12px;padding:var(--note-gap,12px);padding-top:max(var(--note-gap,12px),env(safe-area-inset-top,0px));padding-right:max(var(--note-gap,12px),env(safe-area-inset-right,0px));
+  padding-bottom:max(var(--note-gap,12px),env(safe-area-inset-bottom,0px));padding-left:max(var(--note-gap,12px),env(safe-area-inset-left,0px));
+  background:rgba(0,0,0,.45);overscroll-behavior:contain}
+.reader-note-layer[hidden]{display:none!important}
+.reader-note-dialog{width:100%;max-width:640px;max-height:100%;min-width:0;min-height:0;box-sizing:border-box;display:flex;flex-direction:column;
+  overflow:hidden;background:var(--paper,#fff);color:var(--ink,#111);border:1px solid currentColor;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
+.reader-note-header{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0;padding:6px 8px;border-bottom:1px solid var(--line,#bbb)}
+.reader-note-header h2{flex:1 1 auto;min-width:0;margin:0;font-size:18px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-note-header button{flex:0 0 auto;min-width:52px;min-height:40px;padding:6px 8px;font-size:14px;line-height:1.3}
+.reader-note-content{flex:1 1 auto;min-width:0;min-height:0;padding:12px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;text-align:left}
+
 </style>
 <script>
 /*!
@@ -977,7 +1139,7 @@ function normalizeBookChapters(chapters,text){
   return result;
 }
 function detectTextChapters(text){
-  const matches=[...text.matchAll(/\[([^\[\]\r\n]+)\]/g)].filter(m=>m[1].trim());
+  const matches=[...text.matchAll(/\[([^\[\]\r\n]+)\]/g)].filter(m=>m[1].trim()&&!readerNoteContainsOffset(text,m.index));
   if(matches.length<3)return [];
   const chapters=matches.map(m=>({title:m[1].trim(),start:m.index}));
   if(text.slice(0,chapters[0].start).trim())chapters.unshift({title:'앞부분',start:0});
@@ -1021,11 +1183,11 @@ function readerPrepareChapterImages(){
 }
 function readerChapterBlocks(text){
   chapterBlockBoundaries=new Set();chapterCanonicalStarts=[];
-  if(!bookChapters.length||text!==fullText)return markdownToBlocks(text);
+  if(!bookChapters.length||text!==fullText)return readerMarkdownNoteBlocks(text);
   const blocks=[];let anchor=0;
   bookChapters.forEach((chapter,index)=>{
     chapterBlockBoundaries.add(blocks.length);chapterCanonicalStarts.push(anchor);
-    const part=chapter.blocks||markdownToBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
+    const part=chapter.blocks?chapter.blocks.map(html=>readerFootnoteHTML(html)):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
     const content=part.length?part:['<p></p>'];
     blocks.push(...content);
     for(const html of content)anchor+=htmlToStableText(html).length+1;
@@ -2124,7 +2286,7 @@ function getLayoutSignature(){
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
-    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent]);
+    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[])]);
 }
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
@@ -2861,6 +3023,7 @@ function render(){
 }
 
 async function repaginate(){
+  if(readerNoteIsOpen())return;
   if(pageJumpLayoutLocked())return;
   if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
   if(readerState.layout===getLayoutSignature())return;
@@ -2898,7 +3061,7 @@ pageGestureSurface.addEventListener('pointerdown',e=>{
   if(pageGesturePointers.size!==1||!e.isPrimary){pageGesture=null;pageGestureSuppressUntil=performance.now()+800;return;}
   pageGestureSuppressUntil=0;
   if(restoreInProgress||!pages.length||settingsPanelIsOpen()||pageGestureSelection()||
-    e.target.closest('a,button,input,select,textarea,label'))return;
+    e.target.closest('a,button,input,select,textarea,label,[data-reader-note]'))return;
   pageGesture={id:e.pointerId,x:e.clientX,y:e.clientY,vertical:0,moved:0,
     time:performance.now(),generation:readerState.generation};
   pageGestureSurface.setPointerCapture?.(e.pointerId);
@@ -2938,7 +3101,7 @@ $('#pageSpread').addEventListener('click',e=>{
   if(!pages.length)return;
 
   /* 링크 등 실제 조작 요소를 누른 경우에는 페이지 이동하지 않음 */
-  if(e.target.closest('a,button,input,select,textarea,label'))return;
+  if(e.target.closest('a,button,input,select,textarea,label,[data-reader-note]'))return;
 
   /* 텍스트를 선택한 직후의 탭/클릭은 페이지 이동하지 않음 */
   const selection=window.getSelection?.();
@@ -3006,6 +3169,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  readerCloseNote();
   readerHideSearch();
   resetPageGesture();
   pageJumpInput.blur();cancelPageJumpEdit();
@@ -3135,6 +3299,7 @@ async function restoreReadingSession(reading){
   }
 }
 
+setupReaderNotes();
 setupChapterNavigation();
 setupReaderTools();
 const syncReading=loadReadingSessionSync();
