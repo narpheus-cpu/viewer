@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ActionMode;
 import android.view.WindowInsets;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
@@ -48,7 +49,17 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         position = getSharedPreferences("reader_position_v1", MODE_PRIVATE);
-        root = new FrameLayout(this);
+        root = new FrameLayout(this) {
+            private ActionMode.Callback decorate(ActionMode.Callback callback) {
+                return web instanceof ReaderWebView ? ((ReaderWebView)web).selectionCallback(callback) : callback;
+            }
+            @Override public ActionMode startActionModeForChild(View child, ActionMode.Callback callback) {
+                return super.startActionModeForChild(child, decorate(callback));
+            }
+            @Override public ActionMode startActionModeForChild(View child, ActionMode.Callback callback, int type) {
+                return super.startActionModeForChild(child, decorate(callback), type);
+            }
+        };
         web = new ReaderWebView(this);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
