@@ -1,0 +1,15 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.seosol.ebookviewer.recent'
+    compileSdk 36
+    buildToolsVersion '36.0.0'
+    defaultConfig {
+        applicationId 'com.seosol.ebookviewer.recent'
+        minSdk 23
+        targetSdk 36
+        versionCode 18
+        versionName '1.17'
+    }
+    buildTypes { debug { debuggable true }; release { minifyEnabled false } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
