@@ -48,6 +48,7 @@ let checks=0;
       async function search(value){
         await page.locator('#openReaderSearch').click();await page.locator('#readerSearchInput').fill(value);
         await page.locator('#readerSearchForm').evaluate(form=>form.requestSubmit());
+        await page.waitForFunction(value=>readerSearchQuery===value.trim()&&(typeof readerSearchBusy==='undefined'||!readerSearchBusy),value);
       }
       await search('혁명');assert.equal(await page.locator('.reader-search-result').count(),1);
       assert.match(await page.locator('.reader-search-result-label').innerText(),/마지막/);checks+=2;
@@ -73,7 +74,7 @@ let checks=0;
       }
       await search('검색');assert.equal(await page.locator('.reader-search-result').count(),100);
       assert.match(await page.locator('#readerSearchCount').innerText(),/130/);checks+=2;
-      await page.locator('.search-more').click();assert.equal(await page.locator('.reader-search-result').count(),130);checks++;
+      await page.locator('.search-more').click();await page.waitForFunction(()=>document.querySelectorAll('.reader-search-result').length===130);assert.equal(await page.locator('.reader-search-result').count(),130);checks++;
       const expectedSearchAnchor=await page.evaluate(()=>readerSearchMatches[120].start);
       await page.locator('[data-result="120"]').click();assert.equal(await page.evaluate(()=>readerAnchor()),expectedSearchAnchor);checks++;
       await search('찾을 수 없는 문자열');assert.equal(await page.locator('.reader-search-result').count(),0);
