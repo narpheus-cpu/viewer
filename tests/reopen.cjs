@@ -43,7 +43,8 @@ async function epub(){
   // A one-pixel reduction stays within the measured reserve and must not repaginate.
   const before=await page.evaluate(()=>readerStats.splits);await page.setViewportSize({width,height:843});
   await page.waitForFunction(()=>!restoreInProgress&&readerState.layout===getLayoutSignature());
-  assert.equal(await page.evaluate(()=>readerStats.splits),before);assert.equal(await page.evaluate(()=>readerStats.lastCacheReason),'safe-height');checks+=2;
+  assert.equal(await page.evaluate(()=>readerStats.splits),before);assert.ok(['exact','safe-height'].includes(await page.evaluate(()=>readerStats.lastCacheReason))); // Pixel rounding can preserve the exact measured height.
+   checks+=2;
   assert.equal(await page.evaluate(()=>pageInnerLeft.scrollHeight<=pageInnerLeft.clientHeight+1),true);checks++;
   const overflow=await page.evaluate(()=>{
     const box=ensurePaginationMeasureBox();box.style.height=pageInnerLeft.getBoundingClientRect().height+'px';let worst=0;
