@@ -1082,8 +1082,11 @@ textarea{min-height:42vh}
 .reader-spacing-option{display:block;margin:10px 0;font-size:13px;line-height:1.5}
 .reader-spacing-option small{display:block;margin-left:23px;color:var(--muted);font-size:11px}
 @media(max-width:480px){.bookhead{gap:4px}.book-actions{gap:4px}.book-actions button{font-size:10px;padding:5px}.top-page-nav{gap:4px}}
-.page-inner .reader-note{font-style:italic;cursor:pointer;border:0;background:none;color:var(--muted,#666);padding:0;margin:0;border-radius:0}
+.page-inner .reader-note{font-style:italic;cursor:pointer;border:0;background:#e5e5e5;color:#000;padding:0;margin:0;border-radius:0;
+  text-decoration:underline;text-decoration-style:dotted;text-decoration-color:#000;text-underline-offset:.12em;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone}
 .page-inner .reader-note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.page-inner .reader-note,.page-inner .reader-note *{color:#000;-webkit-text-fill-color:#000}
 .reader-note:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .reader-note-layer{position:fixed;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;
   padding:12px;padding:var(--note-gap,12px);padding-top:max(var(--note-gap,12px),env(safe-area-inset-top,0px));padding-right:max(var(--note-gap,12px),env(safe-area-inset-right,0px));
