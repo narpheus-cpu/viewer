@@ -1,0 +1,35 @@
+const assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url'),{chromium}=require('playwright');
+const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'));
+(async()=>{const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});let checks=0;try{
+for(const viewport of [{width:320,height:480},{width:568,height:320}]){
+ const context=await browser.newContext({viewport,hasTouch:true}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.addInitScript(()=>{
+  window.__nativeTest={calls:[],closes:0,hold:false};window.AndroidSelection={close(){__nativeTest.closes++;}};
+  window.AndroidChatGPT={usesNativeSelectionMenu:()=>true,readPreferences:()=>'',savePreferences:()=>true,request(id,action,raw){const params=JSON.parse(raw);__nativeTest.calls.push({action,params});setTimeout(()=>{let result={};if(action==='status')result={connected:true,plan:true,active:'a',accounts:[{id:'a',label:'Account'}],label:'Account'};if(action==='models')result={models:[{slug:'m',display_name:'Model'}]};if(action==='ask')result={id:'job'};if(action==='poll')result={text:'설명입니다.',done:!__nativeTest.hold};window.__readerChatGPTReply(id,result);},5);}};
+ });
+ await page.goto(pathToFileURL(target).href);await page.evaluate(()=>readerReady);
+ const snapshot=await page.evaluate(()=>({url:location.href,input:inputText.value,reading:localStorage.getItem(READING_STORAGE),recent:activeRecentId,open:viewerOverlay.classList.contains('active')}));
+ await page.evaluate(()=>readerOpenChatGPT('일반 호출'));assert.equal(await page.evaluate(()=>readerGPTIsOpen()),false);checks++;
+ const selected='문장 "따옴표"와 역슬래시 \\ 및 줄바꿈\n<svg onload=alert(1)>\u2028끝';
+ assert.equal(await page.evaluate(t=>readerOpenExternalChatGPT(t),selected),true);await page.waitForFunction(()=>document.getElementById('readerGPTModel').options.length);
+ assert.equal(await page.locator('#readerGPTSelected').inputValue(),selected);assert.equal(await page.locator('#readerGPTSettings').evaluate(el=>el.open),false);assert.equal(await page.locator('#readerGPTPrompt').isVisible(),false);assert.equal(await page.evaluate(()=>__nativeTest.calls.filter(x=>x.action==='ask').length),0);checks+=4;
+ assert.deepEqual(await page.evaluate(()=>({url:location.href,input:inputText.value,reading:localStorage.getItem(READING_STORAGE),recent:activeRecentId,open:viewerOverlay.classList.contains('active')})),snapshot);checks++;
+ await page.locator('#readerGPTSettings>summary').click();await page.locator('#readerGPTPrompt').fill('설명: {{본문}}');await page.locator('#readerGPTSend').click();await page.waitForFunction(()=>document.getElementById('readerGPTStatus').textContent==='답변 완료');assert.equal(await page.locator('#readerGPTAnswer').innerText(),'설명입니다.');assert.equal(await page.locator('#readerGPTSettings').evaluate(el=>el.open),false);assert.deepEqual(await page.evaluate(()=>__nativeTest.calls.find(x=>x.action==='ask').params),{text:selected,prompt:'설명: {{본문}}',model:'m'});checks+=3;
+ // A second PROCESS_TEXT delivery replaces the question and cancels the old job.
+ await page.evaluate(()=>{__nativeTest.hold=true;});await page.locator('#readerGPTSend').click();await page.waitForFunction(()=>!!readerGPTJob);await page.evaluate(()=>readerOpenExternalChatGPT('두 번째 문장'));await page.waitForFunction(()=>!readerGPTBusy);
+ assert.equal(await page.locator('#readerGPTSelected').inputValue(),'두 번째 문장');assert.equal(await page.locator('#readerGPTPrompt').inputValue(),'설명: {{본문}}');assert.equal(await page.evaluate(()=>__nativeTest.closes),0);assert.ok(await page.evaluate(()=>__nativeTest.calls.some(x=>x.action==='cancel')));checks+=4;
+ assert.equal(await page.evaluate(()=>readerOpenExternalChatGPT('x'.repeat(32001))),false);assert.equal(await page.evaluate(()=>readerOpenExternalChatGPT('  ')),false);assert.equal(await page.locator('#readerGPTSelected').inputValue(),'두 번째 문장');checks+=3;
+ await page.locator('#closeReaderGPT').click();assert.equal(await page.evaluate(()=>__nativeTest.closes),1);assert.equal(await page.evaluate(()=>readerGPTIsOpen()),false);checks+=2;
+ await page.locator('#inputText').fill('책의 원래 본문입니다. '.repeat(500));await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length>3&&!restoreInProgress);await page.evaluate(()=>goNextPage());
+ const book=await page.evaluate(()=>({anchor:readerAnchor(),page:pageIndex,text:inputText.value,recent:activeRecentId,splits:readerStats.splits}));
+ await page.evaluate(()=>readerOpenExternalChatGPT('웹에서 선택한 별도 문장'));await page.locator('#closeReaderGPT').click();assert.deepEqual(await page.evaluate(()=>({anchor:readerAnchor(),page:pageIndex,text:inputText.value,recent:activeRecentId,splits:readerStats.splits})),book);assert.equal(await page.evaluate(()=>__nativeTest.closes),2);assert.deepEqual(errors,[]);checks+=3;await context.close();
+}
+// Android web uses the browser menu rather than an unclickable HTML overlay.
+if(!target.includes('assets')){
+ const c=await browser.newContext({viewport:{width:360,height:640},hasTouch:true,userAgent:'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/142.0 Mobile Safari/537.36'}),p=await c.newPage();
+ await p.goto(pathToFileURL(target).href);await p.evaluate(()=>readerReady);await p.locator('#inputText').fill('기본 선택 메뉴로 전달할 본문입니다. '.repeat(50));await p.locator('#openViewerBtn').click();await p.waitForFunction(()=>pages.length&&!restoreInProgress);
+ const selection=await p.evaluate(()=>{const w=document.createTreeWalker(document.getElementById('pageInnerLeft'),NodeFilter.SHOW_TEXT),n=w.nextNode(),r=document.createRange();r.setStart(n,0);r.setEnd(n,5);getSelection().removeAllRanges();getSelection().addRange(r);readerGPTUpdateSelection();return readerGPTCaptureSelection();});
+ assert.ok(selection);assert.equal(await p.locator('#readerGPTSelectionMenu').isVisible(),false);assert.equal(await p.locator('.reader-gpt-settings').innerText(),'ChatGPT 기본 메뉴 연결 앱 설치');checks+=3;await c.close();
+}
+console.log(checks+' external selection, text safety, no automatic send, answer-first layout, replacement/cancel, return and book preservation checks passed: '+target);
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

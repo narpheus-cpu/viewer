@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.seosol.ebookviewer.chatgptmenu">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application android:label="ChatGPT 메뉴 연결" android:theme="@style/AppTheme"
+        android:icon="@drawable/ic_book" android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="true" android:enableOnBackInvokedCallback="true">
+        <activity android:name="com.seosol.ebookviewer.recent.MainActivity" android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize">
+        </activity>
+        <activity-alias android:name=".ChatGPTTextSelection"
+            android:targetActivity="com.seosol.ebookviewer.recent.MainActivity" android:exported="true"
+            android:label="ChatGPT연결">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>

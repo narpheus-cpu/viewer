@@ -155,6 +155,7 @@ function setupReaderNotes(){
 <script>
 /* Selection-to-ChatGPT UI. OAuth credentials stay in the native/PC runtime. */
 const READER_GPT_PREFS='readerChatGPTPreferencesV1',READER_GPT_LOCAL='http://127.0.0.1:17173';
+let readerGPTExternal=false;
 let readerGPTLayer=null,readerGPTMenu=null,readerGPTSelection='',readerGPTBusy=false,readerGPTJob='',readerGPTPoll=0,readerGPTAuthPoll=0,readerGPTEpoch=0;
 let readerGPTAccount='',readerGPTConnected=false,readerGPTRefreshId=0,readerGPTPreviousFocus=null,readerGPTBodyOverflow='',readerGPTRootOverflow='',readerGPTPreviousAria=null;
 let readerGPTPairWindow=null,readerGPTRpcId=0;const readerGPTRpcPending=new Map();
@@ -162,6 +163,7 @@ let readerGPTPrefs={prompt:'선택한 본문의 의미를 쉬운 한국어로 �
 try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatGPT?.readPreferences?.()].map(raw=>{try{return JSON.parse(raw||'null');}catch{return null;}}).filter(x=>x&&typeof x.prompt==='string');if(candidates.length)readerGPTPrefs=candidates.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];}catch{}
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
+function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
 async function readerGPTRpc(action,params={}){
   if(readerGPTNative())return new Promise((resolve,reject)=>{const id=String(++readerGPTRpcId),timer=setTimeout(()=>{readerGPTRpcPending.delete(id);reject(Error('연결 응답이 없습니다. 다시 시도해 주세요.'));},60000);readerGPTRpcPending.set(id,{resolve,reject,timer});try{AndroidChatGPT.request(id,action,JSON.stringify(params));}catch(error){clearTimeout(timer);readerGPTRpcPending.delete(id);reject(error);}});
   const key=sessionStorage.getItem('readerGPTLocalKey')||'';if(!key)throw Error('PC 연결 프로그램을 실행한 뒤 [PC 연결]을 눌러 주세요.');
@@ -188,7 +190,7 @@ function readerGPTGetSelection(){
   return inside(range.startContainer)&&inside(range.endContainer)?selection.toString().trim():'';
 }
 function readerGPTUpdateSelection(){
-  if(!readerGPTMenu)return;const text=readerGPTGetSelection();if(text)readerGPTSelection=text;if(window.AndroidChatGPT?.usesNativeSelectionMenu?.()){readerGPTMenu.hidden=true;return;}
+  if(!readerGPTMenu)return;const text=readerGPTGetSelection();if(text)readerGPTSelection=text;if(window.AndroidChatGPT?.usesNativeSelectionMenu?.()||readerGPTAndroidWeb()){readerGPTMenu.hidden=true;return;}
   if(!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||readerNoteIsOpen()||settingsPanelIsOpen()){readerGPTMenu.hidden=true;return;}
   readerGPTSelection=text;readerGPTMenu.hidden=false;const r=getSelection().getRangeAt(0).getBoundingClientRect(),v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
   const w=readerGPTMenu.offsetWidth,h=readerGPTMenu.offsetHeight,left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
@@ -219,18 +221,25 @@ function readerGPTCaptureSelection(){
   return readerGPTSelection;
 }
 function readerOpenSelectedChatGPT(){const selected=readerGPTCaptureSelection();if(selected)readerOpenChatGPT(selected);}
-function readerOpenChatGPT(text=''){
-  if(!viewerOverlay.classList.contains('active'))return;readerCloseNote();readerHideSearch();
+function readerOpenChatGPT(text='',external=false){
+  if(!external&&!viewerOverlay.classList.contains('active'))return;readerCloseNote();readerHideSearch();
   if(readerGPTIsOpen())return;readerGPTEpoch++;readerGPTPreviousFocus=document.activeElement;readerGPTBodyOverflow=document.body.style.overflow;readerGPTRootOverflow=document.documentElement.style.overflow;readerGPTPreviousAria=viewerOverlay.getAttribute('aria-hidden');
   readerGPTSelection=String(text).trim();readerGPTMenu.hidden=true;readerGPTLayer.hidden=false;readerGPTViewport();
   document.getElementById('readerGPTSelected').value=readerGPTSelection;document.getElementById('readerGPTPrompt').value=readerGPTPrefs.prompt;document.getElementById('readerGPTAnswer').textContent='';document.getElementById('readerGPTSettings').open=false;document.getElementById('readerGPTSaved').textContent='프롬프트는 수정할 때까지 계속 적용됩니다.';
   document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';viewerOverlay.setAttribute('aria-hidden','true');getSelection()?.removeAllRanges();resetPageGesture();readerGPTSetBusy(false);document.getElementById('closeReaderGPT').focus({preventScroll:true});
   readerGPTStatus(readerGPTSelection?'선택한 본문만 질문에 포함됩니다.':'연결·프롬프트 설정입니다. 질문하려면 본문을 드래그해 선택해 주세요.');void readerGPTRefresh();
 }
+function readerOpenExternalChatGPT(text){
+  if(typeof text!=='string'||!text.trim()||text.length>32000)return false;
+  // A new native selection replaces the previous question, without closing the app.
+  readerGPTExternal=false;if(readerGPTIsOpen())readerGPTClose();
+  readerGPTExternal=true;readerOpenChatGPT(text,true);return true;
+}
 function readerGPTClose(){
-  if(!readerGPTIsOpen())return;readerGPTSavePreferences();void readerGPTCancel();readerGPTEpoch++;clearTimeout(readerGPTAuthPoll);readerGPTLayer.hidden=true;
+  if(!readerGPTIsOpen())return;const external=readerGPTExternal;readerGPTExternal=false;readerGPTSavePreferences();void readerGPTCancel();readerGPTEpoch++;clearTimeout(readerGPTAuthPoll);readerGPTLayer.hidden=true;
   document.body.style.overflow=readerGPTBodyOverflow;document.documentElement.style.overflow=readerGPTRootOverflow;if(readerGPTPreviousAria===null)viewerOverlay.removeAttribute('aria-hidden');else viewerOverlay.setAttribute('aria-hidden',readerGPTPreviousAria);
   readerGPTSelection='';readerGPTMenu.hidden=true;if(readerGPTPreviousFocus?.isConnected)readerGPTPreviousFocus.focus({preventScroll:true});resetPageGesture();pageGestureSuppressUntil=performance.now()+800;syncVisualViewport();scheduleRepaginate();
+  if(external)window.AndroidSelection?.close?.();
 }
 async function readerGPTCancel(){clearTimeout(readerGPTPoll);const job=readerGPTJob;readerGPTJob='';readerGPTSetBusy(false);if(job)try{await readerGPTRpc('cancel',{id:job});}catch{};}
 async function readerGPTSend(){
@@ -256,6 +265,7 @@ function setupReaderChatGPT(){
   addEventListener('message',event=>{if(event.origin===READER_GPT_LOCAL&&event.source===readerGPTPairWindow&&/^[A-Za-z0-9_-]{40,100}$/.test(event.data?.readerKey||'')){sessionStorage.setItem('readerGPTLocalKey',event.data.readerKey);readerGPTPairWindow=null;void readerGPTRefresh();}});
   document.getElementById('readerGPTPrompt').addEventListener('input',readerGPTSavePreferences);document.getElementById('readerGPTModel').onchange=readerGPTSavePreferences;
   const settings=document.createElement('button');settings.type='button';settings.className='reader-gpt-settings';settings.textContent='ChatGPT 연결·프롬프트 설정';settings.onclick=()=>{readerOpenChatGPT();document.getElementById('readerGPTSettings').open=true;};document.getElementById('viewerSettings').appendChild(settings);
+  if(readerGPTAndroidWeb()){settings.textContent='ChatGPT 기본 메뉴 연결 앱 설치';settings.onclick=()=>window.open('https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/ChatGPT_Menu_Bridge_v1.0.apk','_blank','noopener');}
   let frame=0;document.addEventListener('selectionchange',()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;readerGPTUpdateSelection();});});
   readerGPTLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerGPTLayer)readerGPTClose();});for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerGPTLayer.addEventListener(type,e=>e.stopPropagation(),{passive:true});
   document.addEventListener('keydown',e=>{if(!readerGPTIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerGPTClose();}else if(e.key==='Tab'){const items=[...readerGPTLayer.querySelectorAll('button,select,textarea,summary,[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);

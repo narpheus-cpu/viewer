@@ -45,9 +45,53 @@ public final class MainActivity extends Activity {
     private final Set<String> selectedFiles = new HashSet<>();
     private SharedPreferences position;
     private OnBackInvokedCallback backCallback;
+    private String pendingSelection;
+    private boolean documentReady, externalSelection;
+
+    private void receiveSelection(Intent intent) {
+        if (intent == null || !Intent.ACTION_PROCESS_TEXT.equals(intent.getAction()) ||
+                !"text/plain".equals(intent.getType())) return;
+        CharSequence value = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
+        String text = value == null ? "" : value.toString().trim();
+        if (text.isEmpty() || text.length() > 32000) {
+            Toast.makeText(this, "본문은 1~32,000자까지 선택해 주세요.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        // Keep selected text in memory only: never in a URL, log or book history.
+        pendingSelection = text;
+        externalSelection = true;
+    }
+
+    private void openPendingSelection() {
+        if (!documentReady || pendingSelection == null) return;
+        String selected = pendingSelection;
+        pendingSelection = null;
+        String literal = JSONObject.quote(selected).replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
+        web.evaluateJavascript("readerReady.then(function(){window.readerOpenExternalChatGPT(" + literal + ");})", null);
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        receiveSelection(intent);
+        openPendingSelection();
+    }
+
+    public final class SelectionBridge {
+        @JavascriptInterface public void close() {
+            runOnUiThread(() -> {
+                if (!externalSelection) return;
+                externalSelection = false;
+                // Complete PROCESS_TEXT and return to the untouched browser tab.
+                setResult(RESULT_CANCELED);
+                finish();
+            });
+        }
+    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        receiveSelection(getIntent());
         position = getSharedPreferences("reader_position_v1", MODE_PRIVATE);
         root = new FrameLayout(this) {
             private ActionMode.Callback decorate(ActionMode.Callback callback) {
@@ -97,9 +141,16 @@ public final class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(getApplicationInfo().flags != 0 &&
             (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0);
         web.addJavascriptInterface(new PositionBridge(), "AndroidReader");
+        web.addJavascriptInterface(new SelectionBridge(), "AndroidSelection");
         try { chatGPT = new ChatGPTClient(this, web); web.addJavascriptInterface(chatGPT, "AndroidChatGPT"); }
         catch (Exception error) { Toast.makeText(this, "ChatGPT 계정 저장소를 열지 못했습니다.", Toast.LENGTH_LONG).show(); }
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (isHome(Uri.parse(url))) {
+                    documentReady = true;
+                    openPendingSelection();
+                }
+            }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return serve(request.getUrl());
             }
@@ -277,6 +328,7 @@ public final class MainActivity extends Activity {
         if (web != null) {
             root.removeView(web);
             web.removeJavascriptInterface("AndroidReader");
+            web.removeJavascriptInterface("AndroidSelection");
             web.removeJavascriptInterface("AndroidChatGPT");
             web.destroy();
         }
