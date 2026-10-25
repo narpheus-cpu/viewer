@@ -46,10 +46,20 @@ public final class MainActivity extends Activity {
     private SharedPreferences position;
     private OnBackInvokedCallback backCallback;
     private String pendingSelection;
-    private boolean documentReady, externalSelection;
+    private boolean documentReady, externalSelection, pendingSettings;
 
     private void receiveSelection(Intent intent) {
-        if (intent == null || !Intent.ACTION_PROCESS_TEXT.equals(intent.getAction()) ||
+        if (intent == null) return;
+        Uri uri = intent.getData();
+        if (Intent.ACTION_VIEW.equals(intent.getAction()) && uri != null &&
+                "ebookviewer".equals(uri.getScheme()) && "chatgpt".equals(uri.getHost()) &&
+                "/settings".equals(uri.getPath()) && uri.getQuery() == null && uri.getFragment() == null) {
+            pendingSelection = "";
+            pendingSettings = true;
+            externalSelection = true;
+            return;
+        }
+        if (!Intent.ACTION_PROCESS_TEXT.equals(intent.getAction()) ||
                 !"text/plain".equals(intent.getType())) return;
         CharSequence value = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
         String text = value == null ? "" : value.toString().trim();
@@ -59,15 +69,18 @@ public final class MainActivity extends Activity {
         }
         // Keep selected text in memory only: never in a URL, log or book history.
         pendingSelection = text;
+        pendingSettings = false;
         externalSelection = true;
     }
 
     private void openPendingSelection() {
         if (!documentReady || pendingSelection == null) return;
         String selected = pendingSelection;
+        boolean settingsOnly = pendingSettings;
         pendingSelection = null;
+        pendingSettings = false;
         String literal = JSONObject.quote(selected).replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
-        web.evaluateJavascript("readerReady.then(function(){window.readerOpenExternalChatGPT(" + literal + ");})", null);
+        web.evaluateJavascript("readerReady.then(function(){window.readerOpenExternalChatGPT(" + literal + "," + settingsOnly + ");})", null);
     }
 
     @Override protected void onNewIntent(Intent intent) {
