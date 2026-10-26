@@ -49,7 +49,8 @@ async function epub(){
   assert.deepEqual(inline,{text:'루시는 유명하다.',label:'루시'});checks++;
   await open(sample);
   assert.equal(await page.locator('#inputText').inputValue(),sample);assert.equal(await page.evaluate(()=>pages.map(htmlToStableText).join('')),visible);checks+=2;
-  for(const title of ['루시','1974년','에티오피아']){
+  // Year notes belong to the chronology (covered by timeline-ui.cjs).
+  for(const title of ['루시','에티오피아']){
    const trigger=await note(title);assert.equal(await trigger.evaluate(el=>getComputedStyle(el).fontStyle),'italic');checks++;
    const before=await page.evaluate(()=>({index:pageIndex,anchor:readerAnchor(),splits:readerStats.splits}));
    await bounds();assert.ok((await page.locator('#readerNoteContent').innerText()).includes('각주:'));checks++;
@@ -106,7 +107,7 @@ async function epub(){
   await page.evaluate(()=>closeViewer());
   await page.locator('#txtFileInput').setInputFiles({name:'notes.epub',mimeType:'application/epub+zip',buffer:await epub()});await page.waitForFunction(()=>!openViewerBtn.disabled);
   await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length&&!restoreInProgress);
-  await page.locator('#chapterSelect').selectOption('1');await note('에티오피아');assert.equal(await page.locator('#readerNoteContent').innerText(),'지명 각주: 나라의 설명');checks++;await page.keyboard.press('Escape');
+  await page.locator('#chapterSelect').selectOption('1',{force:true});await note('에티오피아');assert.equal(await page.locator('#readerNoteContent').innerText(),'지명 각주: 나라의 설명');checks++;await page.keyboard.press('Escape');
   if(target.includes('assets')){
    await note('에티오피아');assert.equal(await page.evaluate(()=>window.__androidBack()),true);assert.equal(await page.evaluate(()=>readerNoteIsOpen()),false);assert.equal(await page.evaluate(()=>viewerOverlay.classList.contains('active')),true);checks+=3;
   }

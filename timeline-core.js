@@ -11,10 +11,27 @@ function isCenturyTail(text,end){
  // A century is never a year, including both endpoints of a century range.
  return /^\s*(?:[~～∼–—−-]\s*(?:(?:기원\s*전|기원\s*후|서기|B\.?\s*C\.?\s*E?\.?|A\.?\s*D\.?|C\.?\s*E\.?)\s*)?[0-9][0-9,]*\s*)?(?:세\s*기|世紀|centur(?:y|ies)\b|c(?!\s*\.?\s*e\b)\.?(?![a-z]))/i.test(text.slice(end));
 }
+// Recognize the full century token before attempting individual years. A century
+// is an interval, never the number printed in its name (11th BCE = 1100..1001 BCE).
+const centuryUnit='(?:세\\s*기|世紀|centur(?:y|ies)\\b|c(?!\\s*\\.?\\s*e\\b)\\.?(?![a-z]))';
+const centuryPattern=new RegExp('(?:('+era+')\\s*)?('+num+')(?:st|nd|rd|th)?(?:\\s*[~～∼–—−-]\\s*(?:('+era+')\\s*)?('+num+')(?:st|nd|rd|th)?)?\\s*'+centuryUnit+'(?:\\s*('+era+')(?!\\s*[0-9]|[a-z]))?','gi');
+function centuryRange(n,e){
+ const c=Number(String(n).replace(/,/g,''));if(!Number.isSafeInteger(c)||c<1||c>99999)return null;
+ return bc(e||'')?{from:-c*100,to:-(c-1)*100-1}:{from:(c-1)*100+1,to:c*100};
+}
+function centuries(text){
+ text=String(text);centuryPattern.lastIndex=0;const out=[];let m;
+ while((m=centuryPattern.exec(text))){
+  if(/[A-Za-z0-9_.,]/.test(text[m.index-1]||''))continue;
+  const e=m[1]||m[5]||'',first=centuryRange(m[2],e),last=m[4]?centuryRange(m[4],m[3]||e):first;if(!first||!last)continue;
+  out.push({start:m.index,end:centuryPattern.lastIndex,text:m[0],from:Math.min(first.from,last.from),to:Math.max(first.to,last.to)});
+ }
+ return out;
+}
 function years(text){
- text=String(text);pattern.lastIndex=0;const out=[];let m;
+ text=String(text);pattern.lastIndex=0;const out=[],blocked=centuries(text);let m;
  while((m=pattern.exec(text))){
-  if(isCenturyTail(text,pattern.lastIndex))continue;
+  if(isCenturyTail(text,pattern.lastIndex)||blocked.some(c=>c.start<pattern.lastIndex&&c.end>m.index))continue;
   const before=text[m.index-1]||'',after=text[pattern.lastIndex]||'';if(/[A-Za-z0-9_.,]/.test(before)||/[A-Za-z0-9_]/.test(after))continue;
   const e=m[1]||m[4]||'',n=m[2]||m[3]||m[5]||m[6];let y=year(n,e);if(!y)continue;
   if(!e&&/^(?:간|\s*(?:동안|전(?:\s|$)|후(?:\s|$)))/.test(text.slice(pattern.lastIndex)))continue;
@@ -25,9 +42,19 @@ function years(text){
 }
 function heading(line,identified){
  let m=line.match(/^\[(BCE|CE)-(Y|C)(\d+)\]\s*(.*)$/i);
- if(m){const n=Number(m[3]);if(!n)return null;const sign=m[1].toUpperCase()==='BCE'?-1:1;return {from:sign*(m[2].toUpperCase()==='C'?(sign<0?n*100:(n-1)*100+1):n),to:sign*(m[2].toUpperCase()==='C'?(sign<0?(n-1)*100+1:n*100):n),title:line.replace(/^\[[^\]]+\]\s*/,''),key:m[1].toUpperCase()+'-'+m[2].toUpperCase()+m[3]};}
+ if(m){
+  const n=Number(m[3]),type=m[2].toUpperCase(),e=m[1].toUpperCase(),title=m[4];
+  const span=type==='C'?centuryRange(n,e):{from:year(n,e),to:year(n,e)};
+  if(!span||!span.from||!span.to)throw Error('연표 제목의 연도/세기 번호가 올바르지 않습니다: '+line);
+  const c=centuries(title).find(x=>x.start===0),y=years(title).find(x=>x.start===0);
+  if((type==='Y'&&c)||(type==='C'&&y)||(c&&(c.from!==span.from||c.to!==span.to))||(y&&y.year!==span.from))throw Error('연표 제목의 표식과 연도/세기가 일치하지 않습니다: '+line);
+  return {...span,title,key:e+'-'+type+m[3]};
+ }
  if(identified)return null;
- const plain=line.replace(/^#{1,6}\s*/,'').replace(/^\[|\]$/g,'').trim();const found=years(plain);if(!found.length||found[0].start!==0)return null;
+ const plain=line.replace(/^#{1,6}\s*/,'').replace(/^\[|\]$/g,'').trim();
+ const c=centuries(plain).find(x=>x.start===0);
+ if(c){const tail=plain.slice(c.end);if(tail&&!/^\s*(?:[|—–:]\s*[^\n]+)?$/.test(tail))return null;return {from:c.from,to:c.to,title:plain,key:'custom-century-'+c.from+'-'+c.to};}
+ const found=years(plain.split(/\s+[—–:]\s*/)[0]);if(!found.length||found[0].start!==0)return null;
  const tail=plain.slice(found[found.length-1].end);if(tail&&!/^\s*(?:[—–:]\s*[^\n]+)?$/.test(tail))return null;
  // Only isolated year headings, never dates embedded in a paragraph.
  if(found.length>2||found.some((x,i)=>i&& !/^\s*[~～∼–—−-]\s*$/.test(plain.slice(found[i-1].end,x.start))))return null;
@@ -54,5 +81,5 @@ function nearest(entries,y){
   if(d<distance||(d===distance&&w<width)){best=i;distance=d;width=w;}}
  return best;
 }
-return {version:1,years,year,label,ordinal,heading,parseText,merge,nearest};
+return {version:2,years,centuries,centuryRange,year,label,ordinal,heading,parseText,merge,nearest};
 });

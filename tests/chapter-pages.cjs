@@ -15,7 +15,7 @@ const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'))
       await page.locator('#inputText').fill(text);await page.locator('#openViewerBtn').click();
       await page.waitForFunction(()=>pages.length&&!restoreInProgress);
       async function checkChapter(chapter,token){
-        await page.locator('#chapterSelect').selectOption(String(chapter));
+        await page.locator('#openReaderChapter').click();await page.locator('#readerChapterList [data-chapter="'+chapter+'"]').click();
         const indices=await page.evaluate(token=>pages.flatMap((html,index)=>htmlToStableText(html).includes(token)?[index]:[]),token);
         assert.ok(indices.length);checks++;
         for(const index of [indices[0],indices.at(-1)]){
@@ -26,6 +26,13 @@ const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'))
         }
       }
       await checkChapter(0,'ALPHA');await checkChapter(1,'BETA');await checkChapter(2,'GAMMA');
+      const position=await page.evaluate(()=>({page:pageIndex,anchor:readerAnchor(),splits:readerStats.splits,text:readerCanonical(),counter:counter.textContent}));
+      for(const action of ['button','escape',...(target.includes('assets')?['back']:[])]){
+        await page.locator('#openReaderChapter').click();assert.equal(await page.locator('#readerChapterList button').count(),3);checks++;
+        const visible=await page.locator('#closeReaderChapter').evaluate(el=>{const r=el.getBoundingClientRect(),v=visualViewport;return r.top>=v.offsetTop&&r.left>=v.offsetLeft&&r.bottom<=v.offsetTop+v.height&&r.right<=v.offsetLeft+v.width});assert.equal(visible,true);checks++;
+        if(action==='button')await page.locator('#closeReaderChapter').click();else if(action==='escape')await page.keyboard.press('Escape');else assert.equal(await page.evaluate(()=>__androidBack()),true);
+        assert.equal(await page.evaluate(()=>readerChapterIsOpen()),false);assert.equal(await page.evaluate(()=>viewerOverlay.classList.contains('active')),true);assert.deepEqual(await page.evaluate(()=>({page:pageIndex,anchor:readerAnchor(),splits:readerStats.splits,text:readerCanonical(),counter:counter.textContent})),position);checks+=3;
+      }
       const placement=await page.evaluate(()=>{
         const footer=document.getElementById('chapterPageCount').getBoundingClientRect(),title=document.getElementById('readerDocumentTitle').getBoundingClientRect();
         const content=document.getElementById('pageInnerLeft').getBoundingClientRect(),book=document.getElementById('book').getBoundingClientRect();

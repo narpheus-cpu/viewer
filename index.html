@@ -484,10 +484,27 @@ function isCenturyTail(text,end){
  // A century is never a year, including both endpoints of a century range.
  return /^\s*(?:[~～∼–—−-]\s*(?:(?:기원\s*전|기원\s*후|서기|B\.?\s*C\.?\s*E?\.?|A\.?\s*D\.?|C\.?\s*E\.?)\s*)?[0-9][0-9,]*\s*)?(?:세\s*기|世紀|centur(?:y|ies)\b|c(?!\s*\.?\s*e\b)\.?(?![a-z]))/i.test(text.slice(end));
 }
+// Recognize the full century token before attempting individual years. A century
+// is an interval, never the number printed in its name (11th BCE = 1100..1001 BCE).
+const centuryUnit='(?:세\\s*기|世紀|centur(?:y|ies)\\b|c(?!\\s*\\.?\\s*e\\b)\\.?(?![a-z]))';
+const centuryPattern=new RegExp('(?:('+era+')\\s*)?('+num+')(?:st|nd|rd|th)?(?:\\s*[~～∼–—−-]\\s*(?:('+era+')\\s*)?('+num+')(?:st|nd|rd|th)?)?\\s*'+centuryUnit+'(?:\\s*('+era+')(?!\\s*[0-9]|[a-z]))?','gi');
+function centuryRange(n,e){
+ const c=Number(String(n).replace(/,/g,''));if(!Number.isSafeInteger(c)||c<1||c>99999)return null;
+ return bc(e||'')?{from:-c*100,to:-(c-1)*100-1}:{from:(c-1)*100+1,to:c*100};
+}
+function centuries(text){
+ text=String(text);centuryPattern.lastIndex=0;const out=[];let m;
+ while((m=centuryPattern.exec(text))){
+  if(/[A-Za-z0-9_.,]/.test(text[m.index-1]||''))continue;
+  const e=m[1]||m[5]||'',first=centuryRange(m[2],e),last=m[4]?centuryRange(m[4],m[3]||e):first;if(!first||!last)continue;
+  out.push({start:m.index,end:centuryPattern.lastIndex,text:m[0],from:Math.min(first.from,last.from),to:Math.max(first.to,last.to)});
+ }
+ return out;
+}
 function years(text){
- text=String(text);pattern.lastIndex=0;const out=[];let m;
+ text=String(text);pattern.lastIndex=0;const out=[],blocked=centuries(text);let m;
  while((m=pattern.exec(text))){
-  if(isCenturyTail(text,pattern.lastIndex))continue;
+  if(isCenturyTail(text,pattern.lastIndex)||blocked.some(c=>c.start<pattern.lastIndex&&c.end>m.index))continue;
   const before=text[m.index-1]||'',after=text[pattern.lastIndex]||'';if(/[A-Za-z0-9_.,]/.test(before)||/[A-Za-z0-9_]/.test(after))continue;
   const e=m[1]||m[4]||'',n=m[2]||m[3]||m[5]||m[6];let y=year(n,e);if(!y)continue;
   if(!e&&/^(?:간|\s*(?:동안|전(?:\s|$)|후(?:\s|$)))/.test(text.slice(pattern.lastIndex)))continue;
@@ -498,9 +515,19 @@ function years(text){
 }
 function heading(line,identified){
  let m=line.match(/^\[(BCE|CE)-(Y|C)(\d+)\]\s*(.*)$/i);
- if(m){const n=Number(m[3]);if(!n)return null;const sign=m[1].toUpperCase()==='BCE'?-1:1;return {from:sign*(m[2].toUpperCase()==='C'?(sign<0?n*100:(n-1)*100+1):n),to:sign*(m[2].toUpperCase()==='C'?(sign<0?(n-1)*100+1:n*100):n),title:line.replace(/^\[[^\]]+\]\s*/,''),key:m[1].toUpperCase()+'-'+m[2].toUpperCase()+m[3]};}
+ if(m){
+  const n=Number(m[3]),type=m[2].toUpperCase(),e=m[1].toUpperCase(),title=m[4];
+  const span=type==='C'?centuryRange(n,e):{from:year(n,e),to:year(n,e)};
+  if(!span||!span.from||!span.to)throw Error('연표 제목의 연도/세기 번호가 올바르지 않습니다: '+line);
+  const c=centuries(title).find(x=>x.start===0),y=years(title).find(x=>x.start===0);
+  if((type==='Y'&&c)||(type==='C'&&y)||(c&&(c.from!==span.from||c.to!==span.to))||(y&&y.year!==span.from))throw Error('연표 제목의 표식과 연도/세기가 일치하지 않습니다: '+line);
+  return {...span,title,key:e+'-'+type+m[3]};
+ }
  if(identified)return null;
- const plain=line.replace(/^#{1,6}\s*/,'').replace(/^\[|\]$/g,'').trim();const found=years(plain);if(!found.length||found[0].start!==0)return null;
+ const plain=line.replace(/^#{1,6}\s*/,'').replace(/^\[|\]$/g,'').trim();
+ const c=centuries(plain).find(x=>x.start===0);
+ if(c){const tail=plain.slice(c.end);if(tail&&!/^\s*(?:[|—–:]\s*[^\n]+)?$/.test(tail))return null;return {from:c.from,to:c.to,title:plain,key:'custom-century-'+c.from+'-'+c.to};}
+ const found=years(plain.split(/\s+[—–:]\s*/)[0]);if(!found.length||found[0].start!==0)return null;
  const tail=plain.slice(found[found.length-1].end);if(tail&&!/^\s*(?:[—–:]\s*[^\n]+)?$/.test(tail))return null;
  // Only isolated year headings, never dates embedded in a paragraph.
  if(found.length>2||found.some((x,i)=>i&& !/^\s*[~～∼–—−-]\s*$/.test(plain.slice(found[i-1].end,x.start))))return null;
@@ -527,7 +554,7 @@ function nearest(entries,y){
   if(d<distance||(d===distance&&w<width)){best=i;distance=d;width=w;}}
  return best;
 }
-return {version:1,years,year,label,ordinal,heading,parseText,merge,nearest};
+return {version:2,years,centuries,centuryRange,year,label,ordinal,heading,parseText,merge,nearest};
 });
 
 /* The book stores only year triggers. Timeline records are loaded separately. */
@@ -579,10 +606,17 @@ async function readerTimelineImport(files){
  const db=await readerTimelineDB();await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','entries'],'readwrite'),store=tx.objectStore('entries');store.clear();for(const e of records)store.put(e.text,version+':'+e.id);tx.objectStore('meta').put(meta,'active');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('연표를 저장하지 못했습니다.'));tx.onabort=()=>reject(tx.error||Error('연표를 저장하지 못했습니다.'));});
  readerTimelineRevision++;readerTimelineMeta=meta;readerTimelineInit=Promise.resolve(meta);readerTimelineCache.clear();readerTimelineSummary();return meta;
 }
-function readerTimelineDecorate(host){
- if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){for(const block of Array.from(host.children))readerTimelineDecorate(block);return;}const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
- while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
- const matches=ReaderTimeline.years(text);if(!matches.length)return;
+function readerTimelineDecorate(host,contextOffset){
+ if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){
+  const index=pageIndex+(host===pageInnerRight?1:0);let offset=Number(pageAnchors[index])||0;
+  for(const block of Array.from(host.children)){const length=htmlToStableText(block.outerHTML).length;readerTimelineDecorate(block,offset);offset+=length+1;}return;
+ }const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
+ while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'&&!node.hasAttribute('data-reader-break')){text+='\n';}}
+ // Read only a small window of the already cached canonical text. If a page
+ // ends at "기원전 10" and the next starts with "세기", never link it as 10 BCE.
+ const canonical=Number.isFinite(contextOffset)?readerCanonical():'',before=canonical.slice(Math.max(0,contextOffset-128),contextOffset),after=canonical.slice(contextOffset+text.length,contextOffset+text.length+128);
+ const blocked=ReaderTimeline.centuries(before+text+after);
+ const matches=ReaderTimeline.years(text).filter(m=>!blocked.some(c=>c.start<before.length+m.end&&c.end>before.length+m.start));if(!matches.length)return;
  function point(offset,end){const e=units.find(u=>end?offset>u.start&&offset<=u.end:offset>=u.start&&offset<u.end);return e?[e.node,offset-e.start]:null;}
  for(const m of matches.reverse()){
   const a=point(m.start,false),b=point(m.end,true);if(!a||!b||!a[0].isConnected||!b[0].isConnected)continue;
@@ -829,7 +863,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.24.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.25.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -1083,7 +1117,7 @@ function setupReaderChatGPT(){
   readerGPTMenu=document.createElement('button');readerGPTMenu.id='readerGPTSelectionMenu';readerGPTMenu.type='button';readerGPTMenu.textContent='ChatGPT연결';readerGPTMenu.hidden=true;document.body.appendChild(readerGPTMenu);
   for(const type of ['pointerdown','mousedown','touchstart'])readerGPTMenu.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});readerGPTMenu.onclick=()=>readerOpenSelectedChatGPT();
   readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
-  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.24.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
+  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.25.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
   document.body.appendChild(readerGPTLayer);setupReaderGPTAnswerPages();document.getElementById('readerGPTPc').hidden=readerGPTNative();document.getElementById('closeReaderGPT').onclick=readerGPTClose;document.getElementById('readerGPTSend').onclick=readerGPTSend;document.getElementById('readerGPTStop').onclick=()=>{void readerGPTCancel();readerGPTStatus('질문을 중지했습니다.');};
   document.getElementById('readerGPTConnect').onclick=async()=>{try{readerGPTStatus('로그인 창을 여는 중…');await readerGPTRpc('signin',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
   document.getElementById('readerGPTAccounts').onchange=async()=>{try{await readerGPTRpc('switch',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
@@ -1093,7 +1127,7 @@ function setupReaderChatGPT(){
   addEventListener('message',event=>{if(event.origin===READER_GPT_LOCAL&&event.source===readerGPTPairWindow&&/^[A-Za-z0-9_-]{40,100}$/.test(event.data?.readerKey||'')){sessionStorage.setItem('readerGPTLocalKey',event.data.readerKey);readerGPTPairWindow=null;void readerGPTRefresh();}});
   document.getElementById('readerGPTPrompt').addEventListener('input',readerGPTSavePreferences);document.getElementById('readerGPTModel').onchange=readerGPTSavePreferences;
   const settings=document.createElement('button');settings.type='button';settings.className='reader-gpt-settings';settings.textContent='ChatGPT 연결·프롬프트 설정';settings.onclick=()=>{readerOpenChatGPT();document.getElementById('readerGPTSettings').open=true;};document.getElementById('viewerSettings').appendChild(settings);
-  if(readerGPTAndroidWeb()){settings.textContent='전자책뷰어에서 계정 연결';settings.onclick=readerGPTAndroidConnect;const update=document.createElement('a');update.className='reader-gpt-android-update';update.href=READER_GPT_ANDROID_UPDATE;update.textContent='모바일 연결 업데이트 설치 (v1.24)';document.getElementById('viewerSettings').appendChild(update);const help=document.createElement('small');help.className='reader-gpt-android-help';help.textContent='기존 뷰어의 계정·모델·프롬프트를 사용합니다. 문장을 선택한 뒤 기본 메뉴의 ChatGPT연결 · 뷰어를 누르세요. 답변은 앱에서 열립니다.';document.getElementById('viewerSettings').appendChild(help);}
+  if(readerGPTAndroidWeb()){settings.textContent='전자책뷰어에서 계정 연결';settings.onclick=readerGPTAndroidConnect;const update=document.createElement('a');update.className='reader-gpt-android-update';update.href=READER_GPT_ANDROID_UPDATE;update.textContent='모바일 연결 업데이트 설치 (v1.25)';document.getElementById('viewerSettings').appendChild(update);const help=document.createElement('small');help.className='reader-gpt-android-help';help.textContent='기존 뷰어의 계정·모델·프롬프트를 사용합니다. 문장을 선택한 뒤 기본 메뉴의 ChatGPT연결 · 뷰어를 누르세요. 답변은 앱에서 열립니다.';document.getElementById('viewerSettings').appendChild(help);}
   let frame=0;document.addEventListener('selectionchange',()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;readerGPTUpdateSelection();});});
   readerGPTLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerGPTLayer)readerGPTClose();});for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerGPTLayer.addEventListener(type,e=>e.stopPropagation(),{passive:true});
   document.addEventListener('keydown',e=>{if(!readerGPTIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerGPTClose();}else if(['ArrowLeft','ArrowRight','PageUp','PageDown'].includes(e.key)&&!document.activeElement?.closest('input,textarea,select,button,#readerGPTSettings')){e.preventDefault();readerGPTTurnAnswerPage(e.key==='ArrowLeft'||e.key==='PageUp'?-1:1);}else if(e.key==='Tab'){const items=[...readerGPTLayer.querySelectorAll('button,select,textarea,summary,[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
@@ -1588,6 +1622,17 @@ textarea{min-height:42vh}
 /* A dedicated row keeps the existing mobile page controls readable. */
 .chapter-nav{display:flex;align-items:center;gap:5px;padding:6px 10px;border-bottom:1px solid var(--line);flex:0 0 auto;min-width:0}
 .chapter-nav[hidden]{display:none}
+.chapter-nav select[hidden]{display:none}
+.chapter-nav .chapter-picker-open{min-width:0;flex:1;width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.reader-chapter-layer{position:fixed;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:rgba(0,0,0,.35)}
+.reader-chapter-layer[hidden]{display:none}
+.reader-chapter-dialog{display:flex;flex-direction:column;width:min(600px,100%);max-height:100%;min-height:0;box-sizing:border-box;background:var(--paper,#fff);color:var(--ink,#111);border:2px solid #333;border-radius:8px;overflow:hidden}
+.reader-chapter-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid #777;flex-shrink:0}
+.reader-chapter-header h2{margin:0;font-size:18px}
+.reader-chapter-header button{padding:8px 16px;font-size:16px;flex-shrink:0}
+.reader-chapter-list{overflow:auto;overscroll-behavior:contain;min-height:0;padding:8px}
+.reader-chapter-list button{display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;padding:12px;font:inherit;border:1px solid #aaa;margin-bottom:6px;background:var(--paper,#fff);color:var(--ink,#111)}
+.reader-chapter-list button[aria-current]{font-weight:bold;border:2px solid #222;background:#e5e5e5;color:#111}
 .chapter-nav select{min-width:0;flex:1;width:0;padding:6px;font:inherit;font-size:12px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px}
 .chapter-nav button{padding:6px 8px;white-space:nowrap;font-size:11px}
 .chapter-progress{font-size:10px;color:var(--muted);white-space:nowrap}
@@ -1814,6 +1859,7 @@ function readerUpdateChapterNav(){
   if(!bookChapters.length)return;
   const current=readerCurrentChapter();
   document.getElementById('chapterSelect').value=String(current);
+  document.getElementById('openReaderChapter').textContent=`${current+1}. ${bookChapters[current].title}`;
   document.getElementById('prevChapter').disabled=restoreInProgress||current===0;
   document.getElementById('nextChapter').disabled=restoreInProgress||current===bookChapters.length-1;
   document.getElementById('chapterProgress').textContent=`${current+1} / ${bookChapters.length}`;
@@ -1823,7 +1869,32 @@ function readerGoChapter(index){
   const anchor=chapterCanonicalStarts[index];
   pageIndex=findPageIndexForAnchor(anchor);readerChooseAnchor(anchor);render();
 }
+let readerChapterLayer=null,readerChapterFocus=null,readerChapterOverflow=null;
+function readerChapterIsOpen(){return !!readerChapterLayer&&!readerChapterLayer.hidden;}
+function readerChapterViewport(){if(!readerChapterLayer)return;const v=window.visualViewport;Object.assign(readerChapterLayer.style,{left:(v?.offsetLeft||0)+'px',top:(v?.offsetTop||0)+'px',width:(v?.width||innerWidth)+'px',height:(v?.height||innerHeight)+'px'});}
+function readerChapterClose(){
+ if(!readerChapterIsOpen())return;readerChapterLayer.hidden=true;
+ document.body.style.overflow=readerChapterOverflow.body;document.documentElement.style.overflow=readerChapterOverflow.root;
+ if(readerChapterOverflow.aria===null)viewerOverlay.removeAttribute('aria-hidden');else viewerOverlay.setAttribute('aria-hidden',readerChapterOverflow.aria);
+ resetPageGesture();pageGestureSuppressUntil=performance.now()+800;
+ if(readerChapterFocus?.isConnected)readerChapterFocus.focus({preventScroll:true});
+}
+function readerChapterOpen(){
+ if(restoreInProgress||!bookChapters.length||readerChapterIsOpen())return;
+ readerChapterFocus=document.activeElement;readerChapterOverflow={body:document.body.style.overflow,root:document.documentElement.style.overflow,aria:viewerOverlay.getAttribute('aria-hidden')};
+ const list=document.getElementById('readerChapterList');list.replaceChildren();const current=readerCurrentChapter();
+ bookChapters.forEach((chapter,index)=>{const button=document.createElement('button');button.type='button';button.textContent=(index+1)+'. '+chapter.title;button.dataset.chapter=String(index);if(index===current)button.setAttribute('aria-current','page');button.onclick=()=>{readerChapterClose();readerGoChapter(index);};list.appendChild(button);});
+ resetPageGesture();getSelection()?.removeAllRanges();document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';viewerOverlay.setAttribute('aria-hidden','true');readerChapterViewport();readerChapterLayer.hidden=false;
+ document.getElementById('closeReaderChapter').focus({preventScroll:true});list.querySelector('[aria-current]')?.scrollIntoView({block:'nearest'});
+}
 function setupChapterNavigation(){
+ readerChapterLayer=document.createElement('div');readerChapterLayer.className='reader-chapter-layer';readerChapterLayer.hidden=true;
+ readerChapterLayer.innerHTML='<section class="reader-chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="readerChapterTitle"><header class="reader-chapter-header"><h2 id="readerChapterTitle">차례 선택</h2><button id="closeReaderChapter" type="button">닫기</button></header><div class="reader-chapter-list" id="readerChapterList"></div></section>';
+ document.body.appendChild(readerChapterLayer);document.getElementById('openReaderChapter').onclick=readerChapterOpen;document.getElementById('closeReaderChapter').onclick=readerChapterClose;
+ readerChapterLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerChapterLayer)readerChapterClose();});
+ document.addEventListener('keydown',e=>{if(!readerChapterIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerChapterClose();}else if(e.key==='Tab'){const items=[...readerChapterLayer.querySelectorAll('button')],first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
+ addEventListener('resize',readerChapterViewport);window.visualViewport?.addEventListener('resize',readerChapterViewport);window.visualViewport?.addEventListener('scroll',readerChapterViewport);
+
   document.getElementById('chapterSelect').addEventListener('change',e=>readerGoChapter(Number(e.target.value)));
   document.getElementById('prevChapter').onclick=()=>readerGoChapter(readerCurrentChapter()-1);
   document.getElementById('nextChapter').onclick=()=>readerGoChapter(readerCurrentChapter()+1);
@@ -2361,7 +2432,7 @@ function setupReaderTools(){
 
     <nav class="chapter-nav" id="chapterNav" aria-label="챕터 이동" hidden>
       <button id="prevChapter" type="button" aria-label="이전 챕터">이전 장</button>
-      <select id="chapterSelect" aria-label="목차에서 챕터 선택"></select>
+      <select id="chapterSelect" aria-label="목차에서 챕터 선택" hidden></select><button id="openReaderChapter" class="chapter-picker-open" type="button" aria-haspopup="dialog">차례 선택</button>
       <span id="chapterProgress" class="chapter-progress"></span>
       <button id="nextChapter" type="button" aria-label="다음 챕터">다음 장</button>
     </nav>

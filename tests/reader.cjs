@@ -49,7 +49,7 @@ async function epubFixture(version=3, withToc=true) {
       await close();
       await page.locator('#inputText').fill('앞부분\n[가] 첫 내용 '.repeat(1)+'긴 본문. '.repeat(300)+'\n[나] 둘 내용\n[다] 셋 내용');await open();
       assert.deepEqual(await page.evaluate(()=>bookChapters.map(c=>c.title)),['앞부분','가','나','다']);checks++;
-      await page.locator('#chapterSelect').selectOption('2');
+      await page.locator('#chapterSelect').selectOption('2',{force:true});
       assert.match(await page.locator('#pageInnerLeft').innerText(),/둘 내용/);checks++;
       const before=await page.evaluate(()=>({pageIndex,anchor:readerAnchor()}));
       await page.reload();await page.evaluate(()=>readerReady);
@@ -68,7 +68,7 @@ async function epubFixture(version=3, withToc=true) {
         assert.ok(data.canonical.indexOf('둘째 내용 보존.')<data.canonical.indexOf('마지막 내용 보존.'));
         assert.ok(data.canonical.includes('링크 글자 보존.'));
         assert.equal(data.ran,false);assert.equal(data.image,true);checks++;
-        await page.locator('#chapterSelect').selectOption('0');
+        await page.locator('#chapterSelect').selectOption('0',{force:true});
         await page.locator('#nextChapter').click();
         const id=await page.evaluate(()=>activeRecentId);
         await close();

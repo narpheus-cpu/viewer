@@ -47,10 +47,17 @@ async function readerTimelineImport(files){
  const db=await readerTimelineDB();await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','entries'],'readwrite'),store=tx.objectStore('entries');store.clear();for(const e of records)store.put(e.text,version+':'+e.id);tx.objectStore('meta').put(meta,'active');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('연표를 저장하지 못했습니다.'));tx.onabort=()=>reject(tx.error||Error('연표를 저장하지 못했습니다.'));});
  readerTimelineRevision++;readerTimelineMeta=meta;readerTimelineInit=Promise.resolve(meta);readerTimelineCache.clear();readerTimelineSummary();return meta;
 }
-function readerTimelineDecorate(host){
- if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){for(const block of Array.from(host.children))readerTimelineDecorate(block);return;}const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
- while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
- const matches=ReaderTimeline.years(text);if(!matches.length)return;
+function readerTimelineDecorate(host,contextOffset){
+ if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){
+  const index=pageIndex+(host===pageInnerRight?1:0);let offset=Number(pageAnchors[index])||0;
+  for(const block of Array.from(host.children)){const length=htmlToStableText(block.outerHTML).length;readerTimelineDecorate(block,offset);offset+=length+1;}return;
+ }const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
+ while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'&&!node.hasAttribute('data-reader-break')){text+='\n';}}
+ // Read only a small window of the already cached canonical text. If a page
+ // ends at "기원전 10" and the next starts with "세기", never link it as 10 BCE.
+ const canonical=Number.isFinite(contextOffset)?readerCanonical():'',before=canonical.slice(Math.max(0,contextOffset-128),contextOffset),after=canonical.slice(contextOffset+text.length,contextOffset+text.length+128);
+ const blocked=ReaderTimeline.centuries(before+text+after);
+ const matches=ReaderTimeline.years(text).filter(m=>!blocked.some(c=>c.start<before.length+m.end&&c.end>before.length+m.start));if(!matches.length)return;
  function point(offset,end){const e=units.find(u=>end?offset>u.start&&offset<=u.end:offset>=u.start&&offset<u.end);return e?[e.node,offset-e.start]:null;}
  for(const m of matches.reverse()){
   const a=point(m.start,false),b=point(m.end,true);if(!a||!b||!a[0].isConnected||!b[0].isConnected)continue;

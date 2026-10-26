@@ -34,7 +34,7 @@ async function epub(){
   if(format==='txt')await page.locator('#inputText').fill('[첫 장]\n\n'+('첫 장 문장이다. '.repeat(200))+'\n\n[둘째 장]\n\n'+('두 번째 문장이다. '.repeat(200))+'\n\n[마지막 장]\n마지막 문장.');
   else{await page.locator('#txtFileInput').setInputFiles({name:'cached.epub',mimeType:'application/epub+zip',buffer:await epub()});await page.waitForFunction(()=>!openViewerBtn.disabled);}
   await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length&&!restoreInProgress);
-  await page.locator('#chapterSelect').selectOption('1');
+  await page.locator('#chapterSelect').selectOption('1',{force:true});
   const original=await page.evaluate(async()=>{await readerState.pendingCache;await readingDatabaseWrite;return {anchor:readerAnchor(),canonical:readerCanonical(),count:document.getElementById('viewerCharCount').textContent,chapterPage:document.getElementById('chapterPageCount').textContent};});
   await page.reload();await page.evaluate(()=>readerReady);
   const reopened=await page.evaluate(()=>({splits:readerStats.splits,blocks:cachedMarkdownSource,reads:bookReads,anchor:readerAnchor(),canonical:readerCanonical(),count:document.getElementById('viewerCharCount').textContent,chapterPage:document.getElementById('chapterPageCount').textContent}));
