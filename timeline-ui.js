@@ -1,5 +1,5 @@
 /* The book stores only year triggers. Timeline records are loaded separately. */
-const READER_TIMELINE_DEFAULT_VERSION='7815d7075d5a2bbe';
+const READER_TIMELINE_DEFAULT_VERSION='aec6e6d4cc637a4a';
 let readerTimelineRevision=0;
 let readerTimelineLayer=null,readerTimelineMeta=null,readerTimelineInit=null,readerTimelineDatabase=null;
 const readerTimelineCache=new Map(),readerTimelineChunks=new Map(),readerTimelineStats={recordsRead:0,chunkFetches:0,renderChars:0};
@@ -14,8 +14,8 @@ async function readerTimelinePut(store,key,value){const db=await readerTimelineD
 function readerTimelineStatus(message,error=false){const el=document.getElementById('readerTimelineImportStatus');if(el){el.textContent=message;el.style.color=error?'#b00020':'';}}
 function readerTimelineSummary(){if(readerTimelineMeta)readerTimelineStatus(readerTimelineMeta.name+' · '+readerTimelineMeta.entries.length.toLocaleString('ko-KR')+'개 연도·구간');}
 async function readerTimelineDefault(){
- const r=await fetch(new URL('timelines/default/index.json',document.baseURI));if(!r.ok)throw Error('기본 연표를 불러올 수 없습니다. TXT 또는 ZIP을 등록해 주세요.');const meta=await r.json();
- if(meta.schema!==1||!Array.isArray(meta.entries)||!meta.entries.length)throw Error('기본 연표 형식이 맞지 않습니다.');meta.kind='default';return meta;
+ const r=await fetch(new URL('timelines/default/index.json?v='+READER_TIMELINE_DEFAULT_VERSION,document.baseURI));if(!r.ok)throw Error('기본 연표를 불러올 수 없습니다. TXT 또는 ZIP을 등록해 주세요.');const meta=await r.json();
+ if(meta.version!==READER_TIMELINE_DEFAULT_VERSION||meta.schema!==1||!Array.isArray(meta.entries)||!meta.entries.length)throw Error('기본 연표 형식이 맞지 않습니다.');meta.kind='default';return meta;
 }
 function readerTimelineEnsure(){
  if(readerTimelineInit)return readerTimelineInit;
@@ -31,7 +31,7 @@ async function readerTimelineRead(index,meta=readerTimelineMeta){
  if(typeof saved==='string')return readerTimelineRemember(key,saved);
  if(meta.kind!=='default')throw Error('저장된 연표를 읽지 못했습니다. 파일을 다시 등록해 주세요.');
  const chunkKey=meta.version+':'+e.chunk;let promise=readerTimelineChunks.get(chunkKey);
- if(!promise){promise=(async()=>{readerTimelineStats.chunkFetches++;const r=await fetch(new URL('timelines/default/part-'+String(e.chunk).padStart(3,'0')+'.json',document.baseURI));if(!r.ok)throw Error('연표 구간을 불러오지 못했습니다. 연결 후 다시 눌러 주세요.');const data=await r.json();if(!data.records||typeof data.records[e.id]!=='string')throw Error('연표 구간 형식이 맞지 않습니다.');
+ if(!promise){promise=(async()=>{readerTimelineStats.chunkFetches++;const r=await fetch(new URL('timelines/default/part-'+String(e.chunk).padStart(3,'0')+'.json?v='+encodeURIComponent(meta.version),document.baseURI));if(!r.ok)throw Error('연표 구간을 불러오지 못했습니다. 연결 후 다시 눌러 주세요.');const data=await r.json();if(!data.records||typeof data.records[e.id]!=='string')throw Error('연표 구간 형식이 맞지 않습니다.');
   try{const db=await readerTimelineDB();const tx=db.transaction('entries','readwrite');for(const [id,text] of Object.entries(data.records))tx.objectStore('entries').put(text,meta.version+':'+id);}catch{}return data.records;})();readerTimelineChunks.set(chunkKey,promise);promise.finally(()=>readerTimelineChunks.delete(chunkKey)).catch(()=>{});}
  const records=await promise;return readerTimelineRemember(key,records[e.id]);
 }
