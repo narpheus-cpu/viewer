@@ -221,13 +221,20 @@ public final class MainActivity extends Activity {
             && (uri.getPort() == -1 || uri.getPort() == 443) && "/assets/index.html".equals(uri.getPath());
     }
 
+    private static boolean isReaderAssetPath(String path) {
+        return "/assets/index.html".equals(path) || "/assets/android.js".equals(path) ||
+            "/assets/reader-core.js".equals(path) || (path != null &&
+            path.matches("/assets/timelines/default/(?:index|part-[0-9]{3})\\.json"));
+    }
+
     private WebResourceResponse serve(Uri uri) {
         if ("https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getHost())
                 && (uri.getPort() == -1 || uri.getPort() == 443)) {
             String path = uri.getPath();
-            if ("/assets/index.html".equals(path) || "/assets/android.js".equals(path) || "/assets/reader-core.js".equals(path)) {
+            if (isReaderAssetPath(path)) {
                 try {
-                    String mime = path.endsWith(".js") ? "application/javascript" : "text/html";
+                    String mime = path.endsWith(".json") ? "application/json" :
+                        path.endsWith(".js") ? "application/javascript" : "text/html";
                     HashMap<String, String> headers = new HashMap<>();
                     headers.put("Cache-Control", "no-cache");
                     headers.put("X-Content-Type-Options", "nosniff");
