@@ -1,5 +1,5 @@
 > 이전 별도 연결 앱입니다. 모바일 웹은 기존 전자책뷰어의 계정을 공유하는
-> [v1.23 업데이트](../../downloads/EbookViewer_v1.23.apk)를 사용하세요.
+> [v1.24 업데이트](../../downloads/EbookViewer_v1.24.apk)를 사용하세요.
 
 # Android browser text-selection bridge
 

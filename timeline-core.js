@@ -7,9 +7,14 @@ function bc(s){return /전|前|^b/i.test(s.replace(/\s/g,''));}
 function year(n,e){const v=Number(String(n).replace(/,/g,''));return Number.isSafeInteger(v)&&v>0&&v<=9999999?(bc(e||'')?-v:v):null;}
 function label(y){return (y<0?'기원전 ':'서기 ')+Math.abs(y).toLocaleString('ko-KR')+'년';}
 function ordinal(y){return y>0?y-1:y;}
+function isCenturyTail(text,end){
+ // A century is never a year, including both endpoints of a century range.
+ return /^\s*(?:[~～∼–—−-]\s*(?:(?:기원\s*전|기원\s*후|서기|B\.?\s*C\.?\s*E?\.?|A\.?\s*D\.?|C\.?\s*E\.?)\s*)?[0-9][0-9,]*\s*)?(?:세\s*기|世紀|centur(?:y|ies)\b|c(?!\s*\.?\s*e\b)\.?(?![a-z]))/i.test(text.slice(end));
+}
 function years(text){
  text=String(text);pattern.lastIndex=0;const out=[];let m;
  while((m=pattern.exec(text))){
+  if(isCenturyTail(text,pattern.lastIndex))continue;
   const before=text[m.index-1]||'',after=text[pattern.lastIndex]||'';if(/[A-Za-z0-9_.,]/.test(before)||/[A-Za-z0-9_]/.test(after))continue;
   const e=m[1]||m[4]||'',n=m[2]||m[3]||m[5]||m[6];let y=year(n,e);if(!y)continue;
   if(!e&&/^(?:간|\s*(?:동안|전(?:\s|$)|후(?:\s|$)))/.test(text.slice(pattern.lastIndex)))continue;

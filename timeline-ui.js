@@ -49,13 +49,18 @@ async function readerTimelineImport(files){
 }
 function readerTimelineDecorate(host){
  if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){for(const block of Array.from(host.children))readerTimelineDecorate(block);return;}const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
- while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-note],[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
+ while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
  const matches=ReaderTimeline.years(text);if(!matches.length)return;
  function point(offset,end){const e=units.find(u=>end?offset>u.start&&offset<=u.end:offset>=u.start&&offset<u.end);return e?[e.node,offset-e.start]:null;}
  for(const m of matches.reverse()){
   const a=point(m.start,false),b=point(m.end,true);if(!a||!b||!a[0].isConnected||!b[0].isConnected)continue;
-  const range=document.createRange();range.setStart(...a);range.setEnd(...b);const trigger=document.createElement('span');trigger.className='reader-year';trigger.dataset.readerYear=String(m.year);trigger.tabIndex=0;trigger.setAttribute('role','button');trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');trigger.appendChild(range.extractContents());range.insertNode(trigger);
+  const range=document.createRange();range.setStart(...a);range.setEnd(...b);
+  // The original footnote can sit inside OR outside the year wrapper after Range extraction.
+  // Mark every overlapping visible footnote with the parsed era, so both touch and keyboard prefer the timeline.
+  for(const unit of units){if(unit.end<=m.start||unit.start>=m.end)continue;const note=unit.node.parentElement?.closest('[data-reader-note]');if(note){note.dataset.readerYear=String(m.year);note.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');}}
+  const trigger=document.createElement('span');trigger.className='reader-year';trigger.dataset.readerYear=String(m.year);trigger.tabIndex=0;trigger.setAttribute('role','button');trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');trigger.appendChild(range.extractContents());range.insertNode(trigger);
  }
+ host.querySelectorAll('[data-reader-note][data-reader-year]').forEach(note=>{if(!note.textContent.trim())note.remove();});
 }
 function readerTimelineViewport(){
  if(!readerTimelineLayer)return;const vv=window.visualViewport,w=vv?.width||innerWidth,h=vv?.height||innerHeight,s=readerTimelineLayer.style;s.left=Math.max(0,vv?.offsetLeft||0)+'px';s.top=Math.max(0,vv?.offsetTop||0)+'px';s.width=w+'px';s.height=h+'px';

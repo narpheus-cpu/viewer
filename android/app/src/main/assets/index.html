@@ -58,9 +58,14 @@ function bc(s){return /전|前|^b/i.test(s.replace(/\s/g,''));}
 function year(n,e){const v=Number(String(n).replace(/,/g,''));return Number.isSafeInteger(v)&&v>0&&v<=9999999?(bc(e||'')?-v:v):null;}
 function label(y){return (y<0?'기원전 ':'서기 ')+Math.abs(y).toLocaleString('ko-KR')+'년';}
 function ordinal(y){return y>0?y-1:y;}
+function isCenturyTail(text,end){
+ // A century is never a year, including both endpoints of a century range.
+ return /^\s*(?:[~～∼–—−-]\s*(?:(?:기원\s*전|기원\s*후|서기|B\.?\s*C\.?\s*E?\.?|A\.?\s*D\.?|C\.?\s*E\.?)\s*)?[0-9][0-9,]*\s*)?(?:세\s*기|世紀|centur(?:y|ies)\b|c(?!\s*\.?\s*e\b)\.?(?![a-z]))/i.test(text.slice(end));
+}
 function years(text){
  text=String(text);pattern.lastIndex=0;const out=[];let m;
  while((m=pattern.exec(text))){
+  if(isCenturyTail(text,pattern.lastIndex))continue;
   const before=text[m.index-1]||'',after=text[pattern.lastIndex]||'';if(/[A-Za-z0-9_.,]/.test(before)||/[A-Za-z0-9_]/.test(after))continue;
   const e=m[1]||m[4]||'',n=m[2]||m[3]||m[5]||m[6];let y=year(n,e);if(!y)continue;
   if(!e&&/^(?:간|\s*(?:동안|전(?:\s|$)|후(?:\s|$)))/.test(text.slice(pattern.lastIndex)))continue;
@@ -154,13 +159,18 @@ async function readerTimelineImport(files){
 }
 function readerTimelineDecorate(host){
  if(!host)return;if(host===pageInnerLeft||host===pageInnerRight){for(const block of Array.from(host.children))readerTimelineDecorate(block);return;}const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),units=[];let node,text='';
- while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-note],[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
+ while((node=walker.nextNode())){if(node.nodeType===3){const skip=!!node.parentElement.closest('pre,code,a,[data-reader-year]');units.push({node,start:text.length,end:text.length+node.length,skip});text+=skip?' '.repeat(node.length):node.data;}else if(node.tagName==='BR'){text+='\n';}}
  const matches=ReaderTimeline.years(text);if(!matches.length)return;
  function point(offset,end){const e=units.find(u=>end?offset>u.start&&offset<=u.end:offset>=u.start&&offset<u.end);return e?[e.node,offset-e.start]:null;}
  for(const m of matches.reverse()){
   const a=point(m.start,false),b=point(m.end,true);if(!a||!b||!a[0].isConnected||!b[0].isConnected)continue;
-  const range=document.createRange();range.setStart(...a);range.setEnd(...b);const trigger=document.createElement('span');trigger.className='reader-year';trigger.dataset.readerYear=String(m.year);trigger.tabIndex=0;trigger.setAttribute('role','button');trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');trigger.appendChild(range.extractContents());range.insertNode(trigger);
+  const range=document.createRange();range.setStart(...a);range.setEnd(...b);
+  // The original footnote can sit inside OR outside the year wrapper after Range extraction.
+  // Mark every overlapping visible footnote with the parsed era, so both touch and keyboard prefer the timeline.
+  for(const unit of units){if(unit.end<=m.start||unit.start>=m.end)continue;const note=unit.node.parentElement?.closest('[data-reader-note]');if(note){note.dataset.readerYear=String(m.year);note.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');}}
+  const trigger=document.createElement('span');trigger.className='reader-year';trigger.dataset.readerYear=String(m.year);trigger.tabIndex=0;trigger.setAttribute('role','button');trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-label',m.text+' 길게 눌러 비교 연표 열기');trigger.appendChild(range.extractContents());range.insertNode(trigger);
  }
+ host.querySelectorAll('[data-reader-note][data-reader-year]').forEach(note=>{if(!note.textContent.trim())note.remove();});
 }
 function readerTimelineViewport(){
  if(!readerTimelineLayer)return;const vv=window.visualViewport,w=vv?.width||innerWidth,h=vv?.height||innerHeight,s=readerTimelineLayer.style;s.left=Math.max(0,vv?.offsetLeft||0)+'px';s.top=Math.max(0,vv?.offsetTop||0)+'px';s.width=w+'px';s.height=h+'px';
@@ -397,7 +407,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.23.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.24.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -661,7 +671,7 @@ function setupReaderChatGPT(){
   addEventListener('message',event=>{if(event.origin===READER_GPT_LOCAL&&event.source===readerGPTPairWindow&&/^[A-Za-z0-9_-]{40,100}$/.test(event.data?.readerKey||'')){sessionStorage.setItem('readerGPTLocalKey',event.data.readerKey);readerGPTPairWindow=null;void readerGPTRefresh();}});
   document.getElementById('readerGPTPrompt').addEventListener('input',readerGPTSavePreferences);document.getElementById('readerGPTModel').onchange=readerGPTSavePreferences;
   const settings=document.createElement('button');settings.type='button';settings.className='reader-gpt-settings';settings.textContent='ChatGPT 연결·프롬프트 설정';settings.onclick=()=>{readerOpenChatGPT();document.getElementById('readerGPTSettings').open=true;};document.getElementById('viewerSettings').appendChild(settings);
-  if(readerGPTAndroidWeb()){settings.textContent='전자책뷰어에서 계정 연결';settings.onclick=readerGPTAndroidConnect;const update=document.createElement('a');update.className='reader-gpt-android-update';update.href=READER_GPT_ANDROID_UPDATE;update.textContent='모바일 연결 업데이트 설치 (v1.23)';document.getElementById('viewerSettings').appendChild(update);const help=document.createElement('small');help.className='reader-gpt-android-help';help.textContent='기존 뷰어의 계정·모델·프롬프트를 사용합니다. 문장을 선택한 뒤 기본 메뉴의 ChatGPT연결 · 뷰어를 누르세요. 답변은 앱에서 열립니다.';document.getElementById('viewerSettings').appendChild(help);}
+  if(readerGPTAndroidWeb()){settings.textContent='전자책뷰어에서 계정 연결';settings.onclick=readerGPTAndroidConnect;const update=document.createElement('a');update.className='reader-gpt-android-update';update.href=READER_GPT_ANDROID_UPDATE;update.textContent='모바일 연결 업데이트 설치 (v1.24)';document.getElementById('viewerSettings').appendChild(update);const help=document.createElement('small');help.className='reader-gpt-android-help';help.textContent='기존 뷰어의 계정·모델·프롬프트를 사용합니다. 문장을 선택한 뒤 기본 메뉴의 ChatGPT연결 · 뷰어를 누르세요. 답변은 앱에서 열립니다.';document.getElementById('viewerSettings').appendChild(help);}
   let frame=0;document.addEventListener('selectionchange',()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;readerGPTUpdateSelection();});});
   readerGPTLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerGPTLayer)readerGPTClose();});for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerGPTLayer.addEventListener(type,e=>e.stopPropagation(),{passive:true});
   document.addEventListener('keydown',e=>{if(!readerGPTIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerGPTClose();}else if(['ArrowLeft','ArrowRight','PageUp','PageDown'].includes(e.key)&&!document.activeElement?.closest('input,textarea,select,button,#readerGPTSettings')){e.preventDefault();readerGPTTurnAnswerPage(e.key==='ArrowLeft'||e.key==='PageUp'?-1:1);}else if(e.key==='Tab'){const items=[...readerGPTLayer.querySelectorAll('button,select,textarea,summary,[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
@@ -3365,7 +3375,7 @@ function beginPageGesture(point,event){
   pageGesturePointers.add(point.id);
   if(pageGesturePointers.size!==1||!point.primary){cancelPageNoteHold();pageGesture=null;pageGestureSuppressUntil=performance.now()+800;finishPageGestureLayout();return;}
   pageGestureSuppressUntil=0;
-  const note=event.target.closest?.('[data-reader-note],[data-reader-year]');
+  const note=event.target.closest?.('[data-reader-year]')||event.target.closest?.('[data-reader-note]');
   if(restoreInProgress||!pages.length||!viewerOverlay.classList.contains('active')||readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen()||settingsPanelIsOpen()||
     (!note&&pageGestureSelection())||(!note&&event.target.closest?.('a,button,input,select,textarea,label')))return;
   const gesture=pageGesture={id:point.id,x:point.x,y:point.y,vertical:0,moved:0,time:performance.now(),generation:readerState.generation,note};
