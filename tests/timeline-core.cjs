@@ -9,4 +9,26 @@ assert.deepEqual(core.years('기원전 6세기와 기원전 155년, 서기 100�
 const parsed=core.merge(core.parseText('기원전 1년\n-한반도\nBC 내용\n\n기원후 1년\n-동양\nAD 내용\n\nC.E. 252년\n-유럽\n내용'));assert.equal(parsed.length,3);assert.deepEqual(parsed.map(e=>e.from),[-1,1,252]);assert.equal(core.nearest(parsed,2),1);assert.equal(core.nearest(parsed,-2),0);checks+=4;
 const centuries=core.merge(core.parseText('[BCE-C050] 기원전 50세기 | 기원전 5000~4901년\n-한반도\n본문 서기 252년\n[BCE-C049] 기원전 49세기 | 기원전 4900~4801년\n내용\n[저장 경계]\n기원전 20년'));assert.equal(centuries.length,2);assert.equal(centuries[0].from,-5000);assert.equal(centuries[0].to,-4901);assert.equal(core.nearest(centuries,-4950),0);assert.equal(core.nearest(centuries,252),1);checks+=5;
 const index=JSON.parse(fs.readFileSync(path.join(__dirname,'../timelines/default/index.json')));assert.equal(index.entries.length,456);assert.equal(index.entries[0].from,-5000);assert.equal(index.entries.at(-1).to,2026);checks+=3;
+
+assert.deepEqual(core.years('기원전 11세기 기원전 10년 서기 523년').map(x=>x.year),[-10,523]);checks++;
+// Century units stay distinct in both body triggers and imported heading intervals.
+for(const n of [1,6,10,11,12,20,50]){
+ for(const t of [`기원전 ${n}세기`,`기원전 ${n} 세 기`,`기원전 ${n}C`,`BC ${n} C.`,`${n}세기 BC`,`${n}th century BCE`,`BCE ${n}世紀`]){
+  assert.deepEqual(core.years(t),[],t);const c=core.centuries(t);assert.equal(c.length,1,t);assert.equal(c[0].from,-n*100,t);assert.equal(c[0].to,-(n-1)*100-1,t);checks+=4;
+ }
+}
+for(const t of ['기원전 11~10세기','기원전 11–기원전 10 C','11~10세기 BC']){
+ assert.deepEqual(core.years(t),[],t);assert.deepEqual(core.heading(t,false).from,-1100);assert.equal(core.heading(t,false).to,-901);checks+=3;
+}
+for(const [t,y] of [['기원전 1000년',-1000],['기원전 332년',-332],['서기 523년',523],['기원전 10년',-10],['기원전 11년',-11],['C.E. 523년',523]]){assert.deepEqual(core.years(t).map(x=>x.year),[y],t);checks++;}
+const mixed=core.merge(core.parseText('기원전 11세기\n오래된 세기 항목\n\n기원전 10세기\n다음 세기 항목\n\n기원전 1000년\n해당 연도\n\n기원전 332년\n해당 연도\n\n서기 523년\n해당 연도'));
+assert.deepEqual(mixed.map(e=>[e.from,e.to]),[[-1100,-1001],[-1000,-1000],[-1000,-901],[-332,-332],[523,523]]);checks++;
+for(const y of [-1100,-1050,-1001]){const e=mixed[core.nearest(mixed,y)];assert.deepEqual([e.from,e.to],[-1100,-1001]);checks++;}
+assert.equal(mixed[core.nearest(mixed,-1000)].from,-1000);assert.equal(mixed[core.nearest(mixed,-1000)].to,-1000);checks+=2;
+for(const t of ['[BCE-Y0010] 기원전 10세기','[BCE-C011] 기원전 11년','[BCE-C011] 기원전 10세기','[BCE-Y0332] 서기 332년']){assert.throws(()=>core.parseText(t+'\n본문'),/일치하지 않습니다/);checks++;}
+for(const e of index.entries){
+ const chunk=JSON.parse(fs.readFileSync(path.join(__dirname,'../timelines/default','part-'+String(e.chunk).padStart(3,'0')+'.json')));const parsed=core.parseText(chunk.records[e.id]);
+ // Existing default headings carry no IDs in the display payload; retain the same intervals.
+ assert.ok(parsed.length>0,e.title);assert.deepEqual([parsed[0].from,parsed[0].to],[e.from,e.to],e.title);checks+=2;
+}
 console.log(checks+' year variants, BCE/CE boundaries, ranges, isolated headings, centuries and supplied dataset checks passed.');

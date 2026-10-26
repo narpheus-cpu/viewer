@@ -64,6 +64,7 @@
 
   window.__androidBack = function () {
     if (typeof viewerOverlay === 'undefined') return false;
+    if (readerChapterIsOpen()) { readerChapterClose(); return true; }
     if (readerTimelineIsOpen()) { readerCloseTimeline(); return true; }
     if (readerGPTIsOpen()) { readerGPTClose(); return true; }
     if (readerNoteIsOpen()) { readerCloseNote(); return true; }
