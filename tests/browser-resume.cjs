@@ -11,9 +11,9 @@ const root=path.resolve(process.argv[2]||path.join(__dirname,'..'));
  await page.route('https://reader.test/**',async route=>{const p=new URL(route.request().url()).pathname,file=path.join(root,p==='/'?'index.html':p.slice(1));if(!fs.existsSync(file)){await route.fulfill({status:404,body:'missing'});return;}await route.fulfill({contentType:file.endsWith('.json')?'application/json':file.endsWith('.js')?'application/javascript':'text/html; charset=utf-8',body:fs.readFileSync(file)});});
  await page.goto('https://reader.test/');await page.evaluate(()=>readerReady);await page.locator('#inputText').fill(('다른 창을 보다가 돌아와도 읽던 위치를 유지하는 문장입니다.\n\n').repeat(500));await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length>5&&!restoreInProgress);await page.evaluate(async()=>{pageIndex=4;readerChooseAnchor(pageAnchors[4]);render();await readerState.pendingCache;});
  await page.evaluate(()=>{
-  window.resumeChecks={loading:0,displays:0,reads:0,splits:0};window.resumeOriginal={pages,anchors:pageAnchors,node:pageInnerLeft.firstChild,anchor:readerAnchor(),index:pageIndex,signature:readerState.layout};
-  const loading=readerSetLoading,display=readerDisplay,read=getRecentBook,split=splitIntoPages;
-  window.readerSetLoading=value=>{if(value)resumeChecks.loading++;return loading(value);};window.readerDisplay=(...args)=>{resumeChecks.displays++;return display(...args);};window.getRecentBook=(...args)=>{resumeChecks.reads++;return read(...args);};window.splitIntoPages=(...args)=>{resumeChecks.splits++;return split(...args);};
+  const initialSplits=readerStats.splits;window.resumeChecks={loading:0,displays:0,reads:0,get splits(){return readerStats.splits-initialSplits;}};window.resumeOriginal={pages,anchors:pageAnchors,node:pageInnerLeft.firstChild,anchor:readerAnchor(),index:pageIndex,signature:readerState.layout};
+  const loading=readerSetLoading,display=readerDisplay,read=getRecentBook;
+  window.readerSetLoading=value=>{if(value)resumeChecks.loading++;return loading(value);};window.readerDisplay=(...args)=>{resumeChecks.displays++;return display(...args);};window.getRecentBook=(...args)=>{resumeChecks.reads++;return read(...args);};
  });
  for(const kind of ['tab','window','bfcache']){
   await page.evaluate(kind=>{if(kind==='tab'){testHidden=true;document.dispatchEvent(new Event('visibilitychange'));}else window.dispatchEvent(new Event('blur'));testViewport.height=440;visualViewport.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('resize'));},kind);await page.waitForTimeout(180);

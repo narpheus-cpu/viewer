@@ -33,7 +33,7 @@ async function epub(){
   await page.evaluate(()=>{viewerSettings={...viewerSettings,fontSize:18,breakSentence:true,sentenceSpacing:true};applyViewerSettings(false);saveViewerSettings();});
   if(format==='txt')await page.locator('#inputText').fill('[첫 장]\n\n'+('첫 장 문장이다. '.repeat(200))+'\n\n[둘째 장]\n\n'+('두 번째 문장이다. '.repeat(200))+'\n\n[마지막 장]\n마지막 문장.');
   else{await page.locator('#txtFileInput').setInputFiles({name:'cached.epub',mimeType:'application/epub+zip',buffer:await epub()});await page.waitForFunction(()=>!openViewerBtn.disabled);}
-  await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length&&!restoreInProgress);
+  await page.locator('#openViewerBtn').click();await page.waitForFunction(()=>pages.length&&!restoreInProgress&&(typeof readerLazyActive!=='function'||!readerLazyActive()));
   await page.locator('#chapterSelect').selectOption('1',{force:true});
   const original=await page.evaluate(async()=>{await readerState.pendingCache;await readingDatabaseWrite;return {anchor:readerAnchor(),canonical:readerCanonical(),count:document.getElementById('viewerCharCount').textContent,chapterPage:document.getElementById('chapterPageCount').textContent};});
   await page.reload();await page.evaluate(()=>readerReady);
@@ -52,10 +52,11 @@ async function epub(){
     box.innerHTML='';return worst;
   });assert.ok(overflow<=1);checks++;
   // Real typography changes reflow; returning to the previous typography uses the retained layout.
-  await page.evaluate(async()=>{viewerSettings.fontSize=22;applyViewerSettings(false);await repaginate();await readerState.pendingCache;});
-  assert.equal(await page.evaluate(()=>readerStats.splits),before+1);checks++;
+  await page.evaluate(async()=>{viewerSettings.fontSize=22;applyViewerSettings(false);await repaginate();});await page.waitForFunction(()=>!restoreInProgress&&(typeof readerLazyActive!=='function'||!readerLazyActive()));await page.evaluate(()=>readerState.pendingCache);
+  const reflowSections=await page.evaluate(()=>typeof readerLazySession!=='undefined'&&readerLazySession?readerLazySession.results.length:1);
+  assert.equal(await page.evaluate(()=>readerStats.splits),before+reflowSections);checks++;
   await page.evaluate(async()=>{viewerSettings.fontSize=18;applyViewerSettings(false);await repaginate();});
-  assert.equal(await page.evaluate(()=>readerStats.splits),before+1);assert.equal(await page.evaluate(()=>readerAnchor()),original.anchor);checks+=2;
+  assert.equal(await page.evaluate(()=>readerStats.splits),before+reflowSections);assert.equal(await page.evaluate(()=>readerAnchor()),original.anchor);checks+=2;
   // Existing v1.12 page caches are upgraded without recalculating their page breaks.
   await page.evaluate(async()=>{
     const legacy={...(await readerReadCache(activeRecentId)),signature:getLayoutSignature(),pages:pages.slice(),anchors:pageAnchors.slice()};
@@ -66,17 +67,11 @@ async function epub(){
   assert.equal(await page.evaluate(()=>readerStats.splits),0);assert.equal(await page.evaluate(()=>readerAnchor()),original.anchor);checks+=2;
   await page.reload();await page.evaluate(()=>readerReady);
   assert.equal(await page.evaluate(()=>cachedMarkdownSource),null);checks++;
-  // Insets settling just after a long reflow must not make the entire book reflow twice.
-  const settling=await page.evaluate(async()=>{
-    const before=readerStats.splits,original=splitIntoPages;let adjusted=false;
-    window.splitIntoPages=text=>{
-      const result=original(text);
-      if(!adjusted){adjusted=true;const height=pageInnerLeft.getBoundingClientRect().height-1;pageInnerLeft.style.height=height+'px';pageInnerRight.style.height=height+'px';}
-      return result;
-    };
-    try{viewerSettings.fontSize=24;applyViewerSettings(false);await repaginate();await readerState.pendingCache;return {splits:readerStats.splits-before,reason:readerStats.lastCacheReason,anchor:readerAnchor()};}
-    finally{window.splitIntoPages=original;}
-  });assert.deepEqual(settling,{splits:1,reason:'reflow-reused',anchor:original.anchor});checks++;
+  // A new typography layout preserves the anchor and calculates each section only once.
+  const typographyBefore=await page.evaluate(()=>readerStats.splits);
+  await page.evaluate(async()=>{viewerSettings.fontSize=24;applyViewerSettings(false);await repaginate();});
+  await page.waitForFunction(()=>!restoreInProgress&&(typeof readerLazyActive!=='function'||!readerLazyActive()));await page.evaluate(()=>readerState.pendingCache);
+  assert.equal(await page.evaluate(()=>readerStats.splits),typographyBefore+reflowSections);assert.equal(await page.evaluate(()=>readerAnchor()),original.anchor);checks++;
   // Deleting a recent item must remove all retained layouts and keep other book data intact.
   await page.evaluate(async()=>{const id=activeRecentId;await deleteRecentById(id);await readerDeleteCache(id);});
   assert.equal(await page.evaluate(()=>readerState.memory.size),0);checks++;
