@@ -16,6 +16,7 @@ const target=path.resolve(process.argv[2]||path.join(__dirname,'../index.html'))
       await page.waitForFunction(()=>pages.length&&!restoreInProgress);
       async function checkChapter(chapter,token){
         await page.locator('#openReaderChapter').click();await page.locator('#readerChapterList [data-chapter="'+chapter+'"]').click();
+        await page.waitForFunction(()=>!restoreInProgress&&!readerLazyActive());
         const indices=await page.evaluate(token=>pages.flatMap((html,index)=>htmlToStableText(html).includes(token)?[index]:[]),token);
         assert.ok(indices.length);checks++;
         for(const index of [indices[0],indices.at(-1)]){
