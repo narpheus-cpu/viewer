@@ -160,6 +160,7 @@ const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',c
 const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
+const readerBrowserResume={away:false,settling:false,timer:0,frame:0};
 const READER_CACHE_VERSION=8;
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
@@ -3316,6 +3317,7 @@ function settingsPanelIsOpen(){
   실제 페이지 재분할은 설정 패널을 닫을 때 한 번만 수행한다.
 */
 function scheduleRepaginate(delay=90){
+  if(readerBrowserLayoutPaused()){clearTimeout(repaginateTimer);return;}
   if(!viewerOverlay.classList.contains('active'))return;
   if(pageJumpLayoutLocked()){clearTimeout(repaginateTimer);return;}
   if(restoreInProgress){
@@ -3681,6 +3683,7 @@ function render(){
 }
 
 async function repaginate(){
+  if(readerBrowserLayoutPaused())return;
   if(readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen())return;
   if(pageGesture){pageGestureLayoutDeferred=true;return;}
   if(pageJumpLayoutLocked())return;
@@ -3921,11 +3924,13 @@ document.addEventListener('keydown',e=>{
 });
 
 function syncVisualViewport(){
+  if(readerBrowserLayoutPaused())return;
   const vv=window.visualViewport;
   const top=vv?Math.max(0,vv.offsetTop):0;
   const left=vv?Math.max(0,vv.offsetLeft):0;
   const width=vv?vv.width:window.innerWidth;
   const height=vv?vv.height:window.innerHeight;
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<1||height<1)return;
   let viewport={top,left,width,height};
   if(pageJumpLayoutLocked()&&pageJumpViewport)viewport=pageJumpViewport;
   else lastVisualViewport=viewport;
@@ -3936,20 +3941,44 @@ function syncVisualViewport(){
   root.style.setProperty('--visual-viewport-height',Math.max(1,viewport.height)+'px');
 }
 
-syncVisualViewport();
-addEventListener('resize',()=>{
-  if(pageJumpSettling)settlePageJumpEdit();
-  syncVisualViewport();
-  scheduleRepaginate();
-});
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',()=>{
-    if(pageJumpSettling)settlePageJumpEdit();
-    syncVisualViewport();
-    scheduleRepaginate();
-  });
-  window.visualViewport.addEventListener('scroll',syncVisualViewport);
+/* Browser focus changes can temporarily report a smaller or empty viewport.
+   Keep the live DOM and pagination until the browser settles on its real size. */
+function readerBrowserLayoutPaused(){return readerBrowserResume.away||readerBrowserResume.settling||document.visibilityState==='hidden';}
+function readerBrowserPauseLayout(){
+ readerBrowserResume.away=true;readerBrowserResume.settling=true;
+ clearTimeout(repaginateTimer);clearTimeout(readerBrowserResume.timer);cancelAnimationFrame(readerBrowserResume.frame);readerBrowserResume.frame=0;
 }
+function readerBrowserScheduleResume(){
+ if(document.visibilityState==='hidden')return;
+ readerBrowserResume.away=false;readerBrowserResume.settling=true;
+ clearTimeout(repaginateTimer);clearTimeout(readerBrowserResume.timer);cancelAnimationFrame(readerBrowserResume.frame);readerBrowserResume.frame=0;
+ readerBrowserResume.timer=setTimeout(()=>{
+  let previous='',stable=0;
+  const sample=()=>{
+   readerBrowserResume.frame=0;if(readerBrowserResume.away||document.visibilityState==='hidden')return;
+   const v=window.visualViewport,w=v?.width||innerWidth,h=v?.height||innerHeight;
+   if(!Number.isFinite(w)||!Number.isFinite(h)||w<1||h<1){readerBrowserScheduleResume();return;}
+   const current=[w,h,v?.offsetTop||0,v?.offsetLeft||0,devicePixelRatio].join(':');stable=current===previous?stable+1:0;previous=current;
+   if(stable<2){readerBrowserResume.frame=requestAnimationFrame(sample);return;}
+   readerBrowserResume.settling=false;
+   if(pageJumpSettling)settlePageJumpEdit();syncVisualViewport();
+   if(viewerOverlay.classList.contains('active')&&pages.length&&readerState.layout!==getLayoutSignature())scheduleRepaginate(0);
+  };
+  readerBrowserResume.frame=requestAnimationFrame(sample);
+ },250);
+}
+function readerBrowserViewportChanged(){
+ if(readerBrowserResume.away||document.visibilityState==='hidden')return;
+ if(readerBrowserResume.settling){readerBrowserScheduleResume();return;}
+ if(pageJumpSettling)settlePageJumpEdit();syncVisualViewport();scheduleRepaginate();
+}
+syncVisualViewport();
+addEventListener('blur',readerBrowserPauseLayout);
+addEventListener('focus',()=>{if(readerBrowserResume.away||readerBrowserResume.settling)readerBrowserScheduleResume();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')readerBrowserPauseLayout();else readerBrowserScheduleResume();});
+addEventListener('pageshow',event=>{if(event.persisted)readerBrowserScheduleResume();});
+addEventListener('resize',readerBrowserViewportChanged);
+if(window.visualViewport){window.visualViewport.addEventListener('resize',readerBrowserViewportChanged);window.visualViewport.addEventListener('scroll',()=>{if(!readerBrowserLayoutPaused())syncVisualViewport();});}
 
 
 /* 초기화 */
