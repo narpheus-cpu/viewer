@@ -5,6 +5,7 @@ const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPagi
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
 const READER_CACHE_VERSION=8;
+const READER_COUNT_VERSION='non-whitespace-v1';
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
 function readerCanonical(){
@@ -143,10 +144,13 @@ function readerCacheStructureValid(cache){
     Array.isArray(cache.chapterStarts)&&cache.chapterStarts.length===bookChapters.length&&
     cache.chapterStarts.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0?x===0:x>=cache.chapterStarts[i-1]));
 }
-function readerRestoreCountCache(cache){
-  if(!readerCacheStructureValid(cache)||!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
+function readerCountCacheValid(cache){
+  return cache?.countVersion===READER_COUNT_VERSION&&readerCacheStructureValid(cache)&&!(!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
     !cache.chapterCounts.every(Number.isSafeInteger)||cache.chapterCounts.some(x=>x<0)||
-    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount)return;
+    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount);
+}
+function readerRestoreCountCache(cache){
+  if(!readerCountCacheValid(cache))return;
   viewerCountSource=fullText;viewerCountSignature=chapterSignature;
   viewerChapterCounts=cache.chapterCounts.slice();viewerTotalCount=cache.totalCount;
 }
@@ -160,7 +164,7 @@ function readerCreatePageCache(id,signature,previous,used){
   return {id,version:READER_CACHE_VERSION,noteVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
     fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
     canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
-    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,layouts,updatedAt:Date.now()};
+    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,countVersion:READER_COUNT_VERSION,layouts,updatedAt:Date.now()};
 }
 
 async function readerHydrateReading(record){
@@ -241,7 +245,7 @@ async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.
     readerStats.lastPaginationMs=performance.now()-started;
     flushReadingSessionSave(true);flushActiveRecentPositionSave();
     // Upgrade old cache metadata without invalidating its already correct page breaks.
-    if(id&&(built||!used||!readerCacheStructureValid(cached)||!Array.isArray(cached.chapterCounts))){
+    if(id&&(built||!used||!readerCountCacheValid(cached))){
       const cache=readerCreatePageCache(id,signature,cached,used);
       readerState.pendingCache=readerStoreCache(cache);
     }
