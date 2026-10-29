@@ -441,7 +441,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.27.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -2047,7 +2047,7 @@ function readerShowSearchResults(reset=false){
     <h1>전자책으로 보기</h1>
     <div class="sub">텍스트를 입력하고 버튼을 누르면, 입력한 내용을 페이지 단위로 넘겨볼 수 있는 전자책 뷰어 팝업이 열립니다.</div>
 
-    <label for="inputText">텍스트 입력 <span id="inputCharCount" class="character-count" title="공백·줄바꿈 포함">0자</span></label>
+    <label for="inputText">텍스트 입력 <span id="inputCharCount" class="character-count" title="공백·탭·줄바꿈 제외">0자</span></label>
     <textarea id="inputText" placeholder="여기에 텍스트(마크다운 서식 가능)를 입력하거나 붙여넣으세요."></textarea>
     <div class="input-actions">
       <button class="secondary" id="chooseTxtBtn" type="button">TXT / EPUB 열기</button>
@@ -2084,7 +2084,7 @@ function readerShowSearchResults(reset=false){
 <div class="modal-overlay" id="viewerOverlay">
   <section class="book" id="book">
     <div class="bookhead">
-      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·줄바꿈 포함)" aria-label="현재 챕터 글자수/전체 글자수">0/0자</div>
+      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·탭·줄바꿈 제외)" aria-label="현재 챕터 글자수/전체 글자수">0/0자</div>
       <div class="top-page-nav" aria-label="페이지 이동">
         <div class="counter" id="counter">0 / 0</div>
         <div class="page-jump">
@@ -2195,10 +2195,14 @@ const $=s=>document.querySelector(s);
 const inputText=$('#inputText');
 let characterCountSource=null,characterCountLabel='0자';
 const characterCountFormat=new Intl.NumberFormat('ko-KR');
+const readerCountWhitespace=/[\s\u0085\u200B]/u;
+function countNonWhitespaceCharacters(text){
+  let count=0;for(const character of text)if(!readerCountWhitespace.test(character))count++;return count;
+}
 function formatCharacterCount(text){
   if(text!==characterCountSource){
     characterCountSource=text;
-    let count=0;for(const character of text)count++;
+    const count=countNonWhitespaceCharacters(text);
     characterCountLabel=characterCountFormat.format(count)+'자';
   }
   return characterCountLabel;
@@ -2206,7 +2210,7 @@ function formatCharacterCount(text){
 function updateInputCharacterCount(){
   $('#inputCharCount').textContent=formatCharacterCount(inputText.value);
 }
-// Cache raw-text counts once per book/chapter configuration, including whitespace.
+// Cache code-point counts once per book/chapter configuration, excluding all whitespace.
 let viewerCountSource=null,viewerCountSignature=null,viewerChapterCounts=[],viewerTotalCount=0;
 function updateViewerCountLabel(){
   if(viewerCountSource!==fullText||viewerCountSignature!==chapterSignature){
@@ -2214,8 +2218,7 @@ function updateViewerCountLabel(){
     const starts=bookChapters.length?bookChapters.map(chapter=>chapter.start):[0];
     viewerTotalCount=0;
     viewerChapterCounts=starts.map((start,index)=>{
-      let count=0;
-      for(const character of fullText.slice(start,starts[index+1]??fullText.length))count++;
+      const count=countNonWhitespaceCharacters(fullText.slice(start,starts[index+1]??fullText.length));
       viewerTotalCount+=count;
       return count;
     });

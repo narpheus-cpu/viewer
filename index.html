@@ -162,6 +162,7 @@ let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
 const readerBrowserResume={away:false,settling:false,timer:0,frame:0};
 const READER_CACHE_VERSION=8;
+const READER_COUNT_VERSION='non-whitespace-v1';
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
 function readerCanonical(){
@@ -300,10 +301,13 @@ function readerCacheStructureValid(cache){
     Array.isArray(cache.chapterStarts)&&cache.chapterStarts.length===bookChapters.length&&
     cache.chapterStarts.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0?x===0:x>=cache.chapterStarts[i-1]));
 }
-function readerRestoreCountCache(cache){
-  if(!readerCacheStructureValid(cache)||!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
+function readerCountCacheValid(cache){
+  return cache?.countVersion===READER_COUNT_VERSION&&readerCacheStructureValid(cache)&&!(!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
     !cache.chapterCounts.every(Number.isSafeInteger)||cache.chapterCounts.some(x=>x<0)||
-    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount)return;
+    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount);
+}
+function readerRestoreCountCache(cache){
+  if(!readerCountCacheValid(cache))return;
   viewerCountSource=fullText;viewerCountSignature=chapterSignature;
   viewerChapterCounts=cache.chapterCounts.slice();viewerTotalCount=cache.totalCount;
 }
@@ -317,7 +321,7 @@ function readerCreatePageCache(id,signature,previous,used){
   return {id,version:READER_CACHE_VERSION,noteVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
     fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
     canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
-    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,layouts,updatedAt:Date.now()};
+    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,countVersion:READER_COUNT_VERSION,layouts,updatedAt:Date.now()};
 }
 
 async function readerHydrateReading(record){
@@ -398,7 +402,7 @@ async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.
     readerStats.lastPaginationMs=performance.now()-started;
     flushReadingSessionSave(true);flushActiveRecentPositionSave();
     // Upgrade old cache metadata without invalidating its already correct page breaks.
-    if(id&&(built||!used||!readerCacheStructureValid(cached)||!Array.isArray(cached.chapterCounts))){
+    if(id&&(built||!used||!readerCountCacheValid(cached))){
       const cache=readerCreatePageCache(id,signature,cached,used);
       readerState.pendingCache=readerStoreCache(cache);
     }
@@ -1008,7 +1012,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.27.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -1262,7 +1266,7 @@ function setupReaderChatGPT(){
   readerGPTMenu=document.createElement('button');readerGPTMenu.id='readerGPTSelectionMenu';readerGPTMenu.type='button';readerGPTMenu.textContent='ChatGPT연결';readerGPTMenu.hidden=true;document.body.appendChild(readerGPTMenu);
   for(const type of ['pointerdown','mousedown','touchstart'])readerGPTMenu.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});readerGPTMenu.onclick=()=>readerOpenSelectedChatGPT();
   readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
-  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.27.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
+  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
   document.body.appendChild(readerGPTLayer);setupReaderGPTAnswerPages();document.getElementById('readerGPTPc').hidden=readerGPTNative();document.getElementById('closeReaderGPT').onclick=readerGPTClose;document.getElementById('readerGPTSend').onclick=readerGPTSend;document.getElementById('readerGPTStop').onclick=()=>{void readerGPTCancel();readerGPTStatus('질문을 중지했습니다.');};
   document.getElementById('readerGPTConnect').onclick=async()=>{try{readerGPTStatus('로그인 창을 여는 중…');await readerGPTRpc('signin',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
   document.getElementById('readerGPTAccounts').onchange=async()=>{try{await readerGPTRpc('switch',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
@@ -2467,7 +2471,7 @@ function setupReaderTools(){
     <h1>전자책으로 보기</h1>
     <div class="sub">텍스트를 입력하고 버튼을 누르면, 입력한 내용을 페이지 단위로 넘겨볼 수 있는 전자책 뷰어 팝업이 열립니다.</div>
 
-    <label for="inputText">텍스트 입력 <span id="inputCharCount" class="character-count" title="공백·줄바꿈 포함">0자</span></label>
+    <label for="inputText">텍스트 입력 <span id="inputCharCount" class="character-count" title="공백·탭·줄바꿈 제외">0자</span></label>
     <textarea id="inputText" placeholder="여기에 텍스트(마크다운 서식 가능)를 입력하거나 붙여넣으세요."></textarea>
     <div class="input-actions">
       <button class="secondary" id="chooseTxtBtn" type="button">TXT / EPUB 열기</button>
@@ -2504,7 +2508,7 @@ function setupReaderTools(){
 <div class="modal-overlay" id="viewerOverlay">
   <section class="book" id="book">
     <div class="bookhead">
-      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·줄바꿈 포함)" aria-label="현재 챕터 글자수/전체 글자수">0/0자</div>
+      <div class="booktitle" id="viewerCharCount" title="현재 챕터 글자수/전체 글자수 (공백·탭·줄바꿈 제외)" aria-label="현재 챕터 글자수/전체 글자수">0/0자</div>
       <div class="top-page-nav" aria-label="페이지 이동">
         <div class="counter" id="counter">0 / 0</div>
         <div class="page-jump">
@@ -2615,10 +2619,14 @@ const $=s=>document.querySelector(s);
 const inputText=$('#inputText');
 let characterCountSource=null,characterCountLabel='0자';
 const characterCountFormat=new Intl.NumberFormat('ko-KR');
+const readerCountWhitespace=/[\s\u0085\u200B]/u;
+function countNonWhitespaceCharacters(text){
+  let count=0;for(const character of text)if(!readerCountWhitespace.test(character))count++;return count;
+}
 function formatCharacterCount(text){
   if(text!==characterCountSource){
     characterCountSource=text;
-    let count=0;for(const character of text)count++;
+    const count=countNonWhitespaceCharacters(text);
     characterCountLabel=characterCountFormat.format(count)+'자';
   }
   return characterCountLabel;
@@ -2626,7 +2634,7 @@ function formatCharacterCount(text){
 function updateInputCharacterCount(){
   $('#inputCharCount').textContent=formatCharacterCount(inputText.value);
 }
-// Cache raw-text counts once per book/chapter configuration, including whitespace.
+// Cache code-point counts once per book/chapter configuration, excluding all whitespace.
 let viewerCountSource=null,viewerCountSignature=null,viewerChapterCounts=[],viewerTotalCount=0;
 function updateViewerCountLabel(){
   if(viewerCountSource!==fullText||viewerCountSignature!==chapterSignature){
@@ -2634,8 +2642,7 @@ function updateViewerCountLabel(){
     const starts=bookChapters.length?bookChapters.map(chapter=>chapter.start):[0];
     viewerTotalCount=0;
     viewerChapterCounts=starts.map((start,index)=>{
-      let count=0;
-      for(const character of fullText.slice(start,starts[index+1]??fullText.length))count++;
+      const count=countNonWhitespaceCharacters(fullText.slice(start,starts[index+1]??fullText.length));
       viewerTotalCount+=count;
       return count;
     });
