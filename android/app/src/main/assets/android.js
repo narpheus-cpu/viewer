@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   window.__androidCheckpoint = function (record) {
-    if (!window.AndroidReader || restoreInProgress || readerState.initializing) return;
+    if (!window.AndroidReader || restoreInProgress || readerState.initializing || !readerState.canCheckpoint) return;
     try {
       const open = record ? !!record.isOpen : viewerOverlay.classList.contains('active');
       const index = Math.min(Math.max(0, pageIndex), Math.max(0, pageAnchors.length - 1));
@@ -52,7 +52,7 @@
   };
 
   window.__androidFlushState = async function () {
-    if (typeof flushReadingSessionSave !== 'function' || restoreInProgress || readerState.initializing) return;
+    if (typeof flushReadingSessionSave !== 'function' || restoreInProgress || readerState.initializing || !readerState.canCheckpoint) return;
     flushReadingSessionSave(viewerOverlay.classList.contains('active'));
     clearTimeout(recentSaveTimer);
     recentSaveTimer = 0;

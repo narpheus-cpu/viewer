@@ -309,14 +309,73 @@ function readerNoteContainsOffset(text,offset){
   while(lo<=hi){const mid=(lo+hi)>>1,r=ranges[mid];if(offset<r.start)hi=mid-1;else if(offset>=r.end)lo=mid+1;else return true;}
   return false;
 }
+// A slash pair must look like a transcription and follow an English word or phrase.
+const READER_IPA_PAIR=/[ \t\u00a0]+\/([a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u02b0-\u02ff\u0300-\u036f\u1d00-\u1d7f\u207f\u2191\u2193][a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u02b0-\u02ff\u0300-\u036f\u1d00-\u1d7f\u207f\u2191\u2193.‿ \t\u00a0]{0,255})\/(?![A-Za-z0-9_/@\\])/gu;
+const READER_ENGLISH_END=/-?[A-Za-z]+(?:['’\-][A-Za-z]+)*-?(?:[ \t\u00a0]+-?[A-Za-z]+(?:['’\-][A-Za-z]+)*-?)*$/;
+function readerFindPronunciations(text){
+  const notes=[];
+  for(const match of text.matchAll(READER_IPA_PAIR)){
+    const content=match[1],start=match.index;
+    if(content!==content.trim()||!/[a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u1d00-\u1d7f]/u.test(content))continue;
+    // Bound the look-back and never attach a note to a fragment of a URL or identifier.
+    const before=text.slice(Math.max(notes[notes.length-1]?.end||0,start-512),start);
+    const phrase=before.match(READER_ENGLISH_END);
+    if(!phrase||/[A-Za-z0-9_/@\\]/.test(text[start-before.length+phrase.index-1]||''))continue;
+    const wordCount=content.split(/[ \t\u00a0]+/).length;
+    const words=[...phrase[0].matchAll(/[^ \t\u00a0]+/g)];
+    const labelStart=start-phrase[0].length+words[Math.max(0,words.length-wordCount)].index;
+    notes.push({labelStart,start,end:start+match[0].length,content:'/'+content+'/'});
+  }
+  return notes;
+}
+let readerPronunciationSource=null,readerPronunciationPresent=false;
+function readerSourceHasPronunciations(text){
+  if(readerPronunciationSource!==text){
+    readerPronunciationSource=text;
+    readerPronunciationPresent=READER_IPA_PAIR.test(text);
+    READER_IPA_PAIR.lastIndex=0;
+  }
+  return readerPronunciationPresent;
+}
+function readerPronunciationHTML(html){
+  if(!/[ \t\u00a0>]\/|&nbsp;\//.test(html))return html;
+  const root=document.createElement('div');root.innerHTML=html;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  const units=[];let node,text='';
+  while((node=walker.nextNode())){
+    if(node.nodeType===Node.TEXT_NODE){
+      if(node.parentElement.closest('pre,code,a,[data-reader-note]')){text+='\0';continue;}
+      units.push({node,start:text.length,end:text.length+node.length});
+      text+=node.data;
+    }else if(/^(?:BR|DIV|P|LI|TD|TH|TR|H[1-6]|BLOCKQUOTE|IMG|HR)$/.test(node.tagName))text+='\0';
+  }
+  const notes=readerFindPronunciations(text);
+  if(!notes.length)return html;
+  function point(offset,end=false){
+    const unit=units.find(entry=>end?offset>entry.start&&offset<=entry.end:offset>=entry.start&&offset<entry.end);
+    return [unit.node,offset-unit.start];
+  }
+  function range(start,end){
+    const result=document.createRange();result.setStart(...point(start));result.setEnd(...point(end,true));return result;
+  }
+  for(const note of notes.reverse()){
+    const title=text.slice(note.labelStart,note.start);
+    range(note.start,note.end).deleteContents();
+    const label=range(note.labelStart,note.start),trigger=readerNoteElement(title,note.content);
+    trigger.setAttribute('data-reader-pronunciation','');
+    trigger.setAttribute('aria-label',title+' 발음기호 열기');
+    trigger.appendChild(label.extractContents());label.insertNode(trigger);
+  }
+  return root.innerHTML;
+}
 function readerMarkdownNoteBlocks(text){
   const notes=readerFindNoteRanges(text);
-  if(!notes.length)return markdownToBlocks(text);
+  if(!notes.length)return markdownToBlocks(text).map(readerPronunciationHTML);
   let prefix='\uE000readerNote';while(text.includes(prefix))prefix+='\uE000';
   let protectedText='',at=0;
   notes.forEach((note,index)=>{protectedText+=text.slice(at,note.start)+prefix+index+'\uE001';at=note.end;});
   protectedText+=text.slice(at);
-  return markdownToBlocks(protectedText).map(html=>readerFootnoteHTML(html,{notes,prefix}));
+  return markdownToBlocks(protectedText).map(html=>readerPronunciationHTML(readerFootnoteHTML(html,{notes,prefix})));
 }
 function readerFootnoteHTML(html,protectedNotes=null){
   if(!protectedNotes&&!html.includes('〔'))return html;
@@ -347,18 +406,33 @@ function readerFootnoteHTML(html,protectedNotes=null){
     const before=text.slice(0,note.start),tail=before.match(/[\t "'’”)\]}」』]*$/u)[0];
     const end=before.length-tail.length,word=before.slice(0,end).match(/[\p{L}\p{N}\p{M}_]+(?:[·.'’/\-][\p{L}\p{N}\p{M}_]+)*\.?$/u);
     const removal=range(note.start,note.end);removal.deleteContents();
-    const trigger=document.createElement('span');trigger.className='reader-note';trigger.tabIndex=0;trigger.setAttribute('role','button');
-    trigger.setAttribute('data-reader-note',note.content.trim());trigger.setAttribute('aria-haspopup','dialog');
-    trigger.setAttribute('data-reader-note-title',word?.[0]||'각주');trigger.setAttribute('aria-label',(word?.[0]||'각주')+' 길게 눌러 각주 열기');
+    const trigger=readerNoteElement(word?.[0]||'각주',note.content.trim());
     if(word){const label=range(end-word[0].length,end);trigger.appendChild(label.extractContents());label.insertNode(trigger);}
     else{trigger.textContent='※';removal.insertNode(trigger);}
   }
   return root.innerHTML;
 }
+function readerNoteElement(title,content){
+  const trigger=document.createElement('span');trigger.className='reader-note';trigger.tabIndex=0;trigger.setAttribute('role','button');
+  trigger.setAttribute('data-reader-note',content);trigger.setAttribute('aria-haspopup','dialog');
+  trigger.setAttribute('data-reader-note-title',title);trigger.setAttribute('aria-label',title+' 길게 눌러 각주 열기');
+  return trigger;
+}
 function readerMigrateNotePosition(record,cache){
-  if(!readerSourceHasNotes(fullText)||cache?.noteVersion===1||typeof cache?.canonical!=='string'||
-    String(record.layoutSignature||'').includes('"footnotes-v1"')||!Number.isFinite(Number(record.pageAnchor)))return record;
-  const old=cache.canonical,ranges=readerFindNoteRanges(old);if(!ranges.length)return record;
+  if(typeof cache?.canonical!=='string'||!Number.isFinite(Number(record.pageAnchor)))return record;
+  const signature=String(record.layoutSignature||''),old=cache.canonical;
+  const migrateNotes=cache.noteVersion!==1&&!signature.includes('"footnotes-v1"')&&readerSourceHasNotes(fullText);
+  const migrateIPA=cache.pronunciationVersion!==1&&!signature.includes('"pronunciations-v1"')&&readerSourceHasPronunciations(fullText);
+  const ranges=migrateNotes?readerFindNoteRanges(old):[];
+  if(migrateIPA){
+    const bracketNotes=ranges.slice();let i=0;
+    for(const note of readerFindPronunciations(old)){
+      while(i<bracketNotes.length&&bracketNotes[i].end<=note.labelStart)i++;
+      if(i===bracketNotes.length||bracketNotes[i].start>=note.end)ranges.push(note);
+    }
+    ranges.sort((a,b)=>a.start-b.start);
+  }
+  if(!ranges.length)return record;
   let visible='',at=0;for(const note of ranges){visible+=old.slice(at,note.start);at=note.end;}visible+=old.slice(at);
   if(visible!==readerCanonical())return record;
   const original=Math.max(0,Math.min(old.length,Number(record.pageAnchor)));let removed=0;
@@ -367,6 +441,7 @@ function readerMigrateNotePosition(record,cache){
 }
 
 let readerNoteLayer=null,readerNoteTrigger=null,readerNoteBodyOverflow='',readerNoteRootOverflow='',readerNotePreviousAria=null;
+let readerNoteIgnoreClickUntil=0;
 function readerNoteIsOpen(){return !!readerNoteLayer&&!readerNoteLayer.hidden;}
 function readerNoteUpdateViewport(){
   if(!readerNoteLayer)return;
@@ -403,13 +478,15 @@ function setupReaderNotes(){
   readerNoteLayer=document.createElement('div');readerNoteLayer.id='readerNoteLayer';readerNoteLayer.className='reader-note-layer';readerNoteLayer.hidden=true;
   readerNoteLayer.innerHTML='<section class="reader-note-dialog" role="dialog" aria-modal="true" aria-labelledby="readerNoteTitle"><header class="reader-note-header"><h2 id="readerNoteTitle"></h2><button id="closeReaderNote" type="button" aria-label="각주 닫기">닫기</button></header><div id="readerNoteContent" class="reader-note-content" tabindex="0" role="document"></div></section>';
   document.body.appendChild(readerNoteLayer);document.getElementById('closeReaderNote').onclick=readerCloseNote;
+  // A touch-generated click can land on the popup that just opened on pointerup.
+  for(const type of ['pointerdown','touchstart'])readerNoteLayer.addEventListener(type,()=>{readerNoteIgnoreClickUntil=0;});
   readerNoteLayer.addEventListener('click',event=>{event.stopPropagation();if(event.target===readerNoteLayer)readerCloseNote();});
   for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerNoteLayer.addEventListener(type,event=>event.stopPropagation(),{passive:true});
   document.addEventListener('contextmenu',event=>{
     if(viewerOverlay.classList.contains('active')&&event.target.closest?.('[data-reader-note]'))event.preventDefault();
   },true);
   document.addEventListener('click',event=>{
-    if(readerNoteIsOpen()&&!readerNoteLayer.contains(event.target)){event.preventDefault();event.stopImmediatePropagation();}
+    if(readerNoteIsOpen()&&(!readerNoteLayer.contains(event.target)||(event.detail!==0&&performance.now()<readerNoteIgnoreClickUntil))){event.preventDefault();event.stopImmediatePropagation();}
   },true);
   document.addEventListener('keydown',event=>{
     if(readerNoteIsOpen()){
@@ -441,7 +518,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.30.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -1146,7 +1223,9 @@ textarea{min-height:42vh}
   padding:12px;
   border-bottom:1px solid var(--line);
 }
+.recent-head{flex-wrap:wrap}
 .recent-head strong{font-size:14px}
+#recentHistoryStatus{flex:0 0 auto;padding:8px 12px;font-size:12px;line-height:1.5}
 .recent-head-actions{display:flex;gap:6px}
 .recent-head-actions button{padding:6px 8px;font-size:11px}
 .recent-list{
@@ -1394,7 +1473,7 @@ function readerChapterBlocks(text){
   const blocks=[];let anchor=0;
   bookChapters.forEach((chapter,index)=>{
     chapterBlockBoundaries.add(blocks.length);chapterCanonicalStarts.push(anchor);
-    const part=chapter.blocks?chapter.blocks.map(html=>readerFootnoteHTML(html)):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
+    const part=chapter.blocks?chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
     const content=part.length?part:['<p></p>'];
     blocks.push(...content);
     for(const html of content)anchor+=htmlToStableText(html).length+1;
@@ -1617,7 +1696,7 @@ async function loadReaderFile(file){
   if(!epub&&!/\.txt$/i.test(file.name))throw new Error('TXT 또는 EPUB 파일을 선택해 주세요.');
   const imported=epub?await importEpub(file):{text:(await file.text()).replace(/^\uFEFF/,''),chapters:[]};
   inputText.value=imported.text;inputBookChapters=imported.chapters;
-  inputFileName=file.name;userEditedAfterRestore=true;updateInputCharacterCount();
+  inputFileName=file.name;userEditedAfterRestore=true;readerState.canCheckpoint=true;updateInputCharacterCount();
   flushReadingSessionSave(false);
   const count=epub?imported.chapters.length:detectTextChapters(imported.text).length;
   setStatus(`불러옴: ${file.name}${count?` · ${count}개 챕터`:''}`);
@@ -2069,12 +2148,14 @@ function readerShowSearchResults(reset=false){
 <div class="recent-overlay" id="recentOverlay" aria-hidden="true">
   <section class="recent-panel" role="dialog" aria-modal="true" aria-labelledby="recentTitle">
     <div class="recent-head">
-      <strong id="recentTitle">최근 내역 · 최대 20개</strong>
+      <strong id="recentTitle">읽을 책 선택 · 최근 20개</strong>
       <div class="recent-head-actions">
+        <button class="secondary" id="chooseRecentFile" type="button">새 파일 열기</button>
         <button class="secondary" id="clearRecentHistory" type="button">전체 삭제</button>
         <button class="secondary" id="closeRecentHistory" type="button">닫기</button>
       </div>
     </div>
+    <div class="status" id="recentHistoryStatus" role="status" aria-live="polite">읽을 책을 선택해 주세요. 최근 책은 자동으로 열지 않습니다.</div>
     <div class="recent-list" id="recentList">
       <div class="recent-empty">저장된 내역이 없습니다.</div>
     </div>
@@ -2524,7 +2605,7 @@ async function pruneRecentHistory(){
   for(const meta of metas.slice(RECENT_LIMIT))await deleteRecentById(meta.id);
 }
 
-async function upsertRecentText(text,{resetPosition=true,fileName}={}){
+async function upsertRecentText(text,{resetPosition=true,fileName,generation=readerState.generation}={}){
   if(!resetPosition&&activeRecentId&&activeRecentMeta&&text===fullText&&
     (inputBookChapters===activeRecentMeta.chapters||(!inputBookChapters.length&&!activeRecentMeta.chapters?.length))){
     const meta=currentRecentPositionMeta();
@@ -2552,6 +2633,7 @@ async function upsertRecentText(text,{resetPosition=true,fileName}={}){
     layoutSignature:resetPosition?'':(typeof existing?.layoutSignature==='string'?existing.layoutSignature:'')
   };
   await putRecentTextAndMeta(text,meta);
+  if(generation!==readerState.generation)return meta;
   activeRecentId=id;
   activeRecentMeta=meta;
   await pruneRecentHistory();
@@ -2574,7 +2656,7 @@ function currentRecentPositionMeta(){
 }
 
 async function saveActiveRecentPosition(){
-  if(restoreInProgress)return;
+  if(restoreInProgress||!readerState.canCheckpoint)return;
   const meta=currentRecentPositionMeta();
   if(!meta)return;
   activeRecentMeta=meta;
@@ -2608,7 +2690,7 @@ async function activateRecentFromReading(reading){
 async function renderRecentHistory(){
   recentList.innerHTML='<div class="recent-empty">불러오는 중...</div>';
   try{
-    const metas=(await getRecentMetas()).slice(0,RECENT_LIMIT);
+    const metas=(await readerBounded(getRecentMetas(),3000,'최근 목록 읽기')).slice(0,RECENT_LIMIT);
     if(!metas.length){
       recentList.innerHTML='<div class="recent-empty">저장된 내역이 없습니다.</div>';
       return;
@@ -2650,12 +2732,13 @@ async function renderRecentHistory(){
       recentList.appendChild(row);
     }
   }catch(error){
-    recentList.innerHTML='<div class="recent-empty">최근 내역을 불러오지 못했습니다.</div>';
+    recentList.innerHTML='<div class="recent-empty">최근 내역을 불러오지 못했습니다. 새 파일을 열거나 다시 시도해 주세요.</div>';const retry=document.createElement('button');retry.type='button';retry.textContent='다시 불러오기';retry.id='retryRecentHistory';retry.onclick=()=>void renderRecentHistory();recentList.appendChild(retry);
     setStatus(error.message||'최근 내역을 불러오지 못했습니다.',true);
   }
 }
 
-function showRecentHistory(){
+function showRecentHistory(message=''){
+  $('#recentHistoryStatus').textContent=typeof message==='string'&&message?message:'읽을 책을 선택해 주세요. 최근 책은 자동으로 열지 않습니다.';
   recentOverlay.classList.add('active');
   recentOverlay.setAttribute('aria-hidden','false');
   void renderRecentHistory();
@@ -2672,7 +2755,8 @@ function getLayoutSignature(){
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
-    navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[])]);
+    navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[]),
+    ...(readerSourceHasPronunciations(fullText)?['pronunciations-v1']:[])]);
 }
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
@@ -2694,7 +2778,7 @@ function flushReadingSessionSave(isOpen=viewerOverlay.classList.contains('active
 }
 
 function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
-  if(restoreInProgress||readerState.initializing)return false;
+  if(restoreInProgress||readerState.initializing||!readerState.canCheckpoint)return false;
   const text=isOpen&&fullText!==''?fullText:inputText.value;
   const safeIndex=Math.min(Math.max(0,pageIndex),Math.max(0,pageAnchors.length-1));
   const pageAnchor=pageAnchors.length?readerAnchor():0;
@@ -2730,7 +2814,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
 inputText.addEventListener('input',()=>{
   inputFileName='';inputBookChapters=[];
   updateInputCharacterCount();
-  userEditedAfterRestore=true;
+  userEditedAfterRestore=true;readerState.canCheckpoint=true;
   scheduleReadingSessionSave(false,180);
 });
 
@@ -3481,6 +3565,10 @@ function endPageGesture(point,event){
     gesture.generation!==readerState.generation)return;
   if(moved<=10){
     if(elapsed>=READER_NOTE_HOLD_MS)return;
+    if(gesture.note?.hasAttribute('data-reader-pronunciation')){
+      readerOpenNote(gesture.note);readerNoteIgnoreClickUntil=pageGestureSuppressUntil=performance.now()+800;
+      if(event.cancelable)event.preventDefault();return;
+    }
     const rect=pageGestureSurface.getBoundingClientRect();point.x-rect.left<rect.width/2?goPrevPage():goNextPage();return;
   }
   if(Math.abs(dx)>=40&&Math.abs(dx)>=dy*1.35)dx<0?goNextPage():goPrevPage();
@@ -3568,12 +3656,13 @@ async function openViewer(){
   const text=inputText.value;
   updateInputCharacterCount();
   if(!text.trim()){setStatus('전자책으로 볼 텍스트를 입력하세요.',true);return;}
-  const generation=++readerState.generation;
-  setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;
+  let generation=++readerState.generation;
+  setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;readerState.canCheckpoint=false;
   let record=text===fullText&&pages.length?{pageAnchor:readerAnchor(),pageContext:readerState.context}: {pageAnchor:0};
   try{
-    record=await upsertRecentText(text,{resetPosition:false,fileName:inputFileName});
-  }catch(error){activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
+    await readerPrepareInitialFont();if(generation!==readerState.generation)return;
+    record=await readerBounded(upsertRecentText(text,{resetPosition:false,fileName:inputFileName,generation}),5000,'최근 내역 저장');
+  }catch(error){if(generation!==readerState.generation)return;generation=++readerState.generation;activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
   if(generation!==readerState.generation)return;
   fullText=text;
   $('#viewerSettings').classList.remove('open');
@@ -3581,6 +3670,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  const wasLoading=restoreInProgress;
   readerLazyCancel();
   readerCloseTimeline();
   readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;
@@ -3591,32 +3681,30 @@ function closeViewer(){
   readerState.cancelled=true;readerState.generation++;
   clearTimeout(repaginateTimer);
   restoreInProgress=false;
-  flushActiveRecentPositionSave();
+  if(!wasLoading)flushActiveRecentPositionSave();
   viewerOverlay.classList.remove('active');readerSetLoading(false);
   $('#viewerSettings').classList.remove('open');
-  flushReadingSessionSave(false);
+  if(!wasLoading)flushReadingSessionSave(false);else{readerState.canCheckpoint=false;showRecentHistory('불러오기를 취소했습니다. 다른 책을 선택할 수 있습니다.');}
 }
 
 async function openRecentBook(id){
-  userEditedAfterRestore=true;
-  await readerReady;
-  const generation=++readerState.generation;
+  userEditedAfterRestore=true;await readerReady;
+  const generation=++readerState.generation;readerState.cancelled=false;readerState.canCheckpoint=false;
+  hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
+  viewerOverlay.classList.add('active');restoreInProgress=true;readerSetLoading(true,'선택한 책을 불러오는 중…');
   try{
-    const bookRecord=await getRecentBook(id);
+    const [bookRecord]=await Promise.all([readerBounded(getRecentBook(id),8000,'책 읽기'),readerPrepareInitialFont()]);
     if(generation!==readerState.generation)return;
-    if(!bookRecord){setStatus('해당 최근 내역을 찾을 수 없습니다.',true);return;}
+    if(!bookRecord)throw Error('해당 최근 내역을 찾을 수 없습니다.');
     const meta=window.__androidRecentMeta(bookRecord.meta||{id});
-    activeRecentId=id;activeRecentMeta=meta;
-    inputText.value=bookRecord.text;fullText=bookRecord.text;
-    inputFileName=meta.fileName||'';inputBookChapters=meta.chapters||[];
-    updateInputCharacterCount();
-    hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
-    viewerOverlay.classList.add('active');
+    activeRecentId=id;activeRecentMeta=meta;inputText.value=bookRecord.text;fullText=bookRecord.text;
+    inputFileName=meta.fileName||'';inputBookChapters=meta.chapters||[];updateInputCharacterCount();
     await readerDisplay(meta,generation);
-  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message,true);}}
+  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerState.canCheckpoint=false;readerSetLoading(false);viewerOverlay.classList.remove('active');setStatus(error.message,true);showRecentHistory(error.message);}}
 }
 
 $('#recentHistoryBtn').onclick=showRecentHistory;
+$('#chooseRecentFile').onclick=()=>{hideRecentHistory();txtFileInput.click();};
 $('#closeRecentHistory').onclick=hideRecentHistory;
 $('#clearRecentHistory').onclick=async()=>{
   if(!confirm('최근 내역 20개를 모두 삭제할까요?'))return;
@@ -3721,38 +3809,25 @@ setupReaderNotes();
 setupReaderChatGPT();
 setupChapterNavigation();
 setupReaderTools();
-const syncReading=loadReadingSessionSync();
-if(syncReading){
-  applyReadingRecordToInput(syncReading);
-  if(syncReading.isOpen){viewerOverlay.classList.add('active');readerSetLoading(true);}
-}
-(async()=>{
-  try{
-    const [dbReading,savedFont]=await Promise.all([loadReadingSessionDB(),getSavedFont().catch(()=>null)]);
-    let reading=newestReadingRecord([syncReading,dbReading]);
-    reading=await readerHydrateReading(reading);
-    reading=await window.__androidRecoverReading(reading);
-    if(!userEditedAfterRestore&&reading)applyReadingRecordToInput(reading);
-    if(savedFont){
-      if(viewerSettings.font==='custom'){
-        try{
-          const oldFingerprint=savedFont.fingerprint;
-          await installCustomFont(savedFont,{select:false,repaginateAfter:false});
-          if(!oldFingerprint)void saveFontRecord(savedFont);
-          setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
-        }catch(error){viewerSettings.font='serif';saveViewerSettings();setFontUploadStatus(error.message,true);}
-      }else{
-        // Registration is deferred until initialization finishes, and cannot trigger a reflow.
-        void installCustomFont(savedFont,{select:false,repaginateAfter:false}).catch(error=>setFontUploadStatus(error.message,true));
-      }
-    }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
+// Startup is deliberately independent of book bodies, saved fonts and pagination.
+// Existing sessions and native checkpoints stay untouched until an explicit choice.
+let readerInitialFontPromise=null;
+function readerPrepareInitialFont(){
+  if(readerInitialFontPromise)return readerInitialFontPromise;
+  readerInitialFontPromise=(async()=>{
+    try{
+      const savedFont=await readerBounded(getSavedFont(),3000,'저장된 글꼴 읽기');
+      if(savedFont){
+        await readerBounded(installCustomFont(savedFont,{select:false,repaginateAfter:false}),15000,'저장된 글꼴 준비');
+        setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
+      }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
+    }catch(error){if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}setFontUploadStatus(error.message,true);}
     applyViewerSettings(false);
-    readerState.initializing=false;
-    if(reading&&!userEditedAfterRestore&&!readerState.cancelled)await restoreReadingSession(reading);
-    else readerSetLoading(false);
-  }catch(error){readerSetLoading(false);restoreInProgress=false;setStatus(error.message,true);}
-  finally{readerState.hydratedBook=null;readerState.initializing=false;resolveReaderReady();}
-})();
+  })();
+  return readerInitialFontPromise;
+}
+readerState.initializing=false;restoreInProgress=false;readerSetLoading(false);resolveReaderReady();showRecentHistory();
+
 </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Durable layout cache and a logical text anchor independent of changing page boundaries. */
 const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',canonical:'',canonicalSource:null,
-  generation:0,fontId:'',fontPromise:Promise.resolve(),memory:new Map(),pendingCache:Promise.resolve(),cancelled:false};
+  generation:0,canCheckpoint:false,fontId:'',fontPromise:Promise.resolve(),memory:new Map(),pendingCache:Promise.resolve(),cancelled:false};
 const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
@@ -111,7 +111,7 @@ async function readerDeleteCache(id){
   }catch{}
 }
 function readerCacheBodyValid(cache,source){
-  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1));
+  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1)&&(!readerSourceHasPronunciations(source)||cache.pronunciationVersion===1));
 }
 function readerSameLayout(cache,signature){
   if(cache.signature===signature)return true;
@@ -161,7 +161,7 @@ function readerCreatePageCache(id,signature,previous,used){
     layouts.push({signature:layout.signature,fitHeight:layout.fitHeight,pages:layout.pages,anchors:layout.anchors});
     if(layouts.length===1)break;
   }
-  return {id,version:READER_CACHE_VERSION,noteVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+  return {id,version:READER_CACHE_VERSION,noteVersion:1,pronunciationVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
     fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
     canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
     chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,countVersion:READER_COUNT_VERSION,layouts,updatedAt:Date.now()};
@@ -223,11 +223,7 @@ async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.
         readerState.canonical=used.canonical;readerState.canonicalSource=source;readerStats.cacheHits++;
         readerStats.lastCacheReason=used===built?'reflow-reused':used.signature===signature?'exact':'safe-height';
       }else{
-        readerStats.lastCacheReason=!cached?'missing':!readerCacheBodyValid(cached,source)?'version-or-source':'layout-changed';
-        await readerPrepareChapterImages();
-        if(generation!==readerState.generation)return;
-        signature=getLayoutSignature();pages=splitIntoPages(source);readerCanonical();
-        built=readerCreatePageCache(id,signature,cached,null);
+        return readerDisplay({...record,_skipFullCache:true},generation);
       }
       await readerBounded(nextFrame(),4000,'화면 표시');await readerBounded(nextFrame(),4000,'화면 표시');
       if(generation!==readerState.generation)return;
@@ -240,7 +236,7 @@ async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.
     const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
     const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
     readerChooseAnchor(target,readerContext(target));pageIndex=findPageIndexForAnchor(target);
-    restoreInProgress=false;render();readerSetLoading(false);
+    restoreInProgress=false;readerState.canCheckpoint=true;render();readerSetLoading(false);
     if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();
     readerStats.lastPaginationMs=performance.now()-started;
     flushReadingSessionSave(true);flushActiveRecentPositionSave();
@@ -333,9 +329,9 @@ async function readerLazyRead(s,c){try{const db=await readerBounded(readerLazyDB
 async function readerLazySave(s,c,result){if(!s.id)return;try{const db=await readerLazyDB(),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');store.put({...result,signature:s.signature,length:s.source.length,version:READER_CACHE_VERSION,updatedAt:Date.now()},readerLazyKey(s,c));let n=0;const q=store.index('updatedAt').openKeyCursor(null,'prev');q.onsuccess=()=>{const e=q.result;if(e){if(++n>512)store.delete(e.primaryKey);e.continue();}};await transactionDone(tx);}catch{}}
 async function readerLazyImages(chapter){const sources=new Set();for(const html of bookChapters[chapter]?.blocks||[]){if(!html.includes('<img'))continue;const root=document.createElement('div');root.innerHTML=html;root.querySelectorAll('img').forEach(image=>sources.add(image.src));}if(!sources.size)return;await readerBounded(Promise.all([...sources].map(src=>new Promise(resolve=>{const image=new Image();image.onload=resolve;image.onerror=resolve;image.src=src;if(image.complete)resolve();}))),12000,'구간 이미지 준비');}
 function readerLazyBlock(s,index){if(!s.formatted.has(index))s.formatted.set(index,readerApplyBreaks(cachedOriginalBlocks[index],cachedQuoteRoles,cachedBlockStarts[index]));return s.formatted.get(index);}
-function readerLazyChapter(anchor){let c=0;for(let i=1;i<chapterCanonicalStarts.length;i++){if(chapterCanonicalStarts[i]>anchor)break;c=i;}return c;}
+function readerLazyChapter(anchor){const starts=readerLazySession?.starts||chapterCanonicalStarts;let c=0;for(let i=1;i<starts.length;i++){if(starts[i]>anchor)break;c=i;}return c;}
 function readerLazyAssemble(s,anchor=readerAnchor()){
- const next=[],starts=[];for(let c=0;c<s.results.length;c++){const result=s.results[c];if(result){next.push(...result.pages);starts.push(...result.anchors);}else{next.push('<div class="reader-chapter-pending" data-reader-pending="'+c+'"></div>');starts.push(chapterCanonicalStarts[c]);}}
+ const next=[],starts=[];for(let c=0;c<s.results.length;c++){const result=s.results[c];if(result){next.push(...result.pages);starts.push(...result.anchors);}else{next.push('<div class="reader-chapter-pending" data-reader-pending="'+c+'"></div>');starts.push(s.starts[c]);}}
  pages=next;pageAnchors=starts;readerChooseAnchor(anchor);pageIndex=findPageIndexForAnchor(anchor);
 }
 function readerLazyCounter(){const s=readerLazySession,c=readerLazyChapter(readerAnchor()),r=s.results[c],ordinal=r?Math.max(0,r.anchors.findIndex((a,i)=>a<=readerAnchor()&&(i+1===r.anchors.length||r.anchors[i+1]>readerAnchor()))):0;return '구간 '+(ordinal+1)+' / '+(r?.pages.length||'계산 중')+' · 전체 계산 '+s.done+'/'+s.results.length;}
@@ -351,12 +347,12 @@ async function readerLazyPump(s){
   if(document.visibilityState==='hidden'){await new Promise(resolve=>setTimeout(resolve,180));continue;}
   if(s.signature!==getLayoutSignature()){
    const anchor=readerAnchor(),context=readerState.context;s.cancelled=true;for(const job of s.jobs.values())job.reject(Error('화면 크기 변경'));readerLazySession=null;
-   if(s.reflows>=3){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');setStatus('화면 크기가 계속 바뀌어 계산을 중단했습니다. 다시 열어 주세요.',true);break;}
+   if(s.reflows>=3){restoreInProgress=false;readerState.canCheckpoint=false;readerSetLoading(false);viewerOverlay.classList.remove('active');const message='화면 크기가 계속 바뀌어 계산을 중단했습니다. 다시 열어 주세요.';setStatus(message,true);showRecentHistory(message);break;}
    await new Promise(resolve=>setTimeout(resolve,120));if(s.generation===readerState.generation&&viewerOverlay.classList.contains('active'))void readerDisplay({pageAnchor:anchor,pageContext:context,_lazyReflows:s.reflows+1});break;
   }
   const job=s.queue.shift();if(s.results[job.c])continue;
   try{
-   let result=null;if(!job.checked){job.checked=true;await readerLazyImages(job.c);if(!readerLazyAlive(s))break;const saved=await readerLazyRead(s,job.c);if(!readerLazyAlive(s))break;if(saved&&saved.signature===s.signature&&saved.version===READER_CACHE_VERSION&&saved.length===s.source.length&&Array.isArray(saved.pages)&&saved.pages.length&&saved.pages.length===saved.anchors?.length&&saved.anchors[0]===chapterCanonicalStarts[job.c]&&saved.pages.every(x=>typeof x==='string')&&saved.anchors.every((a,i)=>Number.isFinite(a)&&(!i||a>saved.anchors[i-1]))){result=saved;readerLazyStats.chapterCacheHits++;}else{job.generator=readerPaginateChapter(s.source,job.c,s);readerLazyStats.chapterBuilds++;}}
+   let result=null;if(!job.checked){job.checked=true;await readerLazyImages(job.c);if(!readerLazyAlive(s))break;const saved=await readerLazyRead(s,job.c);if(!readerLazyAlive(s))break;if(saved&&saved.signature===s.signature&&saved.version===READER_CACHE_VERSION&&saved.length===s.source.length&&Array.isArray(saved.pages)&&saved.pages.length&&saved.pages.length===saved.anchors?.length&&saved.anchors[0]===s.starts[job.c]&&saved.pages.every(x=>typeof x==='string')&&saved.anchors.every((a,i)=>Number.isFinite(a)&&(!i||a>saved.anchors[i-1]))){result=saved;readerLazyStats.chapterCacheHits++;}else{job.generator=readerPaginateChapter(s.source,job.c,s);readerLazyStats.chapterBuilds++;}}
    if(!result){const until=performance.now()+12;let step;do{step=job.generator.next();if(step.done){result=step.value;break;}}while(performance.now()<until);}
    if(result){if(!readerLazyAlive(s))break;s.results[job.c]=result;s.done++;if(s.priority===job.c)s.priority=null;s.jobs.delete(job.c);for(let i=s.bounds[job.c];i<(s.bounds[job.c+1]??cachedOriginalBlocks.length);i++)s.formatted.delete(i);readerLazyAssemble(s);readerLazyUpdateUI();job.resolve(result);void readerLazySave(s,job.c,result);
     if(s.done===s.results.length){s.complete=true;cachedBreakKey='';readerLazyUpdateUI();s.cacheWrite=readerState.pendingCache=readerStoreCache(readerCreatePageCache(s.id,s.signature,s.previous,null));flushReadingSessionSave(true);flushActiveRecentPositionSave();}
@@ -368,27 +364,26 @@ async function readerLazyPump(s){
 async function readerLazyNavigate(anchor,lastPage=false){
  const s=readerLazySession;if(!readerLazyAlive(s))return;const c=readerLazyChapter(anchor),ticket=++s.navigation;
  restoreInProgress=true;readerSetLoading(true,'구간 '+(c+1)+' / '+s.results.length+' 페이지를 계산하는 중…');
- try{const result=await readerLazyEnsure(s,c,true);if(!readerLazyAlive(s)||ticket!==s.navigation)return;if(lastPage)anchor=result.anchors[result.anchors.length-1];readerLazyAssemble(s,anchor);restoreInProgress=false;readerSetLoading(false);render();readerLazyUpdateUI();
+ try{const result=await readerLazyEnsure(s,c,true);if(!readerLazyAlive(s)||ticket!==s.navigation)return;if(lastPage)anchor=result.anchors[result.anchors.length-1];readerLazyAssemble(s,anchor);restoreInProgress=false;readerState.canCheckpoint=true;readerSetLoading(false);render();readerLazyUpdateUI();
   if(!s.opened){s.opened=true;readerLazyStats.firstVisibleMs=performance.now()-s.started;readerPrepareSearchBook?.();}
   if(!s.backgroundQueued){s.backgroundQueued=true;const order=[];for(let n=1;n<s.results.length;n++){if(c+n<s.results.length)order.push(c+n);if(c-n>=0)order.push(c-n);}for(const index of order)void readerLazyEnsure(s,index).catch(()=>{});}
- }catch(error){if(readerLazyAlive(s)&&ticket===s.navigation){restoreInProgress=false;readerSetLoading(false);if(!s.opened){viewerOverlay.classList.remove('active');readerLazyCancel();}setStatus(error.message,true);}}
+ }catch(error){if(readerLazyAlive(s)&&ticket===s.navigation){restoreInProgress=false;readerSetLoading(false);if(!s.opened){readerState.canCheckpoint=false;viewerOverlay.classList.remove('active');readerLazyCancel();showRecentHistory(error.message);}setStatus(error.message,true);}}
 }
 function readerLazyPendingPage(){const html=pages[pageIndex]||'';if(!html.includes('data-reader-pending='))return false;void readerLazyNavigate(readerAnchor());return true;}
 async function readerLazyTurn(direction){if(restoreInProgress)return;const target=pageIndex+direction;if(target<0||target>=pages.length)return;const html=pages[target],anchor=pageAnchors[target];if(html.includes('data-reader-pending=')){await readerLazyNavigate(anchor,direction<0);return;}pageIndex=target;readerChooseAnchor(anchor);render();}
 async function readerDisplay(record={pageAnchor:0},generation=++readerState.generation){
- readerLazyCancel();if(fullText.length<100000)return readerDisplayFull(record,generation);
+ readerLazyCancel();
  const started=performance.now();restoreInProgress=true;readerSetLoading(true,'책 구조와 읽던 구간을 준비하는 중…');await new Promise(resolve=>setTimeout(resolve,0));
  try{
   const cached=activeRecentId?await readerBounded(readerReadCache(activeRecentId),2000,'페이지 캐시').catch(()=>null):null;if(generation!==readerState.generation)return;
   readerLazyPreparing=true;try{readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();if(readerCacheBodyValid(cached,fullText)){readerState.canonical=cached.canonical;readerState.canonicalSource=fullText;}else readerCanonical();}finally{readerLazyPreparing=false;}
-  if(bookChapters.length<2){cachedBreakKey='';return readerDisplayFull(record,generation);}
   await readerWaitForLayout();if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;const signature=getLayoutSignature();
-  if(readerFindCachedLayout(cached,signature,fullText))return readerDisplayFull(record,generation);
+  if(!record._skipFullCache&&readerFindCachedLayout(cached,signature,fullText))return readerDisplayFull(record,generation);
   readerLazyPreparing=true;try{getPaginationBlocks(fullText);readerCanonical();}finally{readerLazyPreparing=false;}
-  readerStats.lastCacheReason='chapter-first';readerState.layout=signature;const bounds=[...chapterBlockBoundaries].sort((a,b)=>a-b);
-  const s=readerLazySession={generation,source:fullText,id:activeRecentId,signature,previous:cached,bounds,results:Array(bookChapters.length).fill(null),queue:[],jobs:new Map(),formatted:new Map(),done:0,complete:false,cancelled:false,running:false,priority:null,navigation:0,started,reflows:record._lazyReflows||0};readerLazyStats.sessions++;
+  readerStats.lastCacheReason='chapter-first';readerState.layout=signature;const bounds=bookChapters.length?[...chapterBlockBoundaries].sort((a,b)=>a-b):[0],starts=bookChapters.length?chapterCanonicalStarts.slice():[0];
+  const s=readerLazySession={generation,source:fullText,id:activeRecentId,signature,previous:cached,bounds,starts,results:Array(bounds.length).fill(null),queue:[],jobs:new Map(),formatted:new Map(),done:0,complete:false,cancelled:false,running:false,priority:null,navigation:0,started,reflows:record._lazyReflows||0};readerLazyStats.sessions++;
   record=readerMigrateNotePosition(record,cached);const anchor=readerResolveAnchor(record);readerLazyAssemble(s,anchor);await readerLazyNavigate(anchor);
- }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');readerLazyCancel();setStatus(error.message,true);}}
+ }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);readerState.canCheckpoint=false;viewerOverlay.classList.remove('active');readerLazyCancel();setStatus(error.message,true);showRecentHistory(error.message);}}
 }
 
 function* readerPaginateChapter(text,chapter,session){

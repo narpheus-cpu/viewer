@@ -268,7 +268,7 @@ async function readerDeleteCache(id){
   }catch{}
 }
 function readerCacheBodyValid(cache,source){
-  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1));
+  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1)&&(!readerSourceHasPronunciations(source)||cache.pronunciationVersion===1));
 }
 function readerSameLayout(cache,signature){
   if(cache.signature===signature)return true;
@@ -318,7 +318,7 @@ function readerCreatePageCache(id,signature,previous,used){
     layouts.push({signature:layout.signature,fitHeight:layout.fitHeight,pages:layout.pages,anchors:layout.anchors});
     if(layouts.length===1)break;
   }
-  return {id,version:READER_CACHE_VERSION,noteVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+  return {id,version:READER_CACHE_VERSION,noteVersion:1,pronunciationVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
     fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
     canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
     chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,countVersion:READER_COUNT_VERSION,layouts,updatedAt:Date.now()};
@@ -880,14 +880,73 @@ function readerNoteContainsOffset(text,offset){
   while(lo<=hi){const mid=(lo+hi)>>1,r=ranges[mid];if(offset<r.start)hi=mid-1;else if(offset>=r.end)lo=mid+1;else return true;}
   return false;
 }
+// A slash pair must look like a transcription and follow an English word or phrase.
+const READER_IPA_PAIR=/[ \t\u00a0]+\/([a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u02b0-\u02ff\u0300-\u036f\u1d00-\u1d7f\u207f\u2191\u2193][a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u02b0-\u02ff\u0300-\u036f\u1d00-\u1d7f\u207f\u2191\u2193.‿ \t\u00a0]{0,255})\/(?![A-Za-z0-9_/@\\])/gu;
+const READER_ENGLISH_END=/-?[A-Za-z]+(?:['’\-][A-Za-z]+)*-?(?:[ \t\u00a0]+-?[A-Za-z]+(?:['’\-][A-Za-z]+)*-?)*$/;
+function readerFindPronunciations(text){
+  const notes=[];
+  for(const match of text.matchAll(READER_IPA_PAIR)){
+    const content=match[1],start=match.index;
+    if(content!==content.trim()||!/[a-z\u00e6\u00e7\u00f0\u00f8\u0127\u014b\u0153\u03b2\u03b8\u03c6\u03c7\u01c0-\u01c3\u0250-\u02af\u1d00-\u1d7f]/u.test(content))continue;
+    // Bound the look-back and never attach a note to a fragment of a URL or identifier.
+    const before=text.slice(Math.max(notes[notes.length-1]?.end||0,start-512),start);
+    const phrase=before.match(READER_ENGLISH_END);
+    if(!phrase||/[A-Za-z0-9_/@\\]/.test(text[start-before.length+phrase.index-1]||''))continue;
+    const wordCount=content.split(/[ \t\u00a0]+/).length;
+    const words=[...phrase[0].matchAll(/[^ \t\u00a0]+/g)];
+    const labelStart=start-phrase[0].length+words[Math.max(0,words.length-wordCount)].index;
+    notes.push({labelStart,start,end:start+match[0].length,content:'/'+content+'/'});
+  }
+  return notes;
+}
+let readerPronunciationSource=null,readerPronunciationPresent=false;
+function readerSourceHasPronunciations(text){
+  if(readerPronunciationSource!==text){
+    readerPronunciationSource=text;
+    readerPronunciationPresent=READER_IPA_PAIR.test(text);
+    READER_IPA_PAIR.lastIndex=0;
+  }
+  return readerPronunciationPresent;
+}
+function readerPronunciationHTML(html){
+  if(!/[ \t\u00a0>]\/|&nbsp;\//.test(html))return html;
+  const root=document.createElement('div');root.innerHTML=html;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  const units=[];let node,text='';
+  while((node=walker.nextNode())){
+    if(node.nodeType===Node.TEXT_NODE){
+      if(node.parentElement.closest('pre,code,a,[data-reader-note]')){text+='\0';continue;}
+      units.push({node,start:text.length,end:text.length+node.length});
+      text+=node.data;
+    }else if(/^(?:BR|DIV|P|LI|TD|TH|TR|H[1-6]|BLOCKQUOTE|IMG|HR)$/.test(node.tagName))text+='\0';
+  }
+  const notes=readerFindPronunciations(text);
+  if(!notes.length)return html;
+  function point(offset,end=false){
+    const unit=units.find(entry=>end?offset>entry.start&&offset<=entry.end:offset>=entry.start&&offset<entry.end);
+    return [unit.node,offset-unit.start];
+  }
+  function range(start,end){
+    const result=document.createRange();result.setStart(...point(start));result.setEnd(...point(end,true));return result;
+  }
+  for(const note of notes.reverse()){
+    const title=text.slice(note.labelStart,note.start);
+    range(note.start,note.end).deleteContents();
+    const label=range(note.labelStart,note.start),trigger=readerNoteElement(title,note.content);
+    trigger.setAttribute('data-reader-pronunciation','');
+    trigger.setAttribute('aria-label',title+' 발음기호 열기');
+    trigger.appendChild(label.extractContents());label.insertNode(trigger);
+  }
+  return root.innerHTML;
+}
 function readerMarkdownNoteBlocks(text){
   const notes=readerFindNoteRanges(text);
-  if(!notes.length)return markdownToBlocks(text);
+  if(!notes.length)return markdownToBlocks(text).map(readerPronunciationHTML);
   let prefix='\uE000readerNote';while(text.includes(prefix))prefix+='\uE000';
   let protectedText='',at=0;
   notes.forEach((note,index)=>{protectedText+=text.slice(at,note.start)+prefix+index+'\uE001';at=note.end;});
   protectedText+=text.slice(at);
-  return markdownToBlocks(protectedText).map(html=>readerFootnoteHTML(html,{notes,prefix}));
+  return markdownToBlocks(protectedText).map(html=>readerPronunciationHTML(readerFootnoteHTML(html,{notes,prefix})));
 }
 function readerFootnoteHTML(html,protectedNotes=null){
   if(!protectedNotes&&!html.includes('〔'))return html;
@@ -918,18 +977,33 @@ function readerFootnoteHTML(html,protectedNotes=null){
     const before=text.slice(0,note.start),tail=before.match(/[\t "'’”)\]}」』]*$/u)[0];
     const end=before.length-tail.length,word=before.slice(0,end).match(/[\p{L}\p{N}\p{M}_]+(?:[·.'’/\-][\p{L}\p{N}\p{M}_]+)*\.?$/u);
     const removal=range(note.start,note.end);removal.deleteContents();
-    const trigger=document.createElement('span');trigger.className='reader-note';trigger.tabIndex=0;trigger.setAttribute('role','button');
-    trigger.setAttribute('data-reader-note',note.content.trim());trigger.setAttribute('aria-haspopup','dialog');
-    trigger.setAttribute('data-reader-note-title',word?.[0]||'각주');trigger.setAttribute('aria-label',(word?.[0]||'각주')+' 길게 눌러 각주 열기');
+    const trigger=readerNoteElement(word?.[0]||'각주',note.content.trim());
     if(word){const label=range(end-word[0].length,end);trigger.appendChild(label.extractContents());label.insertNode(trigger);}
     else{trigger.textContent='※';removal.insertNode(trigger);}
   }
   return root.innerHTML;
 }
+function readerNoteElement(title,content){
+  const trigger=document.createElement('span');trigger.className='reader-note';trigger.tabIndex=0;trigger.setAttribute('role','button');
+  trigger.setAttribute('data-reader-note',content);trigger.setAttribute('aria-haspopup','dialog');
+  trigger.setAttribute('data-reader-note-title',title);trigger.setAttribute('aria-label',title+' 길게 눌러 각주 열기');
+  return trigger;
+}
 function readerMigrateNotePosition(record,cache){
-  if(!readerSourceHasNotes(fullText)||cache?.noteVersion===1||typeof cache?.canonical!=='string'||
-    String(record.layoutSignature||'').includes('"footnotes-v1"')||!Number.isFinite(Number(record.pageAnchor)))return record;
-  const old=cache.canonical,ranges=readerFindNoteRanges(old);if(!ranges.length)return record;
+  if(typeof cache?.canonical!=='string'||!Number.isFinite(Number(record.pageAnchor)))return record;
+  const signature=String(record.layoutSignature||''),old=cache.canonical;
+  const migrateNotes=cache.noteVersion!==1&&!signature.includes('"footnotes-v1"')&&readerSourceHasNotes(fullText);
+  const migrateIPA=cache.pronunciationVersion!==1&&!signature.includes('"pronunciations-v1"')&&readerSourceHasPronunciations(fullText);
+  const ranges=migrateNotes?readerFindNoteRanges(old):[];
+  if(migrateIPA){
+    const bracketNotes=ranges.slice();let i=0;
+    for(const note of readerFindPronunciations(old)){
+      while(i<bracketNotes.length&&bracketNotes[i].end<=note.labelStart)i++;
+      if(i===bracketNotes.length||bracketNotes[i].start>=note.end)ranges.push(note);
+    }
+    ranges.sort((a,b)=>a.start-b.start);
+  }
+  if(!ranges.length)return record;
   let visible='',at=0;for(const note of ranges){visible+=old.slice(at,note.start);at=note.end;}visible+=old.slice(at);
   if(visible!==readerCanonical())return record;
   const original=Math.max(0,Math.min(old.length,Number(record.pageAnchor)));let removed=0;
@@ -938,6 +1012,7 @@ function readerMigrateNotePosition(record,cache){
 }
 
 let readerNoteLayer=null,readerNoteTrigger=null,readerNoteBodyOverflow='',readerNoteRootOverflow='',readerNotePreviousAria=null;
+let readerNoteIgnoreClickUntil=0;
 function readerNoteIsOpen(){return !!readerNoteLayer&&!readerNoteLayer.hidden;}
 function readerNoteUpdateViewport(){
   if(!readerNoteLayer)return;
@@ -974,13 +1049,15 @@ function setupReaderNotes(){
   readerNoteLayer=document.createElement('div');readerNoteLayer.id='readerNoteLayer';readerNoteLayer.className='reader-note-layer';readerNoteLayer.hidden=true;
   readerNoteLayer.innerHTML='<section class="reader-note-dialog" role="dialog" aria-modal="true" aria-labelledby="readerNoteTitle"><header class="reader-note-header"><h2 id="readerNoteTitle"></h2><button id="closeReaderNote" type="button" aria-label="각주 닫기">닫기</button></header><div id="readerNoteContent" class="reader-note-content" tabindex="0" role="document"></div></section>';
   document.body.appendChild(readerNoteLayer);document.getElementById('closeReaderNote').onclick=readerCloseNote;
+  // A touch-generated click can land on the popup that just opened on pointerup.
+  for(const type of ['pointerdown','touchstart'])readerNoteLayer.addEventListener(type,()=>{readerNoteIgnoreClickUntil=0;});
   readerNoteLayer.addEventListener('click',event=>{event.stopPropagation();if(event.target===readerNoteLayer)readerCloseNote();});
   for(const type of ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel'])readerNoteLayer.addEventListener(type,event=>event.stopPropagation(),{passive:true});
   document.addEventListener('contextmenu',event=>{
     if(viewerOverlay.classList.contains('active')&&event.target.closest?.('[data-reader-note]'))event.preventDefault();
   },true);
   document.addEventListener('click',event=>{
-    if(readerNoteIsOpen()&&!readerNoteLayer.contains(event.target)){event.preventDefault();event.stopImmediatePropagation();}
+    if(readerNoteIsOpen()&&(!readerNoteLayer.contains(event.target)||(event.detail!==0&&performance.now()<readerNoteIgnoreClickUntil))){event.preventDefault();event.stopImmediatePropagation();}
   },true);
   document.addEventListener('keydown',event=>{
     if(readerNoteIsOpen()){
@@ -1012,7 +1089,7 @@ try{const candidates=[localStorage.getItem(READER_GPT_PREFS),window.AndroidChatG
 window.__readerChatGPTReply=(id,result)=>{const p=readerGPTRpcPending.get(String(id));if(!p)return;readerGPTRpcPending.delete(String(id));clearTimeout(p.timer);result?.error?p.reject(Error(result.error)):p.resolve(result);};
 function readerGPTNative(){return typeof window.AndroidChatGPT?.request==='function';}
 function readerGPTAndroidWeb(){return !readerGPTNative()&&/Android/i.test(navigator.userAgent);}
-const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk';
+const READER_GPT_ANDROID_UPDATE='https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.30.apk';
 function readerGPTAndroidSettingsURL(){return 'intent://chatgpt/settings#Intent;scheme=ebookviewer;package=com.seosol.ebookviewer.recent;S.browser_fallback_url='+encodeURIComponent(READER_GPT_ANDROID_UPDATE)+';end';}
 function readerGPTAndroidConnect(){window.location.href=readerGPTAndroidSettingsURL();}
 
@@ -1266,7 +1343,7 @@ function setupReaderChatGPT(){
   readerGPTMenu=document.createElement('button');readerGPTMenu.id='readerGPTSelectionMenu';readerGPTMenu.type='button';readerGPTMenu.textContent='ChatGPT연결';readerGPTMenu.hidden=true;document.body.appendChild(readerGPTMenu);
   for(const type of ['pointerdown','mousedown','touchstart'])readerGPTMenu.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});readerGPTMenu.onclick=()=>readerOpenSelectedChatGPT();
   readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
-  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.28.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
+  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.30.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
   document.body.appendChild(readerGPTLayer);setupReaderGPTAnswerPages();document.getElementById('readerGPTPc').hidden=readerGPTNative();document.getElementById('closeReaderGPT').onclick=readerGPTClose;document.getElementById('readerGPTSend').onclick=readerGPTSend;document.getElementById('readerGPTStop').onclick=()=>{void readerGPTCancel();readerGPTStatus('질문을 중지했습니다.');};
   document.getElementById('readerGPTConnect').onclick=async()=>{try{readerGPTStatus('로그인 창을 여는 중…');await readerGPTRpc('signin',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
   document.getElementById('readerGPTAccounts').onchange=async()=>{try{await readerGPTRpc('switch',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
@@ -1968,7 +2045,7 @@ function readerChapterBlocks(text){
   const blocks=[];let anchor=0;
   bookChapters.forEach((chapter,index)=>{
     chapterBlockBoundaries.add(blocks.length);chapterCanonicalStarts.push(anchor);
-    const part=chapter.blocks?chapter.blocks.map(html=>readerFootnoteHTML(html)):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
+    const part=chapter.blocks?chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
     const content=part.length?part:['<p></p>'];
     blocks.push(...content);
     for(const html of content)anchor+=htmlToStableText(html).length+1;
@@ -3098,7 +3175,8 @@ function getLayoutSignature(){
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
-    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[])]);
+    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[]),
+    ...(readerSourceHasPronunciations(fullText)?['pronunciations-v1']:[])]);
 }
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
@@ -3912,6 +3990,10 @@ function endPageGesture(point,event){
     gesture.generation!==readerState.generation)return;
   if(moved<=10){
     if(elapsed>=READER_NOTE_HOLD_MS)return;
+    if(gesture.note?.hasAttribute('data-reader-pronunciation')){
+      readerOpenNote(gesture.note);readerNoteIgnoreClickUntil=pageGestureSuppressUntil=performance.now()+800;
+      if(event.cancelable)event.preventDefault();return;
+    }
     const rect=pageGestureSurface.getBoundingClientRect();point.x-rect.left<rect.width/2?goPrevPage():goNextPage();return;
   }
   if(Math.abs(dx)>=40&&Math.abs(dx)>=dy*1.35)dx<0?goNextPage():goPrevPage();
