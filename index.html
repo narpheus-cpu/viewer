@@ -1280,25 +1280,28 @@ function readerGPTUpdateSelection(){
   if(!readerGPTMenu)return;
   const text=readerGPTGetSelection();
   if(text)readerGPTSelection=text;
-  if(window.AndroidChatGPT?.usesNativeSelectionMenu?.()||readerGPTAndroidWeb()||
-    !text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||
+  const nativeSelection=!!window.AndroidChatGPT?.usesNativeSelectionMenu?.();
+  const androidBrowser=readerGPTAndroidWeb();
+  if(nativeSelection||!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||
     readerTimelineIsOpen()||readerNoteIsOpen()||settingsPanelIsOpen()){
     readerGPTMenu.hidden=true;
     if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;
     return;
   }
   readerGPTSelection=text;
-  readerGPTMenu.hidden=false;
+  // Android Chrome/Boox cannot add items to the OS selection menu.
+  // Surface the reader action alongside the selected text there, too.
+  readerGPTMenu.hidden=androidBrowser;
   if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=false;
   const r=getSelection().getRangeAt(0).getBoundingClientRect();
   const v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
   const gap=5,side=readerInsightsSelectionAction;
-  const w=readerGPTMenu.offsetWidth+(side?gap+side.offsetWidth:0);
-  const h=Math.max(readerGPTMenu.offsetHeight,side?.offsetHeight||0);
+  const w=(androidBrowser?0:readerGPTMenu.offsetWidth+gap)+(side?side.offsetWidth:0);
+  const h=Math.max(androidBrowser?0:readerGPTMenu.offsetHeight,side?.offsetHeight||0);
   const left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
   const top=Math.max(v.offsetTop+6,Math.min(bottom+h<=v.offsetTop+v.height-6?bottom:r.top-h-8,v.offsetTop+v.height-h-6));
-  readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=top+'px';
-  if(side){side.style.left=left+readerGPTMenu.offsetWidth+gap+'px';side.style.top=top+'px';}
+  if(!androidBrowser){readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=top+'px';}
+  if(side){side.style.left=left+(androidBrowser?0:readerGPTMenu.offsetWidth+gap)+'px';side.style.top=top+'px';}
 }
 function readerGPTSetBusy(busy){readerGPTBusy=busy;for(const id of ['readerGPTSend','readerGPTConnect','readerGPTAccounts','readerGPTModel','readerGPTDisconnect'])document.getElementById(id).disabled=busy;document.getElementById('readerGPTStop').hidden=!busy;}
 async function readerGPTRefresh(){
@@ -1379,7 +1382,8 @@ function setupReaderChatGPT(){
     }
   };
   new MutationObserver(()=>{
-    if(readerGPTMenu.hidden&&readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;
+    if(readerGPTMenu.hidden&&!readerGPTAndroidWeb()&&readerInsightsSelectionAction)
+      readerInsightsSelectionAction.hidden=true;
   }).observe(readerGPTMenu,{attributes:true,attributeFilter:['hidden']});
   readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
   readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.30.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
@@ -4165,7 +4169,7 @@ function closeViewer(){
   window.readerInsights?.cancelCorrection();
   readerLazyCancel();
   readerCloseTimeline();
-  readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;
+  readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;
   readerCloseNote();
   readerHideSearch();
   resetPageGesture();
