@@ -25,6 +25,15 @@ async function openReader(page){
  await page.locator('#openViewerBtn').click();
  await page.waitForFunction(()=>!restoreInProgress&&pages.length>0,null,{timeout:20000});
 }
+async function clickNavRoute(page,id){
+  for(let attempt=0;attempt<12;attempt++){
+   const item=page.locator('#insightsPaper [data-nav-id="'+id+'"]');
+   if(await item.count()){await item.click();return;}
+   if(!(await page.locator('#insightsNext').isEnabled()))break;
+   await page.locator('#insightsNext').click();
+  }
+  throw Error('Navigator route not found: '+id);
+}
 (async()=>{
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let checks=0;
@@ -47,7 +56,7 @@ async function openReader(page){
    assert.ok(initial.seen>0&&initial.seen<initial.total,'First page may not unlock the whole novel');checks++;
    await page.locator('#insightsOpen').click();
    await page.waitForSelector('#insightsNavigatorBar:visible');
-   await page.locator('#insightsPaper [data-nav-id=all]').click();
+   await clickNavRoute(page,'all');
    assert.equal(await page.locator('[data-insight-tab]').count(),4);checks++;
    await page.locator('[data-insight-tab=character]').click();
    assert.equal((await page.locator('#insightsPaper').innerText()).includes('의심보다 협력으로 바뀐 목표'),false);checks++;
@@ -62,7 +71,7 @@ async function openReader(page){
    assert.equal(await page.evaluate(()=>ReaderInsightsData.getSeen(fullText)),initial.total,'Manual correction may move forward');checks++;
    await page.locator('#insightsOpen').click();
    await page.waitForSelector('#insightsNavigatorBar:visible');
-   await page.locator('#insightsPaper [data-nav-id=all]').click();
+   await clickNavRoute(page,'all');
    await page.locator('[data-insight-tab=character]').click();
    assert.ok(await page.locator('#insightsPageCount').innerText().then(t=>t!=='0 / 0'));checks++;
    await page.locator('#insightsGoMark').click();
@@ -97,7 +106,7 @@ async function openReader(page){
    });
    await page.waitForFunction(async()=>!!(await window.ReaderInsightsData.load(fullText))?.records?.length);
    await page.waitForSelector('#insightsNavigatorBar:visible');
-   await page.locator('#insightsPaper [data-nav-id=all]').click();
+   await clickNavRoute(page,'all');
    // Explicitly confirm a later sentence; JSON import must respect the same gate.
    await page.evaluate(()=>window.readerInsights.correctTo(readerCanonical().length));
    await page.locator('[data-insight-tab=event]').click();
