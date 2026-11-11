@@ -36,7 +36,12 @@ async function check(){
    });
    await page.waitForFunction(()=>!document.querySelector('#chooseTxtBtn').disabled
        && !document.querySelector('#openViewerBtn').disabled,null,{timeout:20000});
-   assert.equal(await page.locator('#inputText').inputValue(),text.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n'));
+   const normalized=text.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+   const expected=normalized.includes('<<<READER_INSIGHTS_V2_BEGIN>>>')
+     ? await page.evaluate(raw=>window.ReaderInsightsData.parse(raw).body,normalized)
+     : normalized;
+   assert.equal(await page.locator('#inputText').inputValue(),expected,
+     'TXT text must survive import, with embedded JSON stripped from the visible novel');
    checks++;
   }
   // Reproduction of the reported issue: the two buttons stay disabled forever
