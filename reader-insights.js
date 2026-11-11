@@ -1,244 +1,202 @@
-/* Reader insights: pagination-only, spoiler-gated source-grounded notebook. */
+/* Reading insights panel v2: only supplied evidence-based data, always page turns. */
 (function(){
 'use strict';
-const $i=id=>document.getElementById(id);
-const STORAGE='ebookReaderInsightRecordsV1';
-const MAX_RECORDS=1200;
-const MAX_CHARS=16000;
-let shell=null,menu=null,paper=null,number=null,range=null,category='all',pages=[],position=0,bookKey='',lastFocus=null,pointerStart=null;
-const types=[['all','전체'],['fact','주요 사실'],['person','인물'],['relationship','인물 관계'],['goal','욕망·목표'],['event','사건'],['timeline','시간순 연표']];
-const names=Object.fromEntries(types);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function getCanonical(){try{return typeof readerCanonical==='function'?readerCanonical():typeof fullText==='string'?fullText:'';}catch{return typeof fullText==='string'?fullText:'';}}
-function currentAnchor(){try{return Math.max(0,Number(typeof readerAnchor==='function'?readerAnchor():pageAnchors?.[pageIndex])||0);}catch{return 0;}}
-function currentTitle(){return (typeof inputFileName==='string'&&inputFileName)||$i('readerDocumentTitle')?.textContent||'현재 책';}
-function signature(){
- const t=getCanonical(); const name=currentTitle();
- let h=2166136261;const sample=name+'|'+t.length+'|'+t.slice(0,2048)+'|'+t.slice(-2048);
- for(let i=0;i<sample.length;i++){h^=sample.charCodeAt(i);h=Math.imul(h,16777619);}
- return 'bk-'+(h>>>0).toString(36)+'-'+t.length;
-}
-function loadDb(){try{return JSON.parse(localStorage.getItem(STORAGE)||'{}')||{};}catch{return {};}}
-function saveDb(db){try{localStorage.setItem(STORAGE,JSON.stringify(db));return true;}catch{return false;}}
-function state(){
- const db=loadDb();const key=signature();
- return {db,key,entry:db[key]&&typeof db[key]==='object'?db[key]:{maxAnchor:0,records:[]}};
-}
-function upperBound(){
- const t=getCanonical();const v=currentAnchor();return Math.min(t.length,Math.max(0,v));
+const D=()=>window.ReaderInsightsData;
+const el=id=>document.getElementById(id);
+const tabs=[['event','사건 연표'],['relation','인물 관계'],['character','인물별 분석'],['clue','핵심 단서']];
+const tabNames=Object.fromEntries(tabs),confLabels={fact:'확인된 사실',strong_inference:'근거 있는 해석',tentative:'잠정적 해석'};
+const escape=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+let overlay=null,paper=null,category='event',entries=[],shown=[],insightPages=[],pageNumber=0;
+let currentKey='',latestToken=0,focused=null,gesture=null,layoutKey='',offsetCache=new Map(),unmatched=0;
+function bookText(){try{return fullText||'';}catch{return '';}}
+function bookCanonical(){try{return readerCanonical();}catch{return bookText();}}
+function panelOpen(){return !!overlay?.classList.contains('is-open');}
+function readerOpen(){return !!el('viewerOverlay')?.classList.contains('active');}
+function visibleEnd(){
+ let anchor=0;try{anchor=Number(readerAnchor())||0;}catch{}
+ try{
+  const count=typeof visiblePageCount==='function'?visiblePageCount():1;
+  const last=pageIndex+count-1;
+  if(!pages?.[pageIndex]?.includes('data-reader-pending=')&&!pages?.[last]?.includes('data-reader-pending=')){
+   const next=Number(pageAnchors?.[pageIndex+count]);
+   if(Number.isFinite(next)&&next>anchor)anchor=next;
+   else if(pageIndex+count>=pages.length&&!readerLazyActive())anchor=bookCanonical().length;
+  }
+ }catch{}
+ return Math.max(0,anchor);
 }
 function observe(){
- if(!getCanonical()||!$i('viewerOverlay')?.classList.contains('active'))return;
- const {db,key,entry}=state();
- let current=upperBound();
- // Current page is already visible; grant access to this page, but never to later pages.
+ const text=bookText();
+ if(!D()||!readerOpen()||!text||typeof restoreInProgress!=='undefined'&&restoreInProgress)return;
+ D().markSeen(text,visibleEnd());
+ if(panelOpen()&&currentKey!==D().key(text))close();
+}
+function lookupEnd(text,phrase,occ){
+ let end=D().occurrenceEnd(text,phrase,occ);
+ if(end>=0)return end;
+ // Source excerpts may cross paragraph boundaries after rendering.
+ const parts=phrase.trim().split(/\s+/).map(p=>[...p].map(ch=>'\\.^$*+?()[]{}|'.includes(ch)?'\\'+ch:ch).join(''));
+ if(parts.length<2)return -1;
  try{
-  const next=pageAnchors?.[pageIndex+1];
-  if(Number.isFinite(next)&&next>current)current=Math.min(getCanonical().length,next-1);
- }catch{}
- if(current>(Number(entry.maxAnchor)||0)){
-  entry.maxAnchor=current;entry.records=Array.isArray(entry.records)?entry.records:[];
-  db[key]=entry;saveDb(db);
+  const rx=new RegExp(parts.join('\\s+'),'gu');
+  let found;for(let i=0;i<occ;i++){found=rx.exec(text);if(!found)return -1;}
+  return found.index+found[0].length;
+ }catch{return -1;}
+}
+function revealEnd(record,canonicalText){
+ const key=record.reveal.quote+'\x00'+record.reveal.occurrence;
+ if(offsetCache.has(key))return offsetCache.get(key);
+ const offset=lookupEnd(canonicalText,record.reveal.quote,record.reveal.occurrence);
+ offsetCache.set(key,offset);return offset;
+}
+function currentEntries(){
+ const text=bookCanonical(),limit=Math.min(text.length,D().getSeen(bookText()));
+ const mapped=[],missing=[];
+ for(const record of entries){
+  const end=revealEnd(record,text);
+  if(end<0)missing.push(record);
+  else if(end<=limit)mapped.push({...record,revealOffset:end});
  }
+ unmatched=missing.length;
+ const known=new Map(mapped.map(r=>[r.id,r]));
+ shown=mapped.filter(r=>r.category===category);
+ shown.sort((a,b)=>category==='event'&&a.story_order!=null&&b.story_order!=null&&a.story_order!==b.story_order?
+  a.story_order-b.story_order:a.revealOffset-b.revealOffset);
+ shown=shown.map(r=>{
+  const prev=r.replaces?known.get(r.replaces):null;
+  return {...r,display:r.text+(prev?'\n\n이전 판단: '+prev.text:'')+'\n\n근거: '+r.evidence};
+ });
+ const pct=text.length?Math.floor(limit/text.length*100):0;
+ el('insightsSeen').textContent='읽은 범위 '+pct+'%';
+ el('insightsStatus').textContent=unmatched?'위치 검증 실패 '+unmatched+'건':'';
 }
-function unlocked(){
- const {entry}=state();return Math.min(getCanonical().length,Math.max(upperBound(),Number(entry.maxAnchor)||0));
+function cardHtml(entry,portion,part=1,total=1){
+ return '<div class="insights-type">'+escape(tabNames[entry.category])+(entry.subject?' · '+escape(entry.subject):'')+'</div>'+
+ '<h3 class="insights-title">'+escape(entry.title)+(total>1?' <small>('+part+'/'+total+')</small>':'')+'</h3>'+
+ '<div class="insights-body">'+escape(portion)+'</div>'+
+ '<div class="insights-proof">'+escape(confLabels[entry.confidence])+'</div>';
 }
-function shortExcerpt(text,at,limit){
- const head=Math.max(0,at-64),tail=Math.min(limit,text.length,at+140);
- return text.slice(head,tail).replace(/\s+/g,' ').trim();
+function fits(entry,string){
+ const probe=document.createElement('article');probe.className='insights-card insights-measure';
+ probe.innerHTML=cardHtml(entry,string);paper.append(probe);
+ const okay=probe.scrollHeight<=paper.clientHeight-3;probe.remove();return okay;
 }
-function chapterRecords(limit){
- // Read-only chapter headings are factual source locations, not inferred plot.
- const list=typeof bookChapters!=='undefined'&&Array.isArray(bookChapters)?bookChapters:[];
- const text=getCanonical(),output=[];
- for(let i=0;i<list.length;i++){
-  const ch=list[i],at=Number(typeof chapterCanonicalStarts!=='undefined'?chapterCanonicalStarts[i]:ch.start);
-  if(!Number.isFinite(at)||at<0||at>limit)continue;
-  output.push({id:'chapter-'+i,category:'timeline',title:ch.title||'제'+(i+1)+'장',
-   content:'이 장의 시작 지점까지 읽었습니다. 이 항목은 원문 차례를 표시하며, 사건을 자동으로 추론한 요약은 아닙니다.',
-   anchor:at,source:'원문 차례',kind:'chapter'});
- }
- return output;
-}
-function sourceRecords(limit){
- // Literal source excerpts from fully read pages; no semantic fabrication.
- const text=getCanonical();if(!text)return [];
- let marks=[],parts=typeof chapterCanonicalStarts!=='undefined'&&Array.isArray(chapterCanonicalStarts)?chapterCanonicalStarts:[];
- for(let k=0;k<parts.length;k++){
-  let a=Number(parts[k]);if(!Number.isFinite(a)||a<0||a>limit)continue;
-  marks.push(a);
- }
- if(!marks.length)marks=[0];
- return marks.slice(-80).map((at,i)=>({id:'excerpt-'+i+'-'+at,category:'fact',title:'원문 기록 · '+(i+1),
-   content:shortExcerpt(text,at,limit),anchor:at,source:'원문 직접 인용 (내용 분석 아님)',kind:'excerpt'})).filter(x=>x.content);
-}
-function recordAnchor(r,total){
- const a=Number(r.anchor);
- if(Number.isFinite(a)&&a>=0)return Math.min(total,Math.round(a));
- const pct=Number(r.progress);
- if(Number.isFinite(pct)&&pct>=0&&pct<=100)return Math.round(total*pct/100);
- return null;
-}
-function normalizedRecords(limit){
- const t=getCanonical(),{entry}=state();const data=Array.isArray(entry.records)?entry.records:[];
- return data.map((r,i)=>{
-  const anchor=recordAnchor(r,t.length);
-  if(anchor===null||anchor>limit)return null;
-  const category=names[r.category]?r.category:'fact';
-  return {id:r.id||'record-'+i,category,title:String(r.title||'정보').slice(0,150),
-   content:String(r.content||'').slice(0,MAX_CHARS),source:String(r.source||'사용자 제공 기록').slice(0,200),
-   anchor,kind:'manual'};
- }).filter(Boolean);
-}
-function data(){
- const end=unlocked(),real=normalizedRecords(end);
- // Keep the panel useful even without an imported annotated manuscript.
- const fallback=real.length?[]:sourceRecords(end);
- return [...real,...chapterRecords(end),...fallback].sort((a,b)=>a.anchor-b.anchor);
-}
-function splitText(str,available,measure){
- // Binary search by characters, respecting whitespace where possible.
- const raw=String(str);if(!raw)return [''];
- let a=0,out=[];
- while(a<raw.length&&out.length<250){
-  let low=1,high=Math.min(raw.length-a,MAX_CHARS),best=1;
-  while(low<=high){
-   const mid=(low+high)>>1;
-   if(measure(raw.slice(a,a+mid))<=available){best=mid;low=mid+1;}else high=mid-1;
+function split(entry){
+ const text=entry.display;
+ if(!text)return [{...entry,portion:'',part:1,total:1}];
+ const result=[];let offset=0,loop=0;
+ while(offset<text.length&&loop++<500){
+  let length=Math.min(text.length-offset,12000),best=1;
+  if(fits(entry,text.slice(offset,offset+length)))best=length;
+  else{
+   let lo=1,hi=length;
+   while(lo<=hi){const n=(lo+hi)>>1;
+    if(fits(entry,text.slice(offset,offset+n))){best=n;lo=n+1;}else hi=n-1;
+   }
   }
-  let cut=Math.max(1,best);
-  if(a+cut<raw.length&&cut>15){let white=raw.lastIndexOf(' ',a+cut);if(white>a+cut*.55)cut=white-a;}
-  out.push(raw.slice(a,a+cut));a+=cut;
-  while(raw[a]===' ')a++;
+  if(offset+best<text.length&&best>30){
+   const bit=text.slice(offset,offset+best);
+   const stops=[bit.lastIndexOf('\n\n'),bit.lastIndexOf('\n'),bit.lastIndexOf(' ')];
+   for(const p of stops)if(p>best*.65){best=p;break;}
+  }
+  let end=offset+Math.max(1,best);
+  if(end<text.length&&/[\uD800-\uDBFF]/.test(text[end-1])&&/[\uDC00-\uDFFF]/.test(text[end]))end--;
+  end=Math.max(offset+1,end);
+  result.push(text.slice(offset,end));offset=end;
+  while(offset<text.length&&/\s/.test(text[offset]))offset++;
  }
- return out;
+ return result.map((portion,index)=>({...entry,portion,part:index+1,total:result.length}));
 }
-function pageSize(){
- const rect=paper.getBoundingClientRect();
- return {width:Math.max(150,rect.width-30),height:Math.max(150,rect.height-30)};
-}
-function measureText(text,title,source){
- const sample=document.createElement('div');
- sample.className='insights-content';sample.style.cssText='position:absolute;visibility:hidden;pointer-events:none;width:'+pageSize().width+'px;height:auto;overflow:visible;';
- sample.innerHTML='<div class="insights-category">정보</div><div class="insights-entry-title">'+esc(title)+'</div><div class="insights-entry-text" style="flex:none">'+esc(text)+'</div><div class="insights-entry-source">'+esc(source)+'</div>';
- paper.appendChild(sample);const h=sample.scrollHeight;sample.remove();return h;
-}
-function buildPages(){
- const selected=data().filter(r=>category==='all'||r.category===category);
- const dims=pageSize(),maxH=Math.max(100,dims.height);
- const all=[];
- for(const r of selected){
-  const body=r.content||'';
-  const pieces=splitText(body,maxH,part=>measureText(part,r.title,r.source));
-  pieces.forEach((piece,part)=>{
-   all.push({...r,content:piece,subpage:part+1,totalSubpages:pieces.length});
-  });
- }
- if(!all.length)all.push({title:'아직 공개된 정보가 없습니다',content:'읽은 범위에 해당하는 정보가 없습니다. 원문 차례가 있다면 장의 시작 지점을 기록합니다. 사실·인물·관계·목표 등의 해설은 근거 데이터가 제공된 경우에만 표시합니다.',category:'all',source:'스포일러 방지',anchor:0});
- return all;
+function layout(){
+ const key=currentKey+'|'+category+'|'+D().getSeen(bookText())+'|'+paper.clientWidth+'x'+paper.clientHeight+'|'+entries.length;
+ if(layoutKey===key)return;
+ currentEntries();insightPages=shown.flatMap(split);layoutKey=key;
+ pageNumber=Math.max(0,Math.min(pageNumber,insightPages.length-1));
 }
 function paint(){
- if(!shell||!shell.classList.contains('is-open'))return;
- pages=buildPages();position=Math.max(0,Math.min(position,pages.length-1));
- const p=pages[position];
- paper.innerHTML='<article class="insights-content"><div class="insights-category">'+esc(names[p.category]||'독서 정보')+'</div><h3 class="insights-entry-title">'+esc(p.title)+(p.totalSubpages>1?' ('+p.subpage+'/'+p.totalSubpages+')':'')+'</h3><p class="insights-entry-text">'+esc(p.content)+'</p><div class="insights-entry-source">'+esc(p.source||'')+'</div></article>';
- number.textContent=(position+1)+' / '+pages.length;
- $i('insightsPrev').disabled=position===0;
- $i('insightsNext').disabled=position===pages.length-1;
- const n=getCanonical().length,limit=unlocked();
- range.textContent='읽은 지점 '+(n?Math.round(limit/n*100):0)+'%';
+ if(!panelOpen())return;
+ layout();paper.replaceChildren();
+ if(insightPages.length){
+  const p=insightPages[pageNumber],card=document.createElement('article');
+  card.className='insights-card';card.innerHTML=cardHtml(p,p.portion,p.part,p.total);paper.append(card);
+ }
+ el('insightsPageCount').textContent=insightPages.length?(pageNumber+1)+' / '+insightPages.length:'0 / 0';
+ el('insightsPrev').disabled=!insightPages.length||pageNumber===0;
+ el('insightsNext').disabled=!insightPages.length||pageNumber===insightPages.length-1;
 }
-function pageMove(dir){position=Math.min(pages.length-1,Math.max(0,position+dir));paint();}
+function turn(dir){const next=Math.max(0,Math.min(insightPages.length-1,pageNumber+dir));if(next!==pageNumber){pageNumber=next;paint();}}
+function setTab(tab){
+ category=tab;pageNumber=0;layoutKey='';
+ overlay?.querySelectorAll('[data-insight-tab]').forEach(b=>{
+  const is=b.dataset.insightTab===tab;b.classList.toggle('selected',is);b.setAttribute('aria-pressed',String(is));
+ });
+ paint();
+}
 function close(){
- if(!shell||!shell.classList.contains('is-open'))return;
- shell.classList.remove('is-open');shell.setAttribute('aria-hidden','true');
- lastFocus?.focus?.({preventScroll:true});
+ ++latestToken;
+ if(!panelOpen())return;
+ overlay.classList.remove('is-open');overlay.setAttribute('aria-hidden','true');
+ focused?.focus?.({preventScroll:true});
 }
-function open(){
- if(!$i('viewerOverlay')?.classList.contains('active')||!getCanonical())return;
+async function open(){
+ if(!readerOpen()||!bookText()||!D())return;
  if(typeof readerNoteIsOpen==='function'&&readerNoteIsOpen())return;
- observe();lastFocus=document.activeElement;bookKey=signature();category='all';
- menu.value='all';position=0;shell.classList.add('is-open');shell.setAttribute('aria-hidden','false');
- paint();$i('insightsClose').focus({preventScroll:true});
+ observe();const token=++latestToken;
+ currentKey=D().key(bookText());entries=[];offsetCache.clear();layoutKey='';pageNumber=0;
+ focused=document.activeElement;overlay.classList.add('is-open');overlay.setAttribute('aria-hidden','false');
+ setTab('event');paper.replaceChildren();el('insightsPageCount').textContent='0 / 0';
+ el('insightsClose').focus({preventScroll:true});
+ const loaded=await D().load(bookText());
+ if(!panelOpen()||token!==latestToken||currentKey!==D().key(bookText()))return;
+ entries=loaded?.records||[];layoutKey='';paint();
 }
-function importFile(file){
- if(!file)return;
- if(file.size>1024*1024){alert('정보 JSON은 최대 1MB입니다.');return;}
- const reader=new FileReader();
- reader.onload=()=>{
-  try{
-   const obj=JSON.parse(reader.result);
-   const records=Array.isArray(obj)?obj:obj.records;
-   if(!Array.isArray(records)||records.length>MAX_RECORDS)throw Error('records 배열(최대 1200개)이 필요합니다.');
-   const text=getCanonical(),safe=[];
-   records.forEach((r,i)=>{
-    if(!r||typeof r!=='object')return;
-    const at=recordAnchor(r,text.length);
-    if(at===null)throw Error((i+1)+'번 정보에 anchor 또는 progress가 없습니다.');
-    if(!String(r.source||'').trim())throw Error((i+1)+'번 정보에 근거(source)가 없습니다.');
-    safe.push({id:String(r.id||i),category:names[r.category]?r.category:'fact',
-     title:String(r.title||'정보').slice(0,150),content:String(r.content||'').slice(0,MAX_CHARS),
-     source:String(r.source).slice(0,200),anchor:at});
-   });
-   if(!confirm('이 책의 기존 정보 '+normalizedRecords(getCanonical().length).length+'건을 새 정보 '+safe.length+'건으로 교체할까요?'))return;
-   const {db,key,entry}=state();entry.records=safe;db[key]=entry;
-   if(!saveDb(db))throw Error('저장 공간이 부족하거나 접근이 제한되었습니다.');
-   position=0;paint();
-  }catch(err){alert('정보 파일 오류: '+err.message);}
- };
- reader.readAsText(file,'utf-8');
+async function importJson(file){
+ if(!file||!bookText())return;
+ if(file.size>2097152){alert('JSON 정보는 2MB 이하여야 합니다.');return;}
+ try{
+  const obj=JSON.parse(await file.text());
+  const checked=D().validate(obj,bookText());
+  if(!confirm('현재 책의 독서정보를 '+checked.records.length+'건으로 교체할까요?'))return;
+  await D().save(bookText(),checked);
+  entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;paint();
+ }catch(e){alert(e.message||String(e));}
 }
-function setup(){
- if($i('insightsOpen'))return;
- const parent=$i('openReaderSearch');if(!parent)return;
- const b=document.createElement('button');b.id='insightsOpen';b.type='button';b.className='secondary';b.textContent='독서 정보';
- parent.parentNode.insertBefore(b,parent);b.addEventListener('click',open);
- const el=document.createElement('section');el.id='insightsPanel';el.className='insights-shell';el.setAttribute('aria-hidden','true');
- el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-label','독서 정보');
- el.innerHTML='<header class="insights-head"><h2>독서 정보</h2><button id="insightsClose" type="button">닫기</button></header>'+
- '<div class="insights-controls"><select id="insightsCategory" aria-label="정보 종류">'+types.map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select><span class="insights-marker" id="insightsRange"></span><button type="button" id="insightsImportBtn" class="insights-import">정보 불러오기</button><input type="file" id="insightsFileInput" accept=".json,application/json" hidden></div>'+
- '<main id="insightsPaper" class="insights-paper" tabindex="0" aria-label="독서 정보 페이지"></main>'+
- '<footer class="insights-footer"><button id="insightsPrev" type="button">〈 이전</button><span id="insightsNumber" class="insights-count">0 / 0</span><button id="insightsNext" type="button">다음 〉</button></footer>';
- document.body.appendChild(el);shell=el;paper=$i('insightsPaper');menu=$i('insightsCategory');number=$i('insightsNumber');range=$i('insightsRange');
- $i('insightsClose').onclick=close;
- $i('insightsPrev').onclick=()=>pageMove(-1);
- $i('insightsNext').onclick=()=>pageMove(1);
- menu.onchange=()=>{category=menu.value;position=0;paint();};
- $i('insightsImportBtn').onclick=()=>$i('insightsFileInput').click();
- $i('insightsFileInput').onchange=e=>{importFile(e.target.files[0]);e.target.value='';};
- // Capture keys before original reader page keys: while open only this panel navigates.
+function init(){
+ if(el('insightsOpen')||!el('openReaderSearch')||!D())return;
+ const b=document.createElement('button');b.type='button';b.id='insightsOpen';b.className='secondary';b.textContent='독서 정보';
+ el('openReaderSearch').before(b);b.onclick=()=>void open();
+ overlay=document.createElement('section');overlay.id='insightsPanel';overlay.className='insights-shell';
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','독서 정보');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-hidden','true');
+ overlay.innerHTML='<header class="insights-head"><h2>독서 정보</h2><button id="insightsClose" type="button">닫기</button></header>'+
+ '<nav class="insights-tabs" aria-label="독서정보 종류">'+tabs.map(([k,v])=>'<button type="button" data-insight-tab="'+k+'" aria-pressed="false">'+v+'</button>').join('')+'</nav>'+
+ '<div class="insights-toolbar"><span id="insightsSeen"></span><span id="insightsStatus"></span><button type="button" id="insightsImportBtn">정보 불러오기</button><input type="file" id="insightsImportInput" accept=".json,application/json" hidden></div>'+
+ '<main id="insightsPaper" class="insights-paper" tabindex="0" aria-label="독서정보 페이지"></main>'+
+ '<footer class="insights-footer"><button id="insightsPrev" type="button">〈 이전</button><strong id="insightsPageCount">0 / 0</strong><button id="insightsNext" type="button">다음 〉</button></footer>';
+ document.body.append(overlay);paper=el('insightsPaper');
+ el('insightsClose').onclick=close;el('insightsPrev').onclick=()=>turn(-1);el('insightsNext').onclick=()=>turn(1);
+ overlay.querySelectorAll('[data-insight-tab]').forEach(tab=>tab.onclick=()=>setTab(tab.dataset.insightTab));
+ el('insightsImportBtn').onclick=()=>el('insightsImportInput').click();
+ el('insightsImportInput').onchange=e=>{void importJson(e.target.files[0]);e.target.value='';};
  window.addEventListener('keydown',e=>{
-  if(!shell.classList.contains('is-open'))return;
+  if(!panelOpen())return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close();return;}
-  if(['ArrowLeft','ArrowRight','PageUp','PageDown',' '].includes(e.key)){
-   if(e.target.closest('select,input'))return;
-   e.preventDefault();e.stopImmediatePropagation();
-   pageMove(['ArrowLeft','PageUp'].includes(e.key)?-1:1);
+  if(['ArrowLeft','ArrowRight','PageUp','PageDown',' '].includes(e.key)&&!e.target.closest('button,input,select,textarea')){
+   e.preventDefault();e.stopImmediatePropagation();turn(['ArrowLeft','PageUp'].includes(e.key)?-1:1);
   }
  },true);
- paper.addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};},{passive:true});
+ paper.addEventListener('pointerdown',e=>gesture={x:e.clientX,y:e.clientY},{passive:true});
  paper.addEventListener('pointerup',e=>{
-  if(!pointerStart)return;const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;pointerStart=null;
-  if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)*1.3){pageMove(dx<0?1:-1);return;}
-  if(Math.abs(dx)<12&&Math.abs(dy)<12&&!String(window.getSelection()||'').trim()){
-   const rect=paper.getBoundingClientRect();pageMove(e.clientX<rect.left+rect.width/2?-1:1);
+  if(!gesture)return;const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;gesture=null;
+  if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3){turn(dx<0?1:-1);return;}
+  if(Math.abs(dx)<13&&Math.abs(dy)<13&&!String(window.getSelection()||'').trim()){
+   const rect=paper.getBoundingClientRect();turn(e.clientX<rect.left+rect.width/2?-1:1);
   }
  });
- // No scroll wheel pagination: avoids accidental page storms on an e-ink screen.
- el.addEventListener('wheel',e=>e.preventDefault(),{passive:false});
- const ro=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>{if(shell.classList.contains('is-open')){position=0;paint();}}):null;
- ro?.observe(paper);
- // Follows active book and progress; remains independent of the page rendering engine.
- const observer=new MutationObserver(()=>{
-  if(!shell.classList.contains('is-open'))return;
-  if(!$i('viewerOverlay')?.classList.contains('active')){close();return;}
-  if(bookKey!==signature()){close();return;}
- });
- observer.observe($i('viewerOverlay'),{attributes:true,attributeFilter:['class']});
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')observe();});
- // Public hook for original page rendering; no destructive monkey patches.
- window.readerInsights={open,close,observe,refresh:()=>{if(shell.classList.contains('is-open'))paint();},isOpen:()=>shell.classList.contains('is-open')};
+ overlay.addEventListener('wheel',e=>e.preventDefault(),{passive:false});
+ new MutationObserver(()=>{if(panelOpen()&&(!readerOpen()||D().key(bookText())!==currentKey))close();})
+  .observe(el('viewerOverlay'),{attributes:true,attributeFilter:['class']});
+ if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(panelOpen()){layoutKey='';pageNumber=0;paint();}}).observe(paper);
+ window.readerInsights={open,close,observe,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
