@@ -1,0 +1,88 @@
+name: Build Android Insights Preview APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-insights-apk.yml'
+      - 'index.html'
+      - 'reader-insights*'
+      - 'android/**'
+      - 'tests/**'
+      - 'package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-build-and-publish:
+    name: Verify web reader + Android, build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install web test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install browser for integration tests
+        run: npx playwright install --with-deps chromium
+      - name: Run existing viewer regression tests
+        run: npm test
+      - name: Verify reading insights (unit + browser)
+        run: npm run test:insights
+      - name: Verify big book chapter behavior
+        run: npm run test:chapters
+      - name: Run Android bridge tests against Java source
+        run: |
+          python3 android/tests/selection_menu.py
+          python3 android/tests/chatgpt_entry.py
+          python3 android/tests/timeline_assets.py
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Compile debug preview APK
+        run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
+      - name: Check compiled APK and embedded offline features
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          for asset in index.html reader-insights.js reader-insights-data.js reader-insights-nav.js reader-insights.css android.js; do
+            unzip -l "$APK" "assets/$asset" | grep -F "assets/$asset"
+          done
+          unzip -p "$APK" assets/index.html | grep -q 'reader-insights-nav.js'
+          unzip -p "$APK" assets/index.html | grep -q 'readerInsightsLookupAction'
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep package:
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          mkdir -p downloads
+          cp "$APK" downloads/EbookViewer_Insights_v1.31_preview.apk
+          (cd downloads && sha256sum EbookViewer_Insights_v1.31_preview.apk > EbookViewer_Insights_v1.31_preview.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EbookViewer-Insights-v1.31-preview-APK
+          path: |
+            downloads/EbookViewer_Insights_v1.31_preview.apk
+            downloads/EbookViewer_Insights_v1.31_preview.sha256
+          retention-days: 30
+      - name: Publish verified preview APK for direct download
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/EbookViewer_Insights_v1.31_preview.apk downloads/EbookViewer_Insights_v1.31_preview.sha256
+          git commit -m "Publish verified v1.31 insights preview APK [skip ci]"
+          git push origin HEAD:main
