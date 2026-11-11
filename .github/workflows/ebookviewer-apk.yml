@@ -1,0 +1,120 @@
+name: Build and verify EbookViewer 1.31 APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ebookviewer-apk.yml'
+      - 'index.html'
+      - 'reader-insights*.js'
+      - 'reader-insights.css'
+      - 'android/**'
+      - 'tests/reading-insights*.cjs'
+      - 'package.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ebookviewer-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install SDK 36 and Build Tools
+        run: |
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Configure Gradle 9.6 for Android Gradle Plugin 9.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Stage current Web reader into offline APK
+        run: python3 android/tools/sync_web_assets.py
+      - name: Check offline assets and native bridge
+        run: python3 android/tests/insights_assets.py
+      - name: Validate embedded HTML and reader JS syntax
+        run: |
+          node --check reader-insights-data.js
+          node --check reader-insights.js
+          node --check reader-insights-nav.js
+          node --check android/app/src/main/assets/android.js
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=fs.readFileSync('android/app/src/main/assets/index.html','utf8');
+          const matches=[...s.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+          for(const [i,x] of matches.entries())try{new Function(x[1]);}catch(e){throw Error('Embedded script '+i+': '+e.message);}
+          console.log('Verified '+matches.length+' embedded script blocks');
+          NODE
+      - name: Install Node tests
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium for Android asset UI regression
+        run: npx playwright install --with-deps chromium
+      - name: Run all insights and navigation browser regressions
+        run: npm run test:insights
+      - name: Run native selection menu Java test
+        run: python3 android/tests/selection_menu.py
+      - name: Run native bridge and timeline regression tests
+        run: |
+          python3 android/tests/chatgpt_entry.py
+          python3 android/tests/timeline_assets.py
+      - name: Build debug APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Validate resulting APK archive and bundled assets
+        run: |
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          assert apk.is_file() and apk.stat().st_size>100000, 'APK was not created'
+          with ZipFile(apk) as z:
+              names=set(z.namelist())
+              required={
+                'AndroidManifest.xml','classes.dex',
+                'assets/index.html','assets/android.js','assets/reader-core.js',
+                'assets/reader-insights-data.js','assets/reader-insights.js',
+                'assets/reader-insights-nav.js','assets/reader-insights.css'
+              }
+              missing=required-names
+              assert not missing, f'Missing APK assets: {sorted(missing)}'
+              html=z.read('assets/index.html').decode('utf-8')
+              assert 'reader-insights-nav.js' in html
+              assert 'reader-insights-data.js' in html
+              assert 'reader-insights.js' in html
+              assert 'reader-insights.css' in html
+          print('Validated APK size:',apk.stat().st_size,'bytes; all required assets present')
+          PY
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as downloadable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EbookViewer_v1.31_debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish verified debug APK in downloads
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/EbookViewer_v1.31-debug.apk
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/EbookViewer_v1.31-debug.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified EbookViewer 1.31 debug APK [skip ci]'
+            git push
+          fi
