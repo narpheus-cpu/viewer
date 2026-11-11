@@ -30,7 +30,8 @@ check('const syncReading=loadReadingSessionSync();' not in index,"Old automatic 
 check('readerState.initializing=false;' in index,"Reader initialization never finishes")
 check('resolveReaderReady();' in index,"Reader readiness promise not settled")
 check('<script src="./android.js"></script>' in index,"Android checkpoint bridge missing")
-check('<script src="./reader-core.js"></script>' in index,"Android reading core missing")
+check('const readerState=' in index and '<script src="./reader-core.js"></script>' not in index,
+      "Android HTML must use only one reading core (duplicate const would break startup)")
 check('window.readerInsights?.isOpen?.()' in host,"Native back button does not handle insights overlay")
 check('window.readerInsights?.cancelCorrection?.()' in host,"Back does not cancel read position correction")
 for title in ("ChatGPT연결","읽은 지점 지정","독서정보 보기"):
