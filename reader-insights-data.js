@@ -53,11 +53,26 @@ function validate(meta,body){
   if(replaces && ids.get(replaces).rawOffset>at)validError(id+'의 수정 이력이 과거보다 먼저 공개됩니다.');
   const order=r.story_order==null?null:Number(r.story_order);
   if(order!==null&&(!Number.isInteger(order)||order<1||order>1000000))validError(id+'의 story_order를 확인하세요.');
+  // Optional navigation metadata belongs to the gated record; never to the book globally.
+  const safe=(value,max=160)=>typeof value==='string'?value.trim().slice(0,max):'';
+  const entities=Array.isArray(r.entities)?r.entities.slice(0,12).map(item=>{
+   if(typeof item==='string'){const name=safe(item);return name?{id:name,name,type:'other',aliases:[]}:null;}
+   if(!item||typeof item!=='object'||Array.isArray(item))return null;
+   const name=safe(item.name),eid=safe(item.id)||name;
+   if(!name||!eid)return null;
+   const aliases=Array.isArray(item.aliases)?item.aliases.slice(0,12).map(a=>safe(a,80)).filter(Boolean):[];
+   return {id:eid,name,type:['person','place','object','concept','other'].includes(item.type)?item.type:'other',aliases};
+  }).filter(Boolean):[];
+  const aliases=Array.isArray(r.aliases)?r.aliases.slice(0,12).map(a=>safe(a,80)).filter(Boolean):[];
+  const related_ids=Array.isArray(r.related_ids)?r.related_ids.slice(0,30).map(a=>safe(a,100)).filter(Boolean):[];
+  const importance=Number.isInteger(r.importance)&&r.importance>=1&&r.importance<=5?r.importance:3;
+  const scene_id=safe(r.scene_id,120)||null;
   const obj={id,category:cat,title:r.title,text:r.text,confidence,evidence:r.evidence,
-   subject:typeof r.subject==='string'?r.subject.slice(0,160):'',reveal:{quote:r.reveal.quote,occurrence:r.reveal.occurrence},
-   replaces,story_order:order,rawOffset:at};
+   subject:safe(r.subject),reveal:{quote:r.reveal.quote,occurrence:r.reveal.occurrence},
+   replaces,story_order:order,rawOffset:at,entities,aliases,related_ids,importance,scene_id};
   out.push(obj);ids.set(id,obj);
  }
+ for(const row of out)row.related_ids=row.related_ids.filter(other=>other!==row.id&&ids.has(other));
  return {schema_version:2,records:out};
 }
 function parse(raw){
