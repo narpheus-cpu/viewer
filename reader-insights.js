@@ -79,7 +79,8 @@ function cardHtml(entry,portion,part=1,total=1){
 function fits(entry,string){
  const probe=document.createElement('article');probe.className='insights-card insights-measure';
  probe.innerHTML=cardHtml(entry,string);paper.append(probe);
- const okay=probe.scrollHeight<=paper.clientHeight-3;probe.remove();return okay;
+ const style=getComputedStyle(paper);const usable=Math.max(30,paper.clientHeight-parseFloat(style.paddingTop||0)-parseFloat(style.paddingBottom||0)-5);
+ const okay=probe.scrollHeight<=usable;probe.remove();return okay;
 }
 function split(entry){
  const text=entry.display;
