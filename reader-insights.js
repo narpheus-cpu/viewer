@@ -180,6 +180,7 @@ function close(){
 }
 async function open(){
  if(!readerOpen()||!bookText()||!D())return;
+ cancelCorrection();
  if(typeof readerNoteIsOpen==='function'&&readerNoteIsOpen())return;
  observe();const token=++latestToken;
  currentKey=D().key(bookText());entries=[];offsetCache.clear();layoutKey='';pageNumber=0;
@@ -241,11 +242,11 @@ function toggleMarkDialog(show){
  markDialog.setAttribute('aria-hidden',String(!show));
  if(show)el('insightsMarkCancel').focus({preventScroll:true});
 }
+function cancelCorrection(){toggleMarkDialog(false);document.body.classList.remove('insights-correcting');}
 function finishCorrection(at){
  if(at===null||at===undefined)return;
  correctTo(at);
- toggleMarkDialog(false);
- document.body.classList.remove('insights-correcting');
+ cancelCorrection();
  window.getSelection()?.removeAllRanges?.();
  const n=bookCanonical().length,seen=D().getSeen(bookText());
  const pct=n?Math.min(100,Math.floor(seen/n*100)):0;
@@ -289,7 +290,7 @@ function init(){
  el('insightsMarkSelected').onclick=()=>{if(selectedCursor)finishCorrection(selectedCursor.end);};
  el('insightsMarkPage').onclick=()=>finishCorrection(pageWindow()?.end);
  el('insightsMarkZero').onclick=()=>finishCorrection(0);
- el('insightsMarkCancel').onclick=()=>{toggleMarkDialog(false);document.body.classList.remove('insights-correcting');};
+ el('insightsMarkCancel').onclick=cancelCorrection;
 
  overlay=document.createElement('section');overlay.id='insightsPanel';overlay.className='insights-shell';
  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','독서 정보');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-hidden','true');
@@ -310,7 +311,7 @@ function init(){
  el('insightsImportInput').onchange=e=>{void importJson(e.target.files[0]);e.target.value='';};
  window.addEventListener('keydown',e=>{
   if(markDialog?.classList.contains('is-open')){
-   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();toggleMarkDialog(false);}
+   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();cancelCorrection();}
    else if(['ArrowLeft','ArrowRight','PageUp','PageDown'].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();}
    return;
   }
@@ -332,10 +333,10 @@ function init(){
   }
  });
  overlay.addEventListener('wheel',e=>e.preventDefault(),{passive:false});
- new MutationObserver(()=>{if(panelOpen()&&(!readerOpen()||D().key(bookText())!==currentKey))close();})
+ new MutationObserver(()=>{if(!readerOpen()){close();cancelCorrection();}else if(panelOpen()&&D().key(bookText())!==currentKey)close();})
   .observe(el('viewerOverlay'),{attributes:true,attributeFilter:['class']});
  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(panelOpen()){layoutKey='';pageNumber=0;paint();}}).observe(paper);
- window.readerInsights={open,close,observe,prepareAdvance,finishAdvance,correctTo,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
+ window.readerInsights={open,close,cancelCorrection,observe,prepareAdvance,finishAdvance,correctTo,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
