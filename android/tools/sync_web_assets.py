@@ -26,11 +26,11 @@ def stage():
     if "<head>" not in source or "</head>" not in source:
         raise RuntimeError("Cannot find reader HTML head")
 
-    # Native checkpoint/recovery + the optimized Android reader layer were
-    # already used by the original APK. These are packaged as local assets.
+    # The current Web HTML already embeds readerState and readerReady inline.
+    # Reinjecting reader-core.js would redeclare its top-level const and break startup.
+    # Only the native checkpoint bridge must be loaded as a separate local script.
     source = source.replace("<head>", "<head>\n"
-        '<script src="./android.js"></script>\n'
-        '<script src="./reader-core.js"></script>', 1)
+        '<script src="./android.js"></script>', 1)
 
     # The Web page eagerly reopens a last-read book. The Android UI deliberately
     # shows a chooser and defers large-book parsing until the user selects one.
