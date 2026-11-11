@@ -1,16 +1,7 @@
-name: Build Android Insights Preview APK
+name: Build Android Insights Preview APK (manual backup)
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/build-insights-apk.yml'
-      - 'index.html'
-      - 'reader-insights*'
-      - 'android/**'
-      - 'tests/**'
-      - 'package.json'
-
 permissions:
   contents: write
 
