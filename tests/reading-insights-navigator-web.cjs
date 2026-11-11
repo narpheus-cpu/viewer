@@ -50,6 +50,10 @@ async function pageFor(browser){
   await page.locator('#insightsNext').click();
   assert.equal(await page.evaluate(()=>readerAnchor()),sourceAnchor,'The insights pager must not advance book pages');checks++;
   await page.locator('#insightsNavReturn').click();
+  for(let attempt=0;attempt<5&&!await page.locator('#insightsPaper [data-nav-id=all]').count();attempt++){
+    if(!await page.locator('#insightsNext').isEnabled())break;
+    await page.locator('#insightsNext').click();
+  }
   await page.locator('#insightsPaper [data-nav-id=all]').click();
   assert.equal(await page.locator('#insightsPanel .insights-tabs').isVisible(),true);checks++;
   await page.locator('#insightsNavReturn').click();
