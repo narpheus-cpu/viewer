@@ -113,7 +113,7 @@ function getSeen(body){
  try{return Math.max(0,Number(localStorage.getItem(PROGRESS+id))||0);}catch{return 0;}
 }
 function markSeen(body,at){
- const id=key(body),n=Math.max(0,Math.min(body.length,Math.floor(Number(at)||0)));
+ const id=key(body),n=Math.max(0,Math.floor(Number(at)||0));
  const prev=getSeen(body);
  if(n>prev){try{localStorage.setItem(PROGRESS+id,String(n));}catch{}}
  return Math.max(n,prev);
