@@ -225,15 +225,15 @@ function getSelectedCursor(){
  prefix.setStart(pageEl,0);
  try{prefix.setEnd(range.endContainer,range.endOffset);}catch{return null;}
  const guessed=start+prefix.toString().length;
- const candidates=[];
- let at=novel.indexOf(quote,start);
- while(at>=0&&at<upper&&candidates.length<50){
-  const ending=at+quote.length;
-  if(ending<=upper)candidates.push(ending);
-  at=novel.indexOf(quote,at+1);
+ let match=null,distance=Infinity,scanned=0;
+ for(let at=novel.indexOf(quote,start);at>=0&&at<upper&&scanned++<10000;at=novel.indexOf(quote,at+1)){
+  const end=at+quote.length;
+  if(end>upper)break;
+  const delta=Math.abs(end-guessed);
+  if(delta<distance){distance=delta;match=end;}
+  if(end>guessed&&delta>distance)break;
  }
- if(!candidates.length)return null;
- const match=candidates.reduce((best,end)=>Math.abs(end-guessed)<Math.abs(best-guessed)?end:best);
+ if(match===null)return null;
  return {end:match,quote:quote.length>75?quote.slice(-75):quote};
 }
 function toggleMarkDialog(show){
@@ -262,7 +262,7 @@ function openMarkDialog(){
  const pct=n?Math.min(100,Math.floor(before/n*100)):0;
  el('insightsMarkCurrent').textContent='현재 설정된 읽은 범위: '+pct+'%';
  el('insightsMarkSelected').disabled=!selectedCursor;
- el('insightsMarkSelected').textContent=selectedCursor?'선택 문장 끝으로 지정':'선택 문장 끝으로 지정 (본문 선택 필요)';
+ el('insightsMarkSelected').textContent=selectedCursor?'선택한 구절 끝으로 지정':'선택한 구절 끝으로 지정 (본문 선택 필요)';
  el('insightsMarkPage').disabled=!current;
  el('insightsMarkTarget').textContent=current?
   '이 페이지의 마지막 문장까지: '+(n?Math.min(100,Math.floor(current.end/n*100)):0)+'%':'현재 페이지를 측정할 수 없어.';
@@ -281,8 +281,8 @@ function init(){
  markDialog.setAttribute('aria-modal','true');markDialog.setAttribute('aria-hidden','true');
  markDialog.innerHTML='<div class="insights-mark-box"><h2>읽은 지점 직접 지정</h2>'+
  '<div id="insightsMarkCurrent"></div><div id="insightsMarkTarget"></div>'+
- '<p>실제로 읽은 페이지로 이동한 뒤 지정해. 문장 일부를 선택하면 그 문장 끝까지 정확히 지정할 수 있어. 책 마지막에 잘못 갔다면 읽은 곳으로 돌아와 다시 지정해.</p>'+
- '<button id="insightsMarkSelected" type="button">선택 문장 끝으로 지정</button>'+
+ '<p>실제로 읽은 페이지로 이동한 뒤 지정해. 마지막으로 읽은 문장 또는 구절을 선택하면 선택 끝까지 지정할 수 있어. 책 마지막에 잘못 갔다면 읽은 곳으로 돌아와 다시 지정해.</p>'+
+ '<button id="insightsMarkSelected" type="button">선택한 구절 끝으로 지정</button>'+
  '<button id="insightsMarkPage" type="button">이 페이지 끝으로 지정</button>'+
  '<button id="insightsMarkZero" type="button">처음부터 다시 읽음 (0%)</button>'+
  '<button id="insightsMarkCancel" type="button">취소</button><div id="insightsMarkNotice" role="status"></div></div>';
