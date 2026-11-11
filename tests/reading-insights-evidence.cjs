@@ -62,6 +62,10 @@ async function checkViewer(browser,kind){
   name:'long-evidence-demo.txt',mimeType:'text/plain',buffer:Buffer.from(bundled,'utf8')
  });
  await page.waitForFunction(()=>document.querySelector('#inputText').value.includes('E근거14번째'),null,{timeout:20000});
+ // Android chooser-first startup shows the recent-books overlay above the
+ // editable input; dismiss it just as a user would before tapping Read.
+ await page.evaluate(()=>{if(typeof hideRecentHistory==='function')hideRecentHistory();});
+ await page.waitForFunction(()=>!document.querySelector('#openViewerBtn').disabled,null,{timeout:20000});
  await page.locator('#openViewerBtn').click();
  await page.waitForFunction(()=>!restoreInProgress&&pages.length>0,null,{timeout:20000});
  await page.evaluate(()=>window.readerInsights.correctTo(readerCanonical().length));
