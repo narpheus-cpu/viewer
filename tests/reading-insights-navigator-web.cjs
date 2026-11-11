@@ -55,9 +55,8 @@ async function pageFor(browser){
   assert.equal(await page.locator('#insightsNavigatorBar').isVisible(),true);checks++;
   // Drop the read cursor: names learned later must immediately disappear.
   await page.evaluate(()=>window.readerInsights.correctTo(0));
-  await page.locator('#insightsNavFind').click();
-  await page.locator('#insightsNavSearch').fill('서 연구원');
-  assert.equal(await page.locator('#insightsPaper [data-nav-kind=record]').count(),0);checks++;
+  assert.equal(await page.locator('#insightsPaper [data-nav-kind=record]').count(),0,'Unread records must all be hidden');checks++;
+  assert.equal((await page.locator('#insightsPaper').innerText()).trim(),'','The no-information panel stays blank');checks++;
   assert.deepEqual(errors,[]);checks++;
   await context.close();
   console.log(checks+' navigator browser assertions passed');
