@@ -219,8 +219,11 @@ function getSelectedCursor(){
  const start=Math.max(0,Number(pageAnchors[index])||0);
  const next=Number(pageAnchors[index+1]);
  const upper=Number.isFinite(next)&&next>start?Math.min(novel.length,next):novel.length;
+ const startNode=range.startContainer.nodeType===1?range.startContainer:range.startContainer.parentElement;
+ if(!startNode?.closest?.('#pageInnerLeft, #pageInnerRight'))return null;
  const quote=String(range.toString()||'').trim();
- if(quote.length<6||quote.length>1000)return null;
+ // Selection may be a single Korean character or a short word.
+ if(quote.length<1||quote.length>1000)return null;
  const prefix=document.createRange();
  prefix.setStart(pageEl,0);
  try{prefix.setEnd(range.endContainer,range.endOffset);}catch{return null;}
@@ -235,6 +238,28 @@ function getSelectedCursor(){
  }
  if(match===null)return null;
  return {end:match,quote:quote.length>75?quote.slice(-75):quote};
+}
+function selectToRead(){
+ // Called directly from the native-looking browser text-selection toolbar.
+ // Take the precise selection before clearing it; never use the page end here.
+ const cursor=getSelectedCursor();
+ if(!cursor){
+  showReadSelectionFeedback('선택한 단어의 위치를 확인하지 못했습니다. 본문을 다시 선택해 주세요.',true);
+  return false;
+ }
+ correctTo(cursor.end);
+ window.getSelection()?.removeAllRanges?.();
+ showReadSelectionFeedback('이 페이지까지 읽은 지점으로 지정됨 · 선택한 단어 끝 기준');
+ return true;
+}
+let readSelectionFeedbackTimer=0;
+function showReadSelectionFeedback(message,isError=false){
+ const notice=el('readerInsightsSelectionNotice');if(!notice)return;
+ notice.textContent=message;
+ notice.classList.toggle('is-error',!!isError);
+ notice.hidden=false;
+ clearTimeout(readSelectionFeedbackTimer);
+ readSelectionFeedbackTimer=setTimeout(()=>{notice.hidden=true;},4500);
 }
 function toggleMarkDialog(show){
  if(!markDialog)return;
@@ -287,6 +312,12 @@ function init(){
  '<button id="insightsMarkZero" type="button">처음부터 다시 읽음 (0%)</button>'+
  '<button id="insightsMarkCancel" type="button">취소</button><div id="insightsMarkNotice" role="status"></div></div>';
  document.body.append(markDialog);
+ const selectionNotice=document.createElement('div');
+ selectionNotice.id='readerInsightsSelectionNotice';
+ selectionNotice.setAttribute('role','status');
+ selectionNotice.setAttribute('aria-live','polite');
+ selectionNotice.hidden=true;
+ document.body.append(selectionNotice);
  el('insightsMarkSelected').onclick=()=>{if(selectedCursor)finishCorrection(selectedCursor.end);};
  el('insightsMarkPage').onclick=()=>finishCorrection(pageWindow()?.end);
  el('insightsMarkZero').onclick=()=>finishCorrection(0);
@@ -336,7 +367,7 @@ function init(){
  new MutationObserver(()=>{if(!readerOpen()){close();cancelCorrection();}else if(panelOpen()&&D().key(bookText())!==currentKey)close();})
   .observe(el('viewerOverlay'),{attributes:true,attributeFilter:['class']});
  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(panelOpen()){layoutKey='';pageNumber=0;paint();}}).observe(paper);
- window.readerInsights={open,close,cancelCorrection,observe,prepareAdvance,finishAdvance,correctTo,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
+ window.readerInsights={open,close,cancelCorrection,observe,prepareAdvance,finishAdvance,correctTo,selectToRead,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
