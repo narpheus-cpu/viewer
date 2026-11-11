@@ -144,8 +144,10 @@ function lens(s){
  const snippet=norm(s.pageText);
  const anchor=Number(s.currentAnchor)||s.readEnd;
  const matches=[];
+ const superseded=new Set(records.filter(r=>r.replaces).map(r=>r.replaces));
  const namesFor=id=>(recordNames.get(id)||[]).filter(t=>norm(t).length>=2);
  for(const r of records){
+  if(superseded.has(r.id))continue;
   const personMatch=snippet&&namesFor(r.id).some(alias=>snippet.includes(norm(alias)));
   const nearby=Math.abs(r.revealOffset-anchor)<Math.min(5000,Math.max(600,s.bookLength*.01));
   if(!personMatch&&!nearby)continue;
@@ -153,7 +155,7 @@ function lens(s){
   matches.push({...r,score});
  }
  matches.sort((a,b)=>b.score-a.score||b.revealOffset-a.revealOffset);
- return matches.slice(0,40);
+ return matches.slice(0,10);
 }
 function newest(){
  const sorted=records.slice().sort((a,b)=>b.revealOffset-a.revealOffset);
