@@ -70,6 +70,25 @@ function correctTo(offset){
  layoutKey='';pageNumber=0;
  if(panelOpen())paint();
 }
+/* Only vetted visible records may enter the navigator's search/index. */
+function navigationSnapshot(){
+ const canonical=bookCanonical(),limit=Math.min(canonical.length,D()?.getSeen(bookText())||0);
+ const known=entries.map(record=>({...record,revealOffset:revealEnd(record,canonical)}))
+  .filter(record=>record.revealOffset>=0&&record.revealOffset<=limit);
+ const view=pageWindow();
+ const eligible=view&&view.start<limit?view:null;
+ return {records:known,readEnd:limit,bookLength:canonical.length,
+  currentAnchor:eligible?eligible.start:limit,
+  pageText:eligible?canonical.slice(eligible.start,Math.min(limit,eligible.end)):'',
+  bookKey:D()?.key(bookText())||''};
+}
+function openForSelection(text){
+ const query=String(text||'').trim().slice(0,120);
+ if(!query||!bookText())return false;
+ window.ReaderInsightsNavigator?.requestSearch?.(query);
+ void open();
+ return true;
+}
 function lookupEnd(text,phrase,occ){
  let end=D().occurrenceEnd(text,phrase,occ);
  if(end>=0)return end;
@@ -155,6 +174,7 @@ function layout(){
 }
 function paint(){
  if(!panelOpen())return;
+ if(window.ReaderInsightsNavigator?.renderIfActive?.())return;
  layout();paper.replaceChildren();
  if(insightPages.length){
   const p=insightPages[pageNumber],card=document.createElement('article');
@@ -164,8 +184,9 @@ function paint(){
  el('insightsPrev').disabled=!insightPages.length||pageNumber===0;
  el('insightsNext').disabled=!insightPages.length||pageNumber===insightPages.length-1;
 }
-function turn(dir){const next=Math.max(0,Math.min(insightPages.length-1,pageNumber+dir));if(next!==pageNumber){pageNumber=next;paint();}}
+function turn(dir){if(window.ReaderInsightsNavigator?.turn?.(dir))return;const next=Math.max(0,Math.min(insightPages.length-1,pageNumber+dir));if(next!==pageNumber){pageNumber=next;paint();}}
 function setTab(tab){
+ window.ReaderInsightsNavigator?.exitToCategory?.();
  category=tab;pageNumber=0;layoutKey='';
  overlay?.querySelectorAll('[data-insight-tab]').forEach(b=>{
   const is=b.dataset.insightTab===tab;b.classList.toggle('selected',is);b.setAttribute('aria-pressed',String(is));
@@ -174,6 +195,7 @@ function setTab(tab){
 }
 function close(){
  ++latestToken;
+ window.ReaderInsightsNavigator?.onClose?.();
  if(!panelOpen())return;
  overlay.classList.remove('is-open');overlay.setAttribute('aria-hidden','true');
  focused?.focus?.({preventScroll:true});
@@ -189,7 +211,7 @@ async function open(){
  el('insightsClose').focus({preventScroll:true});
  const loaded=await D().load(bookText());
  if(!panelOpen()||token!==latestToken||currentKey!==D().key(bookText()))return;
- entries=loaded?.records||[];layoutKey='';paint();
+ entries=loaded?.records||[];layoutKey='';window.ReaderInsightsNavigator?.onLoaded?.();paint();
 }
 async function importJson(file){
  if(!file||!bookText())return;
@@ -199,7 +221,7 @@ async function importJson(file){
   const checked=D().validate(obj,bookText());
   if(!confirm('현재 책의 독서정보를 '+checked.records.length+'건으로 교체할까요?'))return;
   await D().save(bookText(),checked);
-  entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;paint();
+  entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;window.ReaderInsightsNavigator?.onLoaded?.();paint();
  }catch(e){alert(e.message||String(e));}
 }
 
@@ -367,7 +389,7 @@ function init(){
  new MutationObserver(()=>{if(!readerOpen()){close();cancelCorrection();}else if(panelOpen()&&D().key(bookText())!==currentKey)close();})
   .observe(el('viewerOverlay'),{attributes:true,attributeFilter:['class']});
  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(panelOpen()){layoutKey='';pageNumber=0;paint();}}).observe(paper);
- window.readerInsights={open,close,cancelCorrection,observe,prepareAdvance,finishAdvance,correctTo,selectToRead,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
+ window.readerInsights={open,close,openForSelection,navigationSnapshot,cancelCorrection,observe,prepareAdvance,finishAdvance,correctTo,selectToRead,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
