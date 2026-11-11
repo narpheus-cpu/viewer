@@ -245,11 +245,12 @@ function finishCorrection(at){
  if(at===null||at===undefined)return;
  correctTo(at);
  toggleMarkDialog(false);
+ document.body.classList.remove('insights-correcting');
  window.getSelection()?.removeAllRanges?.();
  const n=bookCanonical().length,seen=D().getSeen(bookText());
  const pct=n?Math.min(100,Math.floor(seen/n*100)):0;
  const note=el('insightsMarkNotice');
- if(note){note.textContent='읽은 지점을 '+pct+'%로 수정했어. 독서정보도 이 지점까지만 공개돼.';}
+ if(note){note.textContent='읽은 범위 '+pct+'%로 수정했어.';}
  if(panelOpen()){layoutKey='';paint();}
 }
 function openMarkDialog(){
@@ -272,7 +273,7 @@ function init(){
  const b=document.createElement('button');b.type='button';b.id='insightsOpen';b.className='secondary';b.textContent='독서 정보';
  el('openReaderSearch').before(b);b.onclick=()=>void open();
  const readButton=document.createElement('button');
- readButton.id='insightsMarkRead';readButton.type='button';readButton.className='secondary';readButton.textContent='읽은 곳 지정';
+ readButton.id='insightsMarkRead';readButton.type='button';readButton.className='secondary';readButton.textContent='이 지점 지정';
  el('openReaderSearch').before(readButton);readButton.onclick=openMarkDialog;
  markDialog=document.createElement('section');markDialog.id='insightsMarkDialog';markDialog.className='insights-mark-dialog';
  markDialog.setAttribute('role','dialog');markDialog.setAttribute('aria-label','읽은 위치 직접 지정');
@@ -288,7 +289,7 @@ function init(){
  el('insightsMarkSelected').onclick=()=>{if(selectedCursor)finishCorrection(selectedCursor.end);};
  el('insightsMarkPage').onclick=()=>finishCorrection(pageWindow()?.end);
  el('insightsMarkZero').onclick=()=>finishCorrection(0);
- el('insightsMarkCancel').onclick=()=>toggleMarkDialog(false);
+ el('insightsMarkCancel').onclick=()=>{toggleMarkDialog(false);document.body.classList.remove('insights-correcting');};
 
  overlay=document.createElement('section');overlay.id='insightsPanel';overlay.className='insights-shell';
  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','독서 정보');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-hidden','true');
@@ -301,7 +302,11 @@ function init(){
  el('insightsClose').onclick=close;el('insightsPrev').onclick=()=>turn(-1);el('insightsNext').onclick=()=>turn(1);
  overlay.querySelectorAll('[data-insight-tab]').forEach(tab=>tab.onclick=()=>setTab(tab.dataset.insightTab));
  el('insightsImportBtn').onclick=()=>el('insightsImportInput').click();
- el('insightsGoMark').onclick=()=>{close();el('insightsMarkRead').focus({preventScroll:true});openMarkDialog();};
+ el('insightsGoMark').onclick=()=>{
+  close();
+  document.body.classList.add('insights-correcting');
+  el('insightsMarkRead').focus({preventScroll:true});
+ };
  el('insightsImportInput').onchange=e=>{void importJson(e.target.files[0]);e.target.value='';};
  window.addEventListener('keydown',e=>{
   if(markDialog?.classList.contains('is-open')){
