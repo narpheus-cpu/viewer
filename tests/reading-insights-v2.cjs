@@ -37,6 +37,7 @@ async function openReader(page){
     buffer:fixture('insights-sample-integrated-v2.txt')
    });
    const raw=fixture('insights-sample-plain.txt').toString('utf8');
+   await page.waitForFunction(expected=>document.getElementById('inputText').value===expected,raw,{timeout:20000});
    assert.equal(await page.locator('#inputText').inputValue(),raw);checks++;
    await openReader(page);
    assert.equal(await page.evaluate(()=>fullText.includes('READER_INSIGHTS_V2_BEGIN')),false);checks++;
@@ -83,6 +84,7 @@ async function openReader(page){
    await page.locator('#txtFileInput').setInputFiles({
     name:'insights-sample-plain.txt',mimeType:'text/plain',buffer:fixture('insights-sample-plain.txt')
    });
+   await page.waitForFunction(()=>document.getElementById('inputText').value.length>100,{timeout:20000});
    await openReader(page);
    await page.locator('#insightsOpen').click();
    assert.equal((await page.locator('#insightsPaper').innerText()).trim(),'');checks++;
