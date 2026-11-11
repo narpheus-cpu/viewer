@@ -54,7 +54,12 @@ function indexVisible(){
   const size=b.recordIds.size-a.recordIds.size;
   return size||a.name.localeCompare(b.name,'ko');
  });
- if(chosen)chosen=entityById.get(chosen.id)||chosen;
+ if(chosen){
+  const updated=entityById.get(chosen.id);
+  if(updated)chosen=updated;
+  else{chosen=null;recordId='';mode='home';stack=[];page=0;}
+ }
+ if(recordId&&!byId.has(recordId)){recordId='';chosen=null;mode='home';stack=[];page=0;}
  return s;
 }
 function forEntity(entity){
