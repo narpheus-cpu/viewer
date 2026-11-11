@@ -4046,7 +4046,7 @@ function resetPageGesture(){cancelPageNoteHold();pageGesture=null;pageGesturePoi
 function pageGestureShowNote(gesture){
   if(pageGesture!==gesture||!gesture.note?.isConnected||gesture.moved>10||pageGesturePointers.size!==1||
     restoreInProgress||gesture.generation!==readerState.generation||settingsPanelIsOpen()||readerNoteIsOpen()||readerTimelineIsOpen())return false;
-  cancelPageNoteHold();if(gesture.note.hasAttribute('data-reader-year'))void readerOpenTimeline(gesture.note);else readerOpenNote(gesture.note);pageGestureSuppressUntil=performance.now()+800;return true;
+  cancelPageNoteHold();if(gesture.note.hasAttribute('data-reader-year'))void readerOpenTimeline(gesture.note);else readerOpenNote(gesture.note);readerNoteIgnoreClickUntil=pageGestureSuppressUntil=performance.now()+800;return true;
 }
 function beginPageGesture(point,event){
   if(point.kind==='mouse'&&event.button!==0)return;
