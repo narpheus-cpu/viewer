@@ -43,6 +43,9 @@ async function pageFor(browser){
   assert.ok(await page.locator('#insightsPaper [data-nav-kind=record]').count());checks++;
   const sourceAnchor=await page.evaluate(()=>readerAnchor());
   await page.locator('#insightsPaper [data-nav-kind=record]').first().click();
+  await page.locator('#insightsNavReturn').click();
+  await page.locator('#insightsPaper [data-nav-id=recent]').click();
+  assert.equal(await page.locator('#insightsNext').isEnabled(),true);
   await page.locator('#insightsNext').click();
   assert.equal(await page.evaluate(()=>readerAnchor()),sourceAnchor,'The insights pager must not advance book pages');checks++;
   await page.locator('#insightsNavReturn').click();
