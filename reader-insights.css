@@ -26,3 +26,18 @@
 .insights-footer{display:flex;justify-content:space-between;align-items:center;gap:7px;padding:8px 10px max(8px,env(safe-area-inset-bottom));border-top:2px solid #111;flex:none}
 #insightsPageCount{font-weight:700;font-variant-numeric:tabular-nums}
 @media(max-height:500px){.insights-head{padding:3px 8px}.insights-tabs{padding:3px}.insights-toolbar{padding:3px;min-height:34px}.insights-paper{padding:6px 10px}.insights-footer{padding:3px 8px}.insights-title{margin-bottom:5px}}
+
+/* Separate e-ink touch dialog for correcting an accidentally inflated read cursor. */
+#insightsMarkRead{white-space:nowrap}
+.insights-mark-dialog{display:none;position:fixed;inset:0;z-index:2147483170;background:rgba(255,255,255,.97);color:#111;align-items:center;justify-content:center;padding:12px;font:16px/1.55 system-ui,'Malgun Gothic',sans-serif;overscroll-behavior:contain}
+.insights-mark-dialog.is-open{display:flex}
+.insights-mark-dialog *{box-sizing:border-box}
+.insights-mark-box{border:2px solid #111;background:#fff;width:min(96vw,480px);max-height:calc(100dvh - 24px);padding:15px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.insights-mark-box h2{font-size:19px;margin:0 0 4px;flex-shrink:0}
+.insights-mark-box p{font-size:13px;line-height:1.4;margin:0;flex-shrink:1}
+.insights-mark-box button{font:inherit;min-height:42px;border:1px solid #333;border-radius:3px;background:#fff;color:#111;cursor:pointer;flex-shrink:0}
+.insights-mark-box button:disabled{opacity:.35}
+#insightsMarkCurrent{font-weight:700}
+#insightsMarkTarget,#insightsMarkNotice{font-size:12px;overflow:hidden;word-break:break-word}
+#insightsMarkNotice:empty{display:none}
+@media(max-height:520px){.insights-mark-box{padding:8px;gap:4px}.insights-mark-box h2{font-size:16px}.insights-mark-box p{font-size:11px}.insights-mark-box button{min-height:31px}}
