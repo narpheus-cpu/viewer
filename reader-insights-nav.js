@@ -49,6 +49,7 @@ function indexVisible(){
   const size=b.recordIds.size-a.recordIds.size;
   return size||a.name.localeCompare(b.name,'ko');
  });
+ if(chosen)chosen=entityById.get(chosen.id)||chosen;
  return s;
 }
 function forEntity(entity){
@@ -92,7 +93,7 @@ function setVisibility(yes){
  panel.classList.toggle('insights-nav-active',yes);
  const tabs=panel.querySelector('.insights-tabs');
  if(tabs)tabs.hidden=yes;
- $('insightsNavReturn').hidden=!yes;
+ $('insightsNavReturn').hidden=!hasData();
 }
 function push(next,extra){
  stack.push({mode,chosen,recordId,query,page});
