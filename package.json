@@ -4,7 +4,7 @@
   "scripts": {
     "test": "node tests/reader.cjs && node tests/reader-tools.cjs && node tests/chapter-pages.cjs && node tests/sentence-periods.cjs && node tests/reopen.cjs && node tests/footnotes.cjs && node tests/note-gestures.cjs && node tests/chatgpt-connector.cjs && node tests/chatgpt-ui.cjs",
     "test:chapters": "node tests/web-large-book.cjs && node tests/web-chapter-controls.cjs && node tests/web-chapter-spread.cjs && node tests/browser-resume.cjs",
-    "test:insights": "node tests/reading-insights-cursor.cjs && node tests/reading-insights-v2.cjs"
+    "test:insights": "node tests/reading-insights-cursor.cjs && node tests/reading-insights-v2.cjs && node tests/reading-insights-selection.cjs"
   },
   "devDependencies": {
     "jszip": "3.10.2",
