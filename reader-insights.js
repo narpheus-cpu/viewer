@@ -44,8 +44,8 @@ function observe(){
 function unlocked(){
  const {entry}=state();return Math.min(getCanonical().length,Math.max(upperBound(),Number(entry.maxAnchor)||0));
 }
-function shortExcerpt(text,at){
- const head=Math.max(0,at-64),tail=Math.min(text.length,at+140);
+function shortExcerpt(text,at,limit){
+ const head=Math.max(0,at-64),tail=Math.min(limit,text.length,at+140);
  return text.slice(head,tail).replace(/\s+/g,' ').trim();
 }
 function chapterRecords(limit){
@@ -71,7 +71,7 @@ function sourceRecords(limit){
  }
  if(!marks.length)marks=[0];
  return marks.slice(-80).map((at,i)=>({id:'excerpt-'+i+'-'+at,category:'fact',title:'원문 기록 · '+(i+1),
-   content:shortExcerpt(text,at),anchor:at,source:'원문 직접 인용 (내용 분석 아님)',kind:'excerpt'})).filter(x=>x.content);
+   content:shortExcerpt(text,at,limit),anchor:at,source:'원문 직접 인용 (내용 분석 아님)',kind:'excerpt'})).filter(x=>x.content);
 }
 function recordAnchor(r,total){
  const a=Number(r.anchor);
