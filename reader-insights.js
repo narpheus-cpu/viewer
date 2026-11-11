@@ -122,7 +122,7 @@ function currentEntries(){
   a.story_order-b.story_order:a.revealOffset-b.revealOffset);
  shown=shown.map(r=>{
   const prev=r.replaces?known.get(r.replaces):null;
-  return {...r,display:r.text+(prev?'\n\n이전 판단: '+prev.text:'')+'\n\n근거: '+r.evidence};
+  return {...r,display:r.text+(prev?'\n\n이전 판단: '+prev.text:'')+'\n\n근거: '+D().formatEvidence(r.evidence)};
  });
  const pct=text.length?Math.floor(limit/text.length*100):0;
  el('insightsSeen').textContent='읽은 범위 '+pct+'%';
