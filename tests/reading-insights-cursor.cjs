@@ -12,7 +12,7 @@ let checks=0;
 function check(message,ok){assert.ok(ok,message);checks++;}
 const book='a'.repeat(5000);
 check('Initially 0% with no stored observation',D.getSeen(book)===0&&!D.getReadState(book).hasRecord);
-D.markSeen(book,250);check('Visible first page end',D.getSeen(uiBook)===250);
+D.markSeen(book,250);check('Visible first page end',D.getSeen(book)===250);
 D.setSeen(book,125);check('Correction backwards is honored',D.getSeen(book)===125);
 D.markSeen(book,100);check('Automatic observer cannot reduce progress',D.getSeen(book)===125);
 D.setSeen(book,0);check('Manual reset to zero keeps a real record',D.getReadState(book).seen===0&&D.getReadState(book).hasRecord);
