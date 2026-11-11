@@ -16,7 +16,7 @@ async function check(){
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://appassets.androidplatform.net/**',async route=>{
-   const u=new URL(route.request().url),f=path.resolve(assets,'.'+u.pathname.replace(/^\/assets/,''));
+   const u=new URL(route.request().url()),f=path.resolve(assets,'.'+u.pathname.replace(/^\/assets/,''));
    if(!f.startsWith(assets+path.sep)&&f!==path.join(assets,'index.html'))
      return route.fulfill({status:403,body:'blocked'});
    if(!fs.existsSync(f))return route.fulfill({status:404,body:'not found'});
