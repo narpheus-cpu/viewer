@@ -88,6 +88,8 @@ async function openReader(page){
     name:'insights-sample-v2.json',mimeType:'application/json',buffer:fixture('insights-sample-v2.json')
    });
    await page.waitForFunction(async()=>!!(await window.ReaderInsightsData.load(fullText))?.records?.length);
+   // Explicitly confirm a later sentence; JSON import must respect the same gate.
+   await page.evaluate(()=>window.readerInsights.correctTo(readerCanonical().length));
    await page.locator('[data-insight-tab=event]').click();
    assert.notEqual((await page.locator('#insightsPageCount').innerText()).trim(),'0 / 0');checks++;
    await page.locator('#insightsClose').click();
