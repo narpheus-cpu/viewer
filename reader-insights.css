@@ -54,3 +54,26 @@ body.insights-correcting .bookhead{z-index:110}
 body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
 .insights-toolbar button{font-size:11px;padding:4px 6px}
 @media(max-width:400px){#insightsOpen{font-size:10px;padding-left:4px;padding-right:4px}.insights-toolbar{gap:3px;padding:4px}.insights-toolbar button{padding:3px 5px}}
+
+/* Both selection actions share one visual toolbar on the Web/GitHub viewer. */
+#readerInsightsSelectionAction{
+ position:fixed;z-index:2147483050;background:var(--paper,#fff);
+ color:var(--ink,#000);border:1px solid currentColor;border-radius:5px;
+ padding:9px 11px;font-size:14px;line-height:normal;min-height:40px;
+ box-shadow:0 2px 8px #0003;white-space:nowrap;touch-action:manipulation
+}
+#readerInsightsSelectionAction[hidden]{display:none!important}
+#readerInsightsSelectionNotice{
+ position:fixed;left:50%;bottom:max(70px,calc(env(safe-area-inset-bottom) + 58px));
+ transform:translateX(-50%);z-index:2147483155;
+ padding:10px 14px;background:#fff;color:#111;border:2px solid #111;
+ border-radius:4px;max-width:calc(100vw - 20px);width:max-content;
+ font:14px/1.5 system-ui,'Malgun Gothic',sans-serif;text-align:center;
+ box-shadow:0 2px 6px #0002;pointer-events:none
+}
+#readerInsightsSelectionNotice[hidden]{display:none!important}
+#readerInsightsSelectionNotice.is-error{border-style:dashed}
+@media(max-width:370px){
+ #readerInsightsSelectionAction{font-size:12px;padding:7px 7px;min-height:38px}
+ #readerGPTSelectionMenu{font-size:12px!important;padding:7px 7px!important}
+}
