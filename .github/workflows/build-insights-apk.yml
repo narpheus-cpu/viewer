@@ -44,6 +44,10 @@ jobs:
         run: npm run test:insights
       - name: Verify big book chapter behavior
         run: npm run test:chapters
+      - name: Stage current Web reader into APK assets
+        run: |
+          python3 android/tools/sync_web_assets.py
+          python3 android/tests/insights_assets.py
       - name: Run Android bridge tests against Java source
         run: |
           python3 android/tests/selection_menu.py
@@ -57,7 +61,7 @@ jobs:
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '9.6.0'
       - name: Compile debug preview APK
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
       - name: Check compiled APK and embedded offline features
