@@ -3,10 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="./android.js"></script>
 <title>전자책 뷰어 - 모바일</title>
-<script src="android.js"></script>
-<script src="reader-core.js"></script>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Arial,sans-serif' font-size='34' font-weight='700' fill='%23fff'%3E%EC%B1%85%3C/text%3E%3C/svg%3E">
 <script>
 /*! markdown-it 15.0.3 | https://github.com/markdown-it/markdown-it
 Copyright (c) 2014 Vitaly Puzrin, Alex Kocharin.
@@ -48,6 +46,580 @@ OTHER DEALINGS IN THE SOFTWARE.
 `,a.map=[t,e.line],!0}function Pt(e,t,n,r){let i=e.bMarks[t]+e.tShift[t],a=e.eMarks[t];if(e.sCount[t]-e.blkIndent>=4||i+3>a)return!1;let o=e.src.charCodeAt(i);if(o!==126&&o!==96)return!1;let s=i;i=e.skipChars(i,o);let c=i-s;if(c<3)return!1;let l=e.src.slice(s,i),u=e.src.slice(i,a);if(o===96&&u.indexOf(String.fromCharCode(o))>=0)return!1;if(r)return!0;let d=t,f=!1;for(;d++,!(d>=n||(i=s=e.bMarks[d]+e.tShift[d],a=e.eMarks[d],i<a&&e.sCount[d]<e.blkIndent));)if(e.src.charCodeAt(i)===o&&!(e.sCount[d]-e.blkIndent>=4)&&(i=e.skipChars(i,o),!(i-s<c)&&(i=e.skipSpaces(i),!(i<a)))){f=!0;break}c=e.sCount[t],e.line=d+ +!!f;let p=e.push(`fence`,`code`,0);return p.info=u,p.content=e.getLines(t+1,d,c,!0),p.markup=l,p.map=[t,e.line],!0}function Ft(e,t,n,r){let i=e.bMarks[t]+e.tShift[t],a=e.eMarks[t],o=e.lineMax;if(e.sCount[t]-e.blkIndent>=4||e.src.charCodeAt(i)!==62)return!1;if(r)return!0;let s=[],c=[],l=[],u=[],d=e.md.block.ruler.getRules(`blockquote`),f=e.parentType;e.parentType=`blockquote`;let p=!1,m;for(m=t;m<n;m++){let t=e.sCount[m]<e.blkIndent;if(i=e.bMarks[m]+e.tShift[m],a=e.eMarks[m],i>=a)break;if(e.src.charCodeAt(i++)===62&&!t){let t=e.sCount[m]+1,n,r;e.src.charCodeAt(i)===32?(i++,t++,r=!1,n=!0):e.src.charCodeAt(i)===9?(n=!0,(e.bsCount[m]+t)%4==3?(i++,t++,r=!1):r=!0):n=!1;let o=t;for(s.push(e.bMarks[m]),e.bMarks[m]=i;i<a;){let t=e.src.charCodeAt(i);if(N(t))t===9?o+=4-(o+e.bsCount[m]+ +!!r)%4:o++;else break;i++}p=i>=a,c.push(e.bsCount[m]),e.bsCount[m]=e.sCount[m]+1+ +!!n,l.push(e.sCount[m]),e.sCount[m]=o-t,u.push(e.tShift[m]),e.tShift[m]=i-e.bMarks[m];continue}if(p)break;let r=!1;for(let t=0,i=d.length;t<i;t++)if(d[t](e,m,n,!0)){r=!0;break}if(r){e.lineMax=m,e.blkIndent!==0&&(s.push(e.bMarks[m]),c.push(e.bsCount[m]),u.push(e.tShift[m]),l.push(e.sCount[m]),e.sCount[m]-=e.blkIndent);break}s.push(e.bMarks[m]),c.push(e.bsCount[m]),u.push(e.tShift[m]),l.push(e.sCount[m]),e.sCount[m]=-1}let h=e.blkIndent;e.blkIndent=0;let g=e.push(`blockquote_open`,`blockquote`,1);g.markup=`>`;let _=[t,0];g.map=_,e.md.block.tokenize(e,t,m);let v=e.push(`blockquote_close`,`blockquote`,-1);v.markup=`>`,e.lineMax=o,e.parentType=f,_[1]=e.line;for(let n=0;n<u.length;n++)e.bMarks[n+t]=s[n],e.tShift[n+t]=u[n],e.sCount[n+t]=l[n],e.bsCount[n+t]=c[n];return e.blkIndent=h,!0}function It(e,t,n,r){let i=e.eMarks[t];if(e.sCount[t]-e.blkIndent>=4)return!1;let a=e.bMarks[t]+e.tShift[t],o=e.src.charCodeAt(a++);if(o!==42&&o!==45&&o!==95)return!1;let s=1;for(;a<i;){let t=e.src.charCodeAt(a++);if(t!==o&&!N(t))return!1;t===o&&s++}if(s<3)return!1;if(r)return!0;e.line=t+1;let c=e.push(`hr`,`hr`,0);return c.map=[t,e.line],c.markup=Array(s+1).join(String.fromCharCode(o)),!0}function Lt(e,t){let n=e.eMarks[t],r=e.bMarks[t]+e.tShift[t],i=e.src.charCodeAt(r++);return i!==42&&i!==45&&i!==43||r<n&&!N(e.src.charCodeAt(r))?-1:r}function Rt(e,t){let n=e.bMarks[t]+e.tShift[t],r=e.eMarks[t],i=n;if(i+1>=r)return-1;let a=e.src.charCodeAt(i++);if(a<48||a>57)return-1;for(;;){if(i>=r)return-1;if(a=e.src.charCodeAt(i++),a>=48&&a<=57){if(i-n>=10)return-1}else{if(a===41||a===46)break;return-1}}return i<r&&(a=e.src.charCodeAt(i),!N(a))?-1:i}function zt(e,t){let n=e.level+2;for(let r=t+2,i=e.tokens.length-2;r<i;r++)e.tokens[r].level===n&&e.tokens[r].type===`paragraph_open`&&(e.tokens[r+2].hidden=!0,e.tokens[r].hidden=!0,r+=2)}function Bt(e,t,n,r){let i,a,o,s,c=t,l=!0;if(e.sCount[c]-e.blkIndent>=4||e.listIndent>=0&&e.sCount[c]-e.listIndent>=4&&e.sCount[c]<e.blkIndent)return!1;let u=!1;r&&e.parentType===`paragraph`&&e.sCount[c]>=e.blkIndent&&(u=!0);let d,f,p;if((p=Rt(e,c))>=0){if(d=!0,o=e.bMarks[c]+e.tShift[c],f=Number(e.src.slice(o,p-1)),u&&f!==1)return!1}else if((p=Lt(e,c))>=0)d=!1;else return!1;if(u&&e.skipSpaces(p)>=e.eMarks[c])return!1;if(r)return!0;let m=e.src.charCodeAt(p-1),h=e.tokens.length;d?(s=e.push(`ordered_list_open`,`ol`,1),f!==1&&(s.attrs=[[`start`,f]])):s=e.push(`bullet_list_open`,`ul`,1);let g=[c,0];s.map=g,s.markup=String.fromCharCode(m);let _=!1,v=e.md.block.ruler.getRules(`list`),y=e.parentType;for(e.parentType=`list`;c<n;){a=p,i=e.eMarks[c];let t=e.sCount[c]+p-(e.bMarks[c]+e.tShift[c]),r=t;for(;a<i;){let t=e.src.charCodeAt(a);if(t===9)r+=4-(r+e.bsCount[c])%4;else if(t===32)r++;else break;a++}let u=a,f;f=u>=i?1:r-t,f>4&&(f=1);let h=t+f;s=e.push(`list_item_open`,`li`,1),s.markup=String.fromCharCode(m);let g=[c,0];s.map=g,d&&(s.info=e.src.slice(o,p-1));let y=e.tight,b=e.tShift[c],x=e.sCount[c],S=e.listIndent;if(e.listIndent=e.blkIndent,e.blkIndent=h,e.tight=!0,e.tShift[c]=u-e.bMarks[c],e.sCount[c]=r,u>=i&&e.isEmpty(c+1)?e.line=Math.min(e.line+2,n):e.md.block.tokenize(e,c,n),(!e.tight||_)&&(l=!1),_=e.line-c>1&&e.isEmpty(e.line-1),e.blkIndent=e.listIndent,e.listIndent=S,e.tShift[c]=b,e.sCount[c]=x,e.tight=y,s=e.push(`list_item_close`,`li`,-1),s.markup=String.fromCharCode(m),c=e.line,g[1]=c,c>=n||e.sCount[c]<e.blkIndent||e.sCount[c]-e.blkIndent>=4)break;let C=!1;for(let t=0,r=v.length;t<r;t++)if(v[t](e,c,n,!0)){C=!0;break}if(C)break;if(d){if(p=Rt(e,c),p<0)break;o=e.bMarks[c]+e.tShift[c]}else if(p=Lt(e,c),p<0)break;if(m!==e.src.charCodeAt(p-1))break}return s=d?e.push(`ordered_list_close`,`ol`,-1):e.push(`bullet_list_close`,`ul`,-1),s.markup=String.fromCharCode(m),g[1]=c,e.line=c,e.parentType=y,l&&zt(e,h),!0}var Vt=999;function Ht(e){let t=e.length;for(let n=0;n<e.length-1;n++){let r=e.charCodeAt(n);if(r<55296||r>56319)continue;let i=e.charCodeAt(n+1);i>=56320&&i<=57343&&(t--,n++)}return t}function U(e,t){return Math.min(e.eMarks[t]+1,e.src.length)}function W(e,t){let n=e.lineMax;if(t>=n||e.isEmpty(t))return-1;let r=!1;if(e.sCount[t]-e.blkIndent>3&&(r=!0),e.sCount[t]<0&&(r=!0),!r){let r=e.md.block.ruler.getRules(`reference`),i=e.parentType;e.parentType=`reference`;let a=!1;for(let i=0,o=r.length;i<o;i++)if(r[i](e,t,n,!0)){a=!0;break}if(e.parentType=i,a)return-1}return e.bMarks[t]+e.tShift[t]}function Ut(e,t,n,r){let i=e.src,a=e.bMarks[t]+e.tShift[t],o=t+1;if(e.sCount[t]-e.blkIndent>=4||i.charCodeAt(a)!==91)return!1;let s=U(e,t),c=``,l=-1,u=++a;for(;a<s;){if(c.length+a-u>Vt*2)return!1;let t=i.charCodeAt(a);if(t===91)return!1;if(t===93){l=a;break}if(t===92&&(t=i.charCodeAt(++a)),t===10&&a<s){let t=W(e,o);if(t<0)return!1;c+=i.slice(u,s),a=u=t,s=U(e,o++)}else a++}if(l<0||i.charCodeAt(l+1)!==58||(c+=i.slice(u,l),c.length>Vt&&Ht(c)>Vt))return!1;for(a=l+2;a<s;){let t=i.charCodeAt(a);if(t===10){let t=W(e,o);if(t<0)break;a=t,s=U(e,o++)}else if(N(t))a++;else break}let d=e.md.helpers.parseLinkDestination(i,a,s);if(!d.ok)return!1;let f=e.md.normalizeLink(d.str);if(!e.md.validateLink(f))return!1;a=d.pos;let p=a,m=s,h=o;for(;a<s;){let t=i.charCodeAt(a);if(t===10){let t=W(e,o);if(t<0)break;a=t,s=U(e,o++)}else if(N(t))a++;else break}let g=a,_=e.md.helpers.parseLinkTitle(i,a,s);for(;_.can_continue;){let t=W(e,o);if(t<0)break;a=t,s=U(e,o++),_=e.md.helpers.parseLinkTitle(i,a,s,_)}let v;for(g!==p&&_.ok?(v=_.str,a=_.pos):(v=``,a=p,s=m,o=h);a<s&&N(i.charCodeAt(a));)a++;if(a<s&&i.charCodeAt(a)!==10&&v)for(v=``,a=p,s=m,o=h;a<s&&N(i.charCodeAt(a));)a++;if(a<s&&i.charCodeAt(a)!==10)return!1;let y=L(c);if(!y)return!1;if(r)return!0;e.env.references===void 0&&(e.env.references={}),e.env.references[y]===void 0&&(e.env.references[y]={title:v,href:f});let b=e.push(`reference_definition`,``,0);b.map=[t,o],b.hidden=!0;let x=Object.create(null);return x.label=y,b.meta=x,e.line=o,!0}var Wt=`address.article.aside.base.basefont.blockquote.body.caption.center.col.colgroup.dd.details.dialog.dir.div.dl.dt.fieldset.figcaption.figure.footer.form.frame.frameset.h1.h2.h3.h4.h5.h6.head.header.hr.html.iframe.legend.li.link.main.menu.menuitem.nav.noframes.ol.optgroup.option.p.param.search.section.summary.table.tbody.td.tfoot.th.thead.title.tr.track.ul`.split(`.`),Gt=`<[A-Za-z][A-Za-z0-9\\-]*(?:\\s+[a-zA-Z_:][a-zA-Z0-9:._-]*(?:\\s*=\\s*(?:[^"'=<>\`\\x00-\\x20]+|'[^']*'|"[^"]*"))?)*\\s*\\/?>`,Kt=`<\\/[A-Za-z][A-Za-z0-9\\-]*\\s*>`;RegExp(`^(?:${Gt}|${Kt}|<!---?>|<!--(?:[^-]|-[^-]|--[^>])*-->|<[?][\\s\\S]*?[?]>|<![A-Za-z][^>]*>|<!\\[CDATA\\[[\\s\\S]*?\\]\\]>)`);var qt=RegExp(`^(?:${Gt}|${Kt})`),G=[[/^<(script|pre|style|textarea)(?=(\s|>|$))/i,/<\/(script|pre|style|textarea)>/i,!0],[/^<!--/,/-->/,!0],[/^<\?/,/\?>/,!0],[/^<![A-Za-z]/,/>/,!0],[/^<!\[CDATA\[/,/\]\]>/,!0],[RegExp(`^</?(${Wt.join(`|`)})(?=(\\s|/?>|$))`,`i`),/^$/,!0],[RegExp(`${qt.source}\\s*$`),/^$/,!1]];function Jt(e,t,n,r){let i=e.bMarks[t]+e.tShift[t],a=e.eMarks[t];if(e.sCount[t]-e.blkIndent>=4||!e.md.options.html||e.src.charCodeAt(i)!==60)return!1;let o=e.src.slice(i,a),s=0;for(;s<G.length&&!G[s][0].test(o);s++);if(s===G.length)return!1;if(r)return G[s][2];let c=t+1,l=G[s][1].test(``);if(!G[s][1].test(o)){for(;c<n&&!(e.sCount[c]<e.blkIndent&&(l||!e.isEmpty(c)));c++)if(i=e.bMarks[c]+e.tShift[c],a=e.eMarks[c],o=e.src.slice(i,a),G[s][1].test(o)){o.length!==0&&c++;break}}e.line=c;let u=e.push(`html_block`,``,0);return u.map=[t,c],u.content=e.getLines(t,c,e.blkIndent,!0),!0}function Yt(e,t,n,r){let i=e.bMarks[t]+e.tShift[t],a=e.eMarks[t];if(e.sCount[t]-e.blkIndent>=4)return!1;let o=e.src.charCodeAt(i);if(o!==35||i>=a)return!1;let s=1;for(o=e.src.charCodeAt(++i);o===35&&i<a&&s<=6;)s++,o=e.src.charCodeAt(++i);if(s>6||i<a&&!N(o))return!1;if(r)return!0;a=e.skipSpacesBack(a,i);let c=e.skipCharsBack(a,35,i);c>i&&N(e.src.charCodeAt(c-1))&&(a=c),e.line=t+1;let l=e.push(`heading_open`,`h${s}`,1);l.markup=`########`.slice(0,s),l.map=[t,e.line];let u=e.push(`inline`,``,0);u.content=R(e.src.slice(i,a)),u.map=[t,e.line],u.children=[];let d=e.push(`heading_close`,`h${s}`,-1);return d.markup=`########`.slice(0,s),!0}function Xt(e,t,n){let r=e.md.block.ruler.getRules(`paragraph`);if(e.sCount[t]-e.blkIndent>=4)return!1;let i=e.parentType;e.parentType=`paragraph`;let a=0,o,s=t+1;for(;s<n&&!e.isEmpty(s);s++){if(e.sCount[s]-e.blkIndent>3)continue;if(e.sCount[s]>=e.blkIndent){let t=e.bMarks[s]+e.tShift[s],n=e.eMarks[s];if(t<n&&(o=e.src.charCodeAt(t),(o===45||o===61)&&(t=e.skipChars(t,o),t=e.skipSpaces(t),t>=n))){a=o===61?1:2;break}}if(e.sCount[s]<0)continue;let t=!1;for(let i=0,a=r.length;i<a;i++)if(r[i](e,s,n,!0)){t=!0;break}if(t)break}if(!a)return e.parentType=i,!1;let c=R(e.getLines(t,s,e.blkIndent,!1));e.line=s+1;let l=e.push(`heading_open`,`h${a}`,1);l.markup=String.fromCharCode(o),l.map=[t,e.line];let u=e.push(`inline`,``,0);u.content=c,u.map=[t,e.line-1],u.children=[];let d=e.push(`heading_close`,`h${a}`,-1);return d.markup=String.fromCharCode(o),e.parentType=i,!0}function Zt(e,t,n){let r=e.md.block.ruler.getRules(`paragraph`),i=e.parentType,a=t+1;for(e.parentType=`paragraph`;a<n&&!e.isEmpty(a);a++){if(e.sCount[a]-e.blkIndent>3||e.sCount[a]<0)continue;let t=!1;for(let i=0,o=r.length;i<o;i++)if(r[i](e,a,n,!0)){t=!0;break}if(t)break}let o=R(e.getLines(t,a,e.blkIndent,!1));e.line=a;let s=e.push(`paragraph_open`,`p`,1);s.map=[t,e.line];let c=e.push(`inline`,``,0);return c.content=o,c.map=[t,e.line],c.children=[],e.push(`paragraph_close`,`p`,-1),e.parentType=i,!0}var K=[[`table`,Mt,[`paragraph`,`reference`]],[`code`,Nt],[`fence`,Pt,[`paragraph`,`reference`,`blockquote`,`list`]],[`blockquote`,Ft,[`paragraph`,`reference`,`blockquote`,`list`]],[`hr`,It,[`paragraph`,`reference`,`blockquote`,`list`]],[`list`,Bt,[`paragraph`,`reference`,`blockquote`]],[`reference`,Ut],[`html_block`,Jt,[`paragraph`,`reference`,`blockquote`]],[`heading`,Yt,[`paragraph`,`reference`,`blockquote`]],[`lheading`,Xt],[`paragraph`,Zt]],Qt=class{constructor(){D(this,`ruler`,new B),D(this,`State`,Ot);for(let e=0;e<K.length;e++)this.ruler.push(K[e][0],K[e][1],{alt:(K[e][2]||[]).slice()})}tokenize(e,t,n){let r=this.ruler.getRules(``),i=r.length,a=e.md.options.maxNesting,o=t,s=!1;for(;o<n&&(e.line=o=e.skipEmptyLines(o),!(o>=n||e.sCount[o]<e.blkIndent));){if(e.level>=a){e.line=n;break}let t=e.line,c=!1;for(let a=0;a<i;a++)if(c=r[a](e,o,n,!1),c){if(t>=e.line)throw Error(`block rule didn't increment state.line`);break}if(!c)throw Error(`none of the block rules matched`);e.tight=!s,e.isEmpty(e.line-1)&&(s=!0),o=e.line,o<n&&e.isEmpty(o)&&(s=!0,o++,e.line=o)}}parse(e,t,n,r){if(!e)return;let i=new this.State(e,t,n,r);this.tokenize(i,i.line,i.lineMax)}},$t=class{constructor(e,t,n,r){D(this,`pos`,0),D(this,`level`,0),D(this,`pending`,``),D(this,`pendingLevel`,0),D(this,`cache`,{}),D(this,`backticks`,{}),D(this,`backticksScanned`,!1),D(this,`skipHtmlSpecial`,!1),D(this,`linkLevel`,0),D(this,`delimiters`,[]),D(this,`_prev_delimiters`,[]),D(this,`Token`,z),this.src=e,this.env=n,this.md=t,this.tokens=r,this.tokens_meta=Array(r.length),this.posMax=this.src.length}pushPending(){let e=new z(`text`,``,0);return e.content=this.pending,e.level=this.pendingLevel,this.tokens.push(e),this.pending=``,e}push(e,t,n){this.pending&&this.pushPending();let r=new z(e,t,n),i;return n<0&&(this.level--,this.delimiters=this._prev_delimiters.pop()),r.level=this.level,n>0&&(this.level++,this._prev_delimiters.push(this.delimiters),this.delimiters=[],i={delimiters:this.delimiters}),this.pendingLevel=this.level,this.tokens.push(r),this.tokens_meta.push(i),r}scanDelims(e,t){let n=this.posMax,r=this.src.charCodeAt(e),i;if(e===0)i=32;else if(e===1)i=this.src.charCodeAt(0),(i&63488)==55296&&(i=65533);else if(i=this.src.charCodeAt(e-1),(i&64512)==56320){let t=this.src.charCodeAt(e-2);i=(t&64512)==55296?65536+(t-55296<<10)+(i-56320):65533}else(i&64512)==55296&&(i=65533);let a=e;for(;a<n&&this.src.charCodeAt(a)===r;)a++;let o=a-e,s=a<n?this.src.charCodeAt(a):32;if((s&64512)==55296){let e=this.src.charCodeAt(a+1);s=(e&64512)==56320?65536+(s-55296<<10)+(e-56320):65533}else(s&64512)==56320&&(s=65533);let c=I(i)||F(i),l=I(s)||F(s),u=P(i),d=P(s),f=!d&&(!l||u||c),p=!u&&(!c||d||l);return{can_open:f&&(t||!p||c),can_close:p&&(t||!f||l),length:o}}};function en(e){switch(e){case 10:case 33:case 35:case 36:case 37:case 38:case 42:case 43:case 45:case 58:case 60:case 61:case 62:case 64:case 91:case 92:case 93:case 94:case 95:case 96:case 123:case 125:case 126:return!0;default:return!1}}function tn(e,t){let n=e.pos;for(;n<e.posMax&&!en(e.src.charCodeAt(n));)n++;return n!==e.pos&&(t||(e.pending+=e.src.slice(e.pos,n)),e.pos=n,!0)}function nn(e){return e>=65&&e<=90||e>=97&&e<=122}function rn(e){return e>=65&&e<=90||e>=97&&e<=122||e>=48&&e<=57||e===43||e===45||e===46}function an(e,t){if(!e.md.options.linkify||e.linkLevel>0)return!1;let n=e.pos,r=e.posMax;if(n+3>r||e.src.charCodeAt(n)!==58||e.src.charCodeAt(n+1)!==47||e.src.charCodeAt(n+2)!==47)return!1;let i=n-Math.min(10,e.pending.length,n),a=n;for(;a>i&&rn(e.src.charCodeAt(a-1));)a--;if(a===n||!nn(e.src.charCodeAt(a)))return!1;let o=n-a,s=e.md.linkify.matchAtStart(e.src.slice(a));if(!s)return!1;let c=s.url;if(c.length<=o)return!1;let l=c.length;for(;l>0&&c.charCodeAt(l-1)===42;)l--;l!==c.length&&(c=c.slice(0,l));let u=e.md.normalizeLink(c);if(!e.md.validateLink(u))return!1;if(!t){e.pending=e.pending.slice(0,-o);let t=e.push(`link_open`,`a`,1);t.attrs=[[`href`,u]],t.markup=`linkify`,t.info=`auto`;let n=e.push(`text`,``,0);n.content=e.md.normalizeLinkText(c);let r=e.push(`link_close`,`a`,-1);r.markup=`linkify`,r.info=`auto`}return e.pos+=c.length-o,!0}function on(e,t){let n=e.pos;if(e.src.charCodeAt(n)!==10)return!1;let r=e.pending.length-1,i=e.posMax;if(!t){if(r>=0&&e.pending.charCodeAt(r)===32){if(r>=1&&e.pending.charCodeAt(r-1)===32){let t=r-1;for(;t>=1&&e.pending.charCodeAt(t-1)===32;)t--;e.pending=e.pending.slice(0,t),e.push(`hardbreak`,`br`,0)}else e.pending=e.pending.slice(0,-1),e.push(`softbreak`,`br`,0)}else e.push(`softbreak`,`br`,0)}for(n++;n<i&&N(e.src.charCodeAt(n));)n++;return e.pos=n,!0}var sn=[];for(let e=0;e<256;e++)sn.push(0);`\\!"#$%&'()*+,./:;<=>?@[]^_\`{|}~-`.split(``).forEach(function(e){sn[e.charCodeAt(0)]=1});function cn(e,t){let n=e.pos,r=e.posMax;if(e.src.charCodeAt(n)!==92||(n++,n>=r))return!1;let i=e.src.charCodeAt(n);if(i===10){for(t||e.push(`hardbreak`,`br`,0),n++;n<r&&(i=e.src.charCodeAt(n),N(i));)n++;return e.pos=n,!0}if(i===32){if(!t){let t=e.push(`text_special`,``,0);t.content=`\\`,t.markup=`\\`,t.info=`escape`}return e.pos=n,!0}let a=e.src[n];if(i>=55296&&i<=56319&&n+1<r){let t=e.src.charCodeAt(n+1);t>=56320&&t<=57343&&(a+=e.src[n+1],n++)}let o=`\\`+a;if(!t){let t=e.push(`text_special`,``,0);t.content=i<256&&sn[i]!==0?a:o,t.markup=o,t.info=`escape`}return e.pos=n+1,!0}function ln(e){let t={},n=0;for(;(n=e.indexOf("`",n))!==-1;){let r=n;for(;e.charCodeAt(++n)===96;);t[n-r]=r}return t}function un(e,t){var n;let r=e.pos;if(e.src.charCodeAt(r)!==96)return!1;let i=e.posMax,a=r+1;for(;a<i&&e.src.charCodeAt(a)===96;)a++;let o=e.src.slice(r,a),s=o.length;if(e.backticksScanned||(e.backticks=ln(e.src),e.backticksScanned=!0),((n=e.backticks[s])==null?-1:n)>=a){let n=a,r;for(;(r=e.src.indexOf("`",n))!==-1&&r<i;){for(n=r+1;e.src.charCodeAt(n)===96;)n++;if(n>i)break;if(n-r===s){if(!t){let t=e.push(`code_inline`,`code`,0);t.markup=o;let n=e.src.slice(a,r).replace(/\n/g,` `);n.startsWith(` `)&&n.endsWith(` `)&&/[^ ]/.test(n)&&(n=n.slice(1,-1)),t.content=n}return e.pos=n,!0}}}return t||(e.pending+=o),e.pos=a,!0}function dn(e,t){let n=e.pos,r=e.src.charCodeAt(n);if(t||r!==126)return!1;let i=e.scanDelims(e.pos,!0),a=i.length,o=String.fromCharCode(r);if(a<2)return!1;let s;a%2&&(s=e.push(`text`,``,0),s.content=o,a--);for(let t=0;t<a;t+=2)s=e.push(`text`,``,0),s.content=o+o,e.delimiters.push({marker:r,length:0,token:e.tokens.length-1,end:-1,open:i.can_open,close:i.can_close});return e.pos+=i.length,!0}function fn(e,t){let n,r=[],i=t.length;for(let a=0;a<i;a++){let i=t[a];if(i.marker!==126||i.end===-1)continue;let o=t[i.end];n=e.tokens[i.token],n.type=`s_open`,n.tag=`s`,n.nesting=1,n.markup=`~~`,n.content=``,n=e.tokens[o.token],n.type=`s_close`,n.tag=`s`,n.nesting=-1,n.markup=`~~`,n.content=``,e.tokens[o.token-1].type===`text`&&e.tokens[o.token-1].content===`~`&&r.push(o.token-1)}for(;r.length;){let t=r.pop(),i=t+1;for(;i<e.tokens.length&&e.tokens[i].type===`s_close`;)i++;i--,t!==i&&(n=e.tokens[i],e.tokens[i]=e.tokens[t],e.tokens[t]=n)}}function pn(e){let t=e.tokens_meta,n=e.tokens_meta.length;fn(e,e.delimiters);for(let i=0;i<n;i++){var r;let n=(r=t[i])==null?void 0:r.delimiters;n&&fn(e,n)}}var mn={tokenize:dn,postProcess:pn};function hn(e,t){let n=e.pos,r=e.src.charCodeAt(n);if(t||r!==95&&r!==42)return!1;let i=e.scanDelims(e.pos,r===42);for(let t=0;t<i.length;t++){let t=e.push(`text`,``,0);t.content=String.fromCharCode(r),e.delimiters.push({marker:r,length:i.length,token:e.tokens.length-1,end:-1,open:i.can_open,close:i.can_close})}return e.pos+=i.length,!0}function gn(e,t){let n=t.length;for(let r=n-1;r>=0;r--){let n=t[r];if(n.marker!==95&&n.marker!==42||n.end===-1)continue;let i=t[n.end],a=r>0&&t[r-1].end===n.end+1&&t[r-1].marker===n.marker&&t[r-1].token===n.token-1&&t[n.end+1].token===i.token+1,o=String.fromCharCode(n.marker),s=e.tokens[n.token];s.type=a?`strong_open`:`em_open`,s.tag=a?`strong`:`em`,s.nesting=1,s.markup=a?o+o:o,s.content=``;let c=e.tokens[i.token];c.type=a?`strong_close`:`em_close`,c.tag=a?`strong`:`em`,c.nesting=-1,c.markup=a?o+o:o,c.content=``,a&&(e.tokens[t[r-1].token].content=``,e.tokens[t[n.end+1].token].content=``,r--)}}function _n(e){let t=e.tokens_meta,n=e.tokens_meta.length;gn(e,e.delimiters);for(let i=0;i<n;i++){var r;let n=(r=t[i])==null?void 0:r.delimiters;n&&gn(e,n)}}var vn={tokenize:hn,postProcess:_n};function yn(e,t){let n,r,i,a,o=``,s=``,c=e.pos,l=!0;if(e.src.charCodeAt(e.pos)!==91)return!1;let u=e.pos,d=e.posMax,f=e.pos+1,p=e.md.helpers.parseLinkLabel(e,e.pos,!0);if(p<0)return!1;let m=p+1;if(m<d&&e.src.charCodeAt(m)===40){for(l=!1,m++;m<d&&(n=e.src.charCodeAt(m),N(n)||n===10);m++);if(m>=d)return!1;if(c=m,i=e.md.helpers.parseLinkDestination(e.src,m,e.posMax),i.ok){for(o=e.md.normalizeLink(i.str),e.md.validateLink(o)?m=i.pos:o=``,c=m;m<d&&(n=e.src.charCodeAt(m),N(n)||n===10);m++);if(i=e.md.helpers.parseLinkTitle(e.src,m,e.posMax),m<d&&c!==m&&i.ok)for(s=i.str,m=i.pos;m<d&&(n=e.src.charCodeAt(m),N(n)||n===10);m++);}(m>=d||e.src.charCodeAt(m)!==41)&&(l=!0),m++}if(l){if(e.env.references===void 0)return!1;if(m<d&&e.src.charCodeAt(m)===91?(c=m+1,m=e.md.helpers.parseLinkLabel(e,m),m>=0?r=e.src.slice(c,m++):m=p+1):m=p+1,r||(r=e.src.slice(f,p)),r=L(r),a=e.env.references[r],!a)return e.pos=u,!1;o=a.href,s=a.title}if(!t){e.pos=f,e.posMax=p;let t=e.push(`link_open`,`a`,1),n=[[`href`,o]];if(t.attrs=n,s&&n.push([`title`,s]),r){let e=Object.create(null);e.label=r,t.meta=e}e.linkLevel++,e.md.inline.tokenize(e),e.linkLevel--,e.push(`link_close`,`a`,-1)}return e.pos=m,e.posMax=d,!0}function bn(e,t){let n,r,i,a,o,s,c,l,u=``,d=e.pos,f=e.posMax;if(e.src.charCodeAt(e.pos)!==33||e.src.charCodeAt(e.pos+1)!==91)return!1;let p=e.pos+2,m=e.md.helpers.parseLinkLabel(e,e.pos+1,!1);if(m<0)return!1;if(a=m+1,a<f&&e.src.charCodeAt(a)===40){for(a++;a<f&&(n=e.src.charCodeAt(a),N(n)||n===10);a++);if(a>=f)return!1;for(l=a,s=e.md.helpers.parseLinkDestination(e.src,a,e.posMax),s.ok&&(u=e.md.normalizeLink(s.str),e.md.validateLink(u)?a=s.pos:u=``),l=a;a<f&&(n=e.src.charCodeAt(a),N(n)||n===10);a++);if(s=e.md.helpers.parseLinkTitle(e.src,a,e.posMax),a<f&&l!==a&&s.ok)for(c=s.str,a=s.pos;a<f&&(n=e.src.charCodeAt(a),N(n)||n===10);a++);else c=``;if(a>=f||e.src.charCodeAt(a)!==41)return e.pos=d,!1;a++}else{if(e.env.references===void 0)return!1;if(a<f&&e.src.charCodeAt(a)===91?(l=a+1,a=e.md.helpers.parseLinkLabel(e,a),a>=0?i=e.src.slice(l,a++):a=m+1):a=m+1,i||(i=e.src.slice(p,m)),i=L(i),o=e.env.references[i],!o)return e.pos=d,!1;u=o.href,c=o.title}if(!t){r=e.src.slice(p,m);let t=[];e.md.inline.parse(r,e.md,e.env,t);let n=e.push(`image`,`img`,0),a=[[`src`,u],[`alt`,``]];if(n.attrs=a,n.children=t,n.content=r,c&&a.push([`title`,c]),i){let e=Object.create(null);e.label=i,n.meta=e}}return e.pos=a,e.posMax=f,!0}var xn=/^([a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$/,Sn=/^([a-zA-Z][a-zA-Z0-9+.-]{1,31}):([^<>\x00-\x20]*)$/;function Cn(e,t){let n=e.pos;if(e.src.charCodeAt(n)!==60)return!1;let r=e.pos,i=e.posMax;for(;;){if(++n>=i)return!1;let t=e.src.charCodeAt(n);if(t===60)return!1;if(t===62)break}let a=e.src.slice(r+1,n);if(Sn.test(a)){let n=e.md.normalizeLink(a);if(!e.md.validateLink(n))return!1;if(!t){let t=e.push(`link_open`,`a`,1);t.attrs=[[`href`,n]],t.markup=`autolink`,t.info=`auto`;let r=e.push(`text`,``,0);r.content=e.md.normalizeLinkText(a);let i=e.push(`link_close`,`a`,-1);i.markup=`autolink`,i.info=`auto`}return e.pos+=a.length+2,!0}if(xn.test(a)){let n=e.md.normalizeLink(`mailto:${a}`);if(!e.md.validateLink(n))return!1;if(!t){let t=e.push(`link_open`,`a`,1);t.attrs=[[`href`,n]],t.markup=`autolink`,t.info=`auto`;let r=e.push(`text`,``,0);r.content=e.md.normalizeLinkText(a);let i=e.push(`link_close`,`a`,-1);i.markup=`autolink`,i.info=`auto`}return e.pos+=a.length+2,!0}return!1}function wn(e){return/^<a[>\s]/i.test(e)}function Tn(e){return/^<\/a\s*>/i.test(e)}function En(e){let t=e|32;return t>=97&&t<=122}function Dn(e,t){let n=e.src,r,i;if(n.startsWith(`<!--`,t)){if(n.startsWith(`>`,t+4))return t+5;if(n.startsWith(`->`,t+4))return t+6;r=t+4,i=`-->`}else if(n.startsWith(`<![CDATA[`,t))r=t+9,i=`]]>`;else if(n.charCodeAt(t+1)===63)r=t+2,i=`?>`;else if(En(n.charCodeAt(t+2)))r=t+3,i=`>`;else return-1;if(e.skipHtmlSpecial)return-1;let a=n.indexOf(i,r);return a<0?(e.skipHtmlSpecial=!0,-1):a+i.length}function On(e,t){if(!e.md.options.html)return!1;let n=e.posMax,r=e.pos;if(e.src.charCodeAt(r)!==60||r+2>=n)return!1;let i,a=e.src.charCodeAt(r+1);if(a===33||a===63)i=Dn(e,r);else if(a===47||En(a)){let t=e.src.slice(r).match(qt);i=t?r+t[0].length:-1}else return!1;if(i<0)return!1;if(!t){let t=e.push(`html_inline`,``,0);t.content=e.src.slice(r,i),wn(t.content)&&e.linkLevel++,Tn(t.content)&&e.linkLevel--}return e.pos=i,!0}var kn=/^&#((?:x[a-f0-9]{1,6}|[0-9]{1,7}));/i,An=/^&([a-z][a-z0-9]{1,31});/i;function jn(e,t){let n=e.pos,r=e.posMax;if(e.src.charCodeAt(n)!==38||n+1>=r)return!1;if(e.src.charCodeAt(n+1)===35){let r=e.src.slice(n).match(kn);if(r){if(!t){let t=r[1][0].toLowerCase()===`x`?parseInt(r[1].slice(1),16):parseInt(r[1],10),n=e.push(`text_special`,``,0);n.content=Me(t)?A(t):A(65533),n.markup=r[0],n.info=`entity`}return e.pos+=r[0].length,!0}}else{let r=e.src.slice(n).match(An);if(r){let n=Oe(r[0]);if(n!==r[0]){if(!t){let t=e.push(`text_special`,``,0);t.content=n,t.markup=r[0],t.info=`entity`}return e.pos+=r[0].length,!0}}}return!1}function Mn(e){let t={},n=e.length;if(!n)return;let r=0,i=-2,a=[];for(let o=0;o<n;o++){let n=e[o];if(a.push(0),(e[r].marker!==n.marker||i!==n.token-1)&&(r=o),i=n.token,n.length=n.length||0,!n.close)continue;t.hasOwnProperty(n.marker)||(t[n.marker]=[-1,-1,-1,-1,-1,-1]);let s=t[n.marker][(n.open?3:0)+n.length%3],c=r-a[r]-1,l=c;for(;c>s;c-=a[c]+1){let t=e[c];if(t.marker===n.marker&&t.open&&t.end<0){let r=!1;if((t.close||n.open)&&(t.length+n.length)%3==0&&(t.length%3!=0||n.length%3!=0)&&(r=!0),!r){let r=c>0&&!e[c-1].open?a[c-1]+1:0;a[o]=o-c+r,a[c]=r,n.open=!1,t.end=o,t.close=!1,l=-1,i=-2;break}}}l!==-1&&(t[n.marker][(n.open?3:0)+(n.length||0)%3]=l)}}function Nn(e){let t=e.tokens_meta,n=e.tokens_meta.length;Mn(e.delimiters);for(let e=0;e<n;e++){var r;let n=(r=t[e])==null?void 0:r.delimiters;n&&Mn(n)}}function Pn(e){let t,n,r=0,i=e.tokens,a=e.tokens.length;for(t=n=0;t<a;t++)i[t].nesting<0&&r--,i[t].level=r,i[t].nesting>0&&r++,i[t].type===`text`&&t+1<a&&i[t+1].type===`text`?i[t+1].content=i[t].content+i[t+1].content:(t!==n&&(i[n]=i[t]),n++);t!==n&&(i.length=n)}var Fn=[[`text`,tn],[`linkify`,an],[`newline`,on],[`escape`,cn],[`backticks`,un],[`strikethrough`,mn.tokenize],[`emphasis`,vn.tokenize],[`link`,yn],[`image`,bn],[`autolink`,Cn],[`html_inline`,On],[`entity`,jn]],In=[[`balance_pairs`,Nn],[`strikethrough`,mn.postProcess],[`emphasis`,vn.postProcess],[`fragments_join`,Pn]],Ln=class{constructor(){D(this,`ruler`,new B),D(this,`ruler2`,new B),D(this,`State`,$t);for(let e=0;e<Fn.length;e++)this.ruler.push(Fn[e][0],Fn[e][1]);for(let e=0;e<In.length;e++)this.ruler2.push(In[e][0],In[e][1])}skipToken(e){let t=e.pos,n=this.ruler.getRules(``),r=n.length,i=e.md.options.maxNesting,a=e.cache;if(a[t]!==void 0){e.pos=a[t];return}let o=!1;if(e.level<i){for(let i=0;i<r;i++)if(e.level++,o=n[i](e,!0),e.level--,o){if(t>=e.pos)throw Error(`inline rule didn't increment state.pos`);break}}else e.pos=e.posMax;o||e.pos++,a[t]=e.pos}tokenize(e){let t=this.ruler.getRules(``),n=t.length,r=e.posMax,i=e.md.options.maxNesting;for(;e.pos<r;){let a=e.pos,o=!1;if(e.level<i){for(let r=0;r<n;r++)if(o=t[r](e,!1),o){if(a>=e.pos)throw Error(`inline rule didn't increment state.pos`);break}}if(o){if(e.pos>=r)break}else e.pending+=e.src[e.pos++]}e.pending&&e.pushPending()}parse(e,t,n,r){let i=new this.State(e,t,n,r);this.tokenize(i);let a=this.ruler2.getRules(``),o=a.length;for(let e=0;e<o;e++)a[e](i)}};function Rn(e,t){var n=Object.keys(e);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(e);t&&(r=r.filter(function(t){return Object.getOwnPropertyDescriptor(e,t).enumerable})),n.push.apply(n,r)}return n}function q(e){for(var t=1;t<arguments.length;t++){var n=arguments[t]==null?{}:arguments[t];t%2?Rn(Object(n),!0).forEach(function(t){D(e,t,n[t])}):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(n)):Rn(Object(n)).forEach(function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(n,t))})}return e}function zn(e,t){if(e==null)return{};var n={};for(var r in e)if({}.hasOwnProperty.call(e,r)){if(t.includes(r))continue;n[r]=e[r]}return n}function Bn(e,t){if(e==null)return{};var n,r,i=zn(e,t);if(Object.getOwnPropertySymbols){var a=Object.getOwnPropertySymbols(e);for(r=0;r<a.length;r++)n=a[r],t.includes(n)||{}.propertyIsEnumerable.call(e,n)&&(i[n]=e[n])}return i}var Vn=[`rebuilder`],Hn=class{constructor(e={}){D(this,`src_Any`,C.source),D(this,`src_Cc`,ee.source),D(this,`src_Z`,ie.source),D(this,`src_P`,ne.source),D(this,`src_ZPCc`,[this.src_Z,this.src_P,this.src_Cc].join(`|`)),D(this,`src_ZCc`,[this.src_Z,this.src_Cc].join(`|`)),D(this,`cache`,{}),D(this,`opts`,{maxLength:1e4,urlAuth:!1,schema_names:[]}),this.opts=q(q({},this.opts),e)}set(e={}){return this.opts=q(q({},this.opts),e),this.cache={},this}escapeRE(e){return e.replace(/[.?*+^$[\]\\(){}|-]/g,`\\$&`)}nestedPairRE(e,t,n=4){let r=this.escapeRE(e),i=this.escapeRE(t),a=`(?:(?!${this.src_ZCc}|${r}|${i}).)`,o=`${r}${a}{0,1000}${i}`;for(let e=2;e<=n;e++)o=`${r}(?:${a}|${o}){0,1000}${i}`;return o}get_text_separators(){var e,t;return(t=(e=this.cache).text_separators)==null?e.text_separators=/[><\uff5c]/:t}get_pseudo_letter(){var e,t;return(t=(e=this.cache).src_pseudo_letter)==null?e.src_pseudo_letter=RegExp(`(?:(?!${this.get_text_separators().source}|${this.src_ZPCc})${this.src_Any})`):t}get_ipv4_addr(){var e,t;return(t=(e=this.cache).src_ip4)==null?e.src_ip4=RegExp(`(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])[.]){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])`):t}get_ipv6_addr(){var e,t;let n=`[0-9A-Fa-f]{1,4}`,r=`(?:(?:${n}:${n})|${this.get_ipv4_addr().source})`;return(t=(e=this.cache).src_ip6_addr)==null?e.src_ip6_addr=RegExp(`(?:(?:${n}:){6}${r}|::(?:${n}:){5}${r}|(?:${n})?::(?:${n}:){4}${r}|(?:(?:${n}:){0,1}${n})?::(?:${n}:){3}${r}|(?:(?:${n}:){0,2}${n})?::(?:${n}:){2}${r}|(?:(?:${n}:){0,3}${n})?::${n}:${r}|(?:(?:${n}:){0,4}${n})?::${r}|(?:(?:${n}:){0,5}${n})?::${n}|(?:(?:${n}:){0,6}${n})?::)`):t}get_ipv6_url_host(){var e,t;return(t=(e=this.cache).src_ip6_host)==null?e.src_ip6_host=RegExp(`\\[${this.get_ipv6_addr().source}\\]`):t}get_ipv6_mail_host(){var e,t;return(t=(e=this.cache).src_ipv6_mail_host)==null?e.src_ipv6_mail_host=RegExp(`\\[IPv6:${this.get_ipv6_addr().source}\\]`):t}get_auth(){var e,t;return(t=(e=this.cache).src_auth)==null?e.src_auth=RegExp(`(?:(?:(?!${this.src_ZCc}|[@/\\[\\]()]).){1,50}@)?`):t}get_port(){var e,t;return(t=(e=this.cache).src_port)==null?e.src_port=RegExp(`(?::(?:6(?:[0-4]\\d{3}|5(?:[0-4]\\d{2}|5(?:[0-2]\\d|3[0-5])))|[1-5]?\\d{1,4}))?`):t}get_host_terminator(){var e,t;return(t=(e=this.cache).src_host_terminator)==null?e.src_host_terminator=RegExp(`(?=$|${this.get_text_separators().source}|${this.src_ZPCc})(?!${this.opts[`---`]?`-(?!--)|`:`-|`}_|:\\d|\\.-|\\.(?!$|${this.src_ZPCc}))`):t}get_path_terminator(){var e,t;return(t=(e=this.cache).src_path_terminator)==null?e.src_path_terminator=RegExp(`${this.src_ZPCc}|${this.get_text_separators().source}`):t}get_path(){var e,t;return(t=(e=this.cache).src_path)==null?e.src_path=RegExp(`(?:[/?#](?:${this.nestedPairRE(`[`,`]`)}|${this.nestedPairRE(`(`,`)`)}|${this.nestedPairRE(`{`,`}`)}|\\"(?:(?!${this.src_ZCc}|["]).){1,100}\\"|\\'(?:(?!${this.src_ZCc}|[']).){1,100}\\'|\\'(?=${this.get_pseudo_letter().source}|[-])|\\.{2,20}[:]?[a-zA-Z0-9%/&]|\\.(?!${this.src_ZCc}|[.]|$)|`+(this.opts[`---`]?`\\-(?!--(?:[^-]|$))(?:-{0,19})|`:`\\-{1,20}|`)+`,(?!${this.src_ZCc}|$)|;(?!${this.src_ZCc}|$)|\\!{1,20}(?!${this.src_ZCc}|[!]|$)|\\?(?!${this.src_ZCc}|[?]|$)|`+this.get_path_extra().source+`[\\\\/:%@#&=_~*]|(?!${this.get_path_terminator().source}).){1,${this.opts.maxLength}}|\\/)?`):t}get_mail_name(){var e,t;return(t=(e=this.cache).src_mail_name)==null?e.src_mail_name=RegExp("[-!#$%&'*+/=?^_`{|}~a-zA-Z0-9](?:[-!#$%&'*+/=?^_`{|}~a-zA-Z0-9]|[.](?=[-!#$%&'*+/=?^_`{|}~a-zA-Z0-9])){0,63}"):t}get_xn(){var e,t;return(t=(e=this.cache).src_xn)==null?e.src_xn=RegExp(`xn--[a-z0-9\\-]{1,59}`):t}get_tld(){if(this.cache.tld)return this.cache.tld;let e=[...new Set(this.opts.tlds||[])].sort().reverse().join(`|`);return this.cache.tld=RegExp(`${e||`$#none#$`}|${this.get_xn().source}`),this.cache.tld}get_domain_root(){var e,t;return(t=(e=this.cache).src_domain_root)==null?e.src_domain_root=RegExp(`(?:`+this.get_xn().source+`|${this.get_pseudo_letter().source}{1,63})`):t}get_domain(){var e,t;return(t=(e=this.cache).src_domain)==null?e.src_domain=RegExp(`(?:`+this.get_xn().source+`|(?:${this.get_pseudo_letter().source})|(?:${this.get_pseudo_letter().source}(?:-|${this.get_pseudo_letter().source}){0,61}${this.get_pseudo_letter().source}))`):t}get_url_host_port(){var e,t;return(t=(e=this.cache).url_host_port)==null?e.url_host_port=RegExp(`(?:`+this.get_ipv6_url_host().source+`|(?:(?:(?:${this.get_domain().source})\\.){0,10}${this.get_domain().source}))`+this.get_port().source+this.get_host_terminator().source):t}get_fuzzy_url_host_port(){var e,t;return(t=(e=this.cache).fuzzy_url_host_port)==null?e.fuzzy_url_host_port=RegExp(`(?:`+(this.opts.fuzzyIP?this.get_ipv4_addr().source+`|`:``)+`(?:(?:(?:${this.get_domain().source})\\.){1,10}(?:${this.get_tld().source})))`+this.get_host_terminator().source):t}get_mail_host(){var e,t;return(t=(e=this.cache).src_mail_host)==null?e.src_mail_host=RegExp(`(?:`+this.get_ipv6_mail_host().source+`|(?:(?:(?:${this.get_domain().source})\\.){0,4}${this.get_domain().source}))`+this.get_host_terminator().source):t}get_fuzzy_mail_host(){var e,t;return(t=(e=this.cache).src_fuzzy_mail_host)==null?e.src_fuzzy_mail_host=RegExp(`(?:`+this.get_ipv6_mail_host().source+`|(?:(?:(?:${this.get_domain().source})[.]){1,4}${this.get_domain_root().source}))`+this.get_host_terminator().source):t}get_path_extra(){var e,t;return(t=(e=this.cache).src_path_extra)==null?e.src_path_extra=RegExp(``):t}get_fuzzy_mail_host_search(){var e,t;return(t=(e=this.cache).mail_fuzzy_host_search)==null?e.mail_fuzzy_host_search=RegExp(`@${this.get_fuzzy_mail_host().source}`,`ig`):t}get_fuzzy_link_search(){var e,t;return(t=(e=this.cache).link_fuzzy_search)==null?e.link_fuzzy_search=RegExp(`(^|(?![.:/\\-_@])(?:[$+<=>^\`|\uff5c]|${this.src_ZPCc}))(?:(?![$+<=>^\`|\uff5c])${this.get_fuzzy_url_host_port().source}${this.get_path().source})`,`ig`):t}get_http_validator(){var e,t;return(t=(e=this.cache).http_validator)==null?e.http_validator=RegExp(`\\/\\/`+(this.opts.urlAuth?this.get_auth().source:``)+this.get_url_host_port().source+this.get_path().source,`iy`):t}get_relative_proto_validator(){var e,t;return(t=(e=this.cache).relative_proto_validator)==null?e.relative_proto_validator=RegExp((this.opts.urlAuth?this.get_auth().source:``)+`(?:localhost|${this.get_ipv6_url_host().source}|(?:(?:${this.get_domain().source})[.]){1,10}${this.get_domain_root().source})`+this.get_port().source+this.get_host_terminator().source+this.get_path().source,`iy`):t}get_mail_name_validator(){var e,t;return(t=(e=this.cache).mail_name_validator)==null?e.mail_name_validator=RegExp(`(?:^|${this.get_text_separators().source}|"|\\(|${this.src_ZCc})(${this.get_mail_name().source})$`):t}get_mailto_validator(){var e,t;return(t=(e=this.cache).mailto_validator)==null?e.mailto_validator=RegExp(`${this.get_mail_name().source}@${this.get_mail_host().source}`,`iy`):t}get_schema_names(){var e,t;return(t=(e=this.cache).schema_names)==null?e.schema_names=new RegExp((this.opts.schema_names||[]).map(e=>this.escapeRE(e)).join(`|`)):t}get_schema_search(){var e,t;return(t=(e=this.cache).schema_search)==null?e.schema_search=RegExp(`(^|(?!_)(?:[><\uff5c]|${this.src_ZPCc}))(${this.get_schema_names().source})`,`ig`):t}get_schema_at_start(){var e,t;return(t=(e=this.cache).schema_at_start)==null?e.schema_at_start=RegExp(`^${this.get_schema_search().source}`,`i`):t}},Un={validate:(e,t,n)=>{let r=n.re.get_http_validator();r.lastIndex=t;let i=r.exec(e);return i?i[0].length:0},normalize:(e,t)=>t.normalize(e)},Wn={"http:":Un,"https:":Un,"ftp:":Un,"//":{validate:function(e,t,n){let r=n.re.get_relative_proto_validator();r.lastIndex=t;let i=r.exec(e);return i?t>=3&&e[t-3]===`:`||t>=3&&e[t-3]===`/`?0:i[0].length:0},normalize:(e,t)=>t.normalize(e)},"mailto:":{validate:function(e,t,n){let r=n.re.get_mailto_validator();r.lastIndex=t;let i=r.exec(e);return i?i[0].length:0},normalize:(e,t)=>t.normalize(e)}},Gn=`a:cdefgilmnoqrstuwxz|b:abdefghijmnorstvwyz|c:acdfghiklmnoruvwxyz|d:ejkmoz|e:cegrstu|f:ijkmor|g:abdefghilmnpqrstuwy|h:kmnrtu|i:delmnoqrst|j:emop|k:eghimnprwyz|l:abcikrstuvy|m:acdeghklmnopqrstuvwxyz|n:acefgilopruz|o:m|p:aefghklmnrstwy|q:a|r:eosuw|s:abcdeghijklmnortuvxyz|t:cdfghjklmnortvwz|u:agksyz|v:aceginu|w:fs|y:et|z:amw`,Kn=`biz|com|edu|gov|net|org|pro|web|xxx|aero|asia|coop|info|museum|name|shop|рф`;function qn(){let e=Kn.split(`|`);return Gn.split(`|`).forEach(t=>{let n=t.indexOf(`:`),r=t.slice(0,n);for(let i of t.slice(n+1))e.push(r+i)}),e}var Jn={fuzzyLink:!1,fuzzyEmail:!0,fuzzyIP:!1,"---":!1,tlds:qn(),urlAuth:!1,maxLength:1e4},Yn=class{constructor(e,t,n,r){D(this,`schema`,void 0),D(this,`index`,void 0),D(this,`lastIndex`,void 0),D(this,`raw`,void 0),D(this,`text`,void 0),D(this,`url`,void 0);let i=e.slice(n,r);this.schema=t.toLowerCase(),this.index=n,this.lastIndex=r,this.raw=i,this.text=i,this.url=i}},Xn=class{constructor(e={}){D(this,`__opts__`,void 0),D(this,`__schemas__`,void 0),D(this,`re`,void 0);let{rebuilder:t}=e,n=Bn(e,Vn);this.__opts__=q(q({},Jn),n),this.__schemas__=q({},Wn),this.re=t||new Hn,this.re.set(q(q({},this.__opts__),{},{schema_names:Object.keys(this.__schemas__)}))}add(e,t=null){if(!t)delete this.__schemas__[e];else{let n=q({normalize:(e,t)=>t.normalize(e)},t);this.__schemas__[e]=n}return this.re.set(q(q({},this.__opts__),{},{schema_names:Object.keys(this.__schemas__)})),this}set(e={}){return this.__opts__=q(q({},this.__opts__),e),this.re.set(q(q({},this.__opts__),{},{schema_names:Object.keys(this.__schemas__)})),this}test(e){if(!e.length)return!1;let t,n;for(n=this.re.get_schema_search(),n.lastIndex=0;(t=n.exec(e))!==null;)if(this.testSchemaAt(e,t[2],n.lastIndex))return!0;if(this.__opts__.fuzzyLink&&this.__schemas__[`http:`]&&(n=this.re.get_fuzzy_link_search(),n.lastIndex=0,n.exec(e)!==null))return!0;if(this.__opts__.fuzzyEmail&&this.__schemas__[`mailto:`]&&e.indexOf(`@`)>=0){let n=this.re.get_fuzzy_mail_host_search(),r=this.re.get_mail_name_validator();for(n.lastIndex=0;(t=n.exec(e))!==null;){let n=e.slice(Math.max(0,t.index-65),t.index);if(r.test(n))return!0}}return!1}testSchemaAt(e,t,n){return this.__schemas__[t.toLowerCase()]?this.__schemas__[t.toLowerCase()].validate(e.slice(0,n+this.__opts__.maxLength),n,this):0}match(e){let t=[],n=this.re.get_schema_search(),r,i,a,o,s,c,l=!1,u=!1,d=!1,f=0;if(!e.length)return null;for(n.lastIndex=0,this.__opts__.fuzzyLink&&this.__schemas__[`http:`]&&(r=this.re.get_fuzzy_link_search(),r.lastIndex=0),this.__opts__.fuzzyEmail&&this.__schemas__[`mailto:`]&&(i=this.re.get_fuzzy_mail_host_search(),i.lastIndex=0,a=this.re.get_mail_name_validator());;){let p=Math.max(f-1,0);if(i&&a&&!d&&(!s||s.index<f))for(i.lastIndex<p&&(i.lastIndex=p);;){let t=i.exec(e);if(!t){d=!0,s=void 0;break}let n=a.exec(e.slice(Math.max(0,t.index-65),t.index));if(n){if(s={schema:`mailto:`,index:t.index-n[1].length,lastIndex:t.index+t[0].length},s.index>=f)break;i.lastIndex<p&&(i.lastIndex=p)}}if(r&&!u&&(!o||o.index<f))for(r.lastIndex<p&&(r.lastIndex=p);;){let t=r.exec(e);if(!t){u=!0,o=void 0;break}if(o={schema:``,index:t.index+t[1].length,lastIndex:t.index+t[0].length},o.index>=f)break;r.lastIndex<p&&(r.lastIndex=p)}let m=s;(!m||o&&(o.index<m.index||o.index===m.index&&o.lastIndex>m.lastIndex))&&(m=o);let h;if(!l)for(;;){if(!c){n.lastIndex<p&&(n.lastIndex=p);let t=n.exec(e);if(!t){l=!0;break}c={schema:t[2],index:t.index+t[1].length,lastIndex:t.index+t[0].length}}if(c.index<f){c=void 0;continue}if(m&&c.index>m.index)break;let t=c;c=void 0;let r=this.testSchemaAt(e,t.schema,t.lastIndex);if(r){h={schema:t.schema,index:t.index,lastIndex:t.lastIndex+r};break}}let g=h;if((!g||s&&(s.index<g.index||s.index===g.index&&s.lastIndex>g.lastIndex))&&(g=s),(!g||o&&(o.index<g.index||o.index===g.index&&o.lastIndex>g.lastIndex))&&(g=o),!g)break;g===s?s=void 0:g===o&&(o=void 0);let _=new Yn(e,g.schema,g.index,g.lastIndex);_.schema?this.__schemas__[_.schema].normalize(_,this):this.normalize(_),t.push(_),f=g.lastIndex}return t.length?t:null}matchAtStart(e){if(!e.length)return null;let t=this.re.get_schema_at_start().exec(e);if(!t)return null;let n=this.testSchemaAt(e,t[2],t[0].length);if(!n)return null;let r=new Yn(e,t[2],t.index+t[1].length,t.index+t[0].length+n);return this.__schemas__[r.schema].normalize(r,this),r}tlds(e,t=!1){return e=Array.isArray(e)?e:[e],t?this.__opts__.tlds=this.__opts__.tlds.concat(e):this.__opts__.tlds=e,this.re.set(q(q({},this.__opts__),{},{schema_names:Object.keys(this.__schemas__)})),this}normalize(e){e.schema||(e.url=`http://${e.url}`),e.schema===`mailto:`&&!/^mailto:/i.test(e.url)&&(e.url=`mailto:${e.url}`)}},J=2147483647,Y=36,Zn=1,X=26,Qn=38,$n=700,er=72,tr=128,nr=`-`,rr=/^xn--/,ir=/[^\0-\x7F]/,ar=/[\x2E\u3002\uFF0E\uFF61]/g,or={overflow:`Overflow: input needs wider integers to process`,"not-basic":`Illegal input >= 0x80 (not a basic code point)`,"invalid-input":`Invalid input`},sr=35,Z=Math.floor,cr=String.fromCharCode;function Q(e){throw RangeError(or[e])}function lr(e,t){let n=[],r=e.length;for(;r--;)n[r]=t(e[r]);return n}function ur(e,t){let n=e.split(`@`),r=``;n.length>1&&(r=n[0]+`@`,e=n[1]),e=e.replace(ar,`.`);let i=lr(e.split(`.`),t).join(`.`);return r+i}function dr(e){let t=[],n=0,r=e.length;for(;n<r;){let i=e.charCodeAt(n++);if(i>=55296&&i<=56319&&n<r){let r=e.charCodeAt(n++);(r&64512)==56320?t.push(((i&1023)<<10)+(r&1023)+65536):(t.push(i),n--)}else t.push(i)}return t}var fr=e=>String.fromCodePoint(...e),pr=function(e){return e>=48&&e<58?26+(e-48):e>=65&&e<91?e-65:e>=97&&e<123?e-97:Y},mr=function(e,t){return e+22+75*(e<26)-((t!=0)<<5)},hr=function(e,t,n){let r=0;for(e=n?Z(e/$n):e>>1,e+=Z(e/t);e>455;r+=Y)e=Z(e/sr);return Z(r+36*e/(e+Qn))},gr=function(e){let t=[],n=e.length,r=0,i=tr,a=er,o=e.lastIndexOf(nr);o<0&&(o=0);for(let n=0;n<o;++n)e.charCodeAt(n)>=128&&Q(`not-basic`),t.push(e.charCodeAt(n));for(let s=o>0?o+1:0;s<n;){let o=r;for(let t=1,i=Y;;i+=Y){s>=n&&Q(`invalid-input`);let o=pr(e.charCodeAt(s++));o>=Y&&Q(`invalid-input`),o>Z((J-r)/t)&&Q(`overflow`),r+=o*t;let c=i<=a?Zn:i>=a+X?X:i-a;if(o<c)break;let l=Y-c;t>Z(J/l)&&Q(`overflow`),t*=l}let c=t.length+1;a=hr(r-o,c,o==0),Z(r/c)>J-i&&Q(`overflow`),i+=Z(r/c),r%=c,t.splice(r++,0,i)}return String.fromCodePoint(...t)},_r=function(e){let t=[];e=dr(e);let n=e.length,r=tr,i=0,a=er;for(let n of e)n<128&&t.push(cr(n));let o=t.length,s=o;for(o&&t.push(nr);s<n;){let n=J;for(let t of e)t>=r&&t<n&&(n=t);let c=s+1;n-r>Z((J-i)/c)&&Q(`overflow`),i+=(n-r)*c,r=n;for(let n of e)if(n<r&&++i>J&&Q(`overflow`),n===r){let e=i;for(let n=Y;;n+=Y){let r=n<=a?Zn:n>=a+X?X:n-a;if(e<r)break;let i=e-r,o=Y-r;t.push(cr(mr(r+i%o,0))),e=Z(i/o)}t.push(cr(mr(e,0))),a=hr(i,c,s===o),i=0,++s}++i,++r}return t.join(``)},vr={version:`2.3.1`,ucs2:{decode:dr,encode:fr},decode:gr,encode:_r,toASCII:function(e){return ur(e,function(e){return ir.test(e)?`xn--`+_r(e):e})},toUnicode:function(e){return ur(e,function(e){return rr.test(e)?gr(e.slice(4).toLowerCase()):e})}},yr={default:{options:{html:!1,xhtmlOut:!1,breaks:!1,langPrefix:`language-`,linkify:!1,typographer:!1,quotes:`“”‘’`,highlight:null,maxNesting:100},components:{core:{},block:{},inline:{}}},zero:{options:{html:!1,xhtmlOut:!1,breaks:!1,langPrefix:`language-`,linkify:!1,typographer:!1,quotes:`“”‘’`,highlight:null,maxNesting:20},components:{core:{rules:[`normalize`,`block`,`strip_references`,`inline`,`text_join`]},block:{rules:[`paragraph`]},inline:{rules:[`text`],rules2:[`balance_pairs`,`fragments_join`]}}},commonmark:{options:{html:!0,xhtmlOut:!0,breaks:!1,langPrefix:`language-`,linkify:!1,typographer:!1,quotes:`“”‘’`,highlight:null,maxNesting:20},components:{core:{rules:[`normalize`,`block`,`strip_references`,`inline`,`text_join`]},block:{rules:[`blockquote`,`code`,`fence`,`heading`,`hr`,`html_block`,`lheading`,`list`,`reference`,`paragraph`]},inline:{rules:[`autolink`,`backticks`,`emphasis`,`entity`,`escape`,`html_inline`,`image`,`link`,`newline`,`text`],rules2:[`balance_pairs`,`emphasis`,`fragments_join`]}}}},br=/^(vbscript|javascript|file|data):/,xr=/^data:image\/(gif|png|jpeg|webp);/,Sr=[`http:`,`https:`,`mailto:`],$=class{validateLink(e){let t=e.trim().toLowerCase();return!br.test(t)||xr.test(t)}normalizeLink(e){let t=b(e,!0);if(t.hostname&&(!t.protocol||Sr.indexOf(t.protocol)>=0))try{t.hostname=vr.toASCII(t.hostname)}catch(e){}return t.auth&&(t.auth=s(t.auth)),t.hostname&&(t.hostname=s(t.hostname)),t.pathname&&(t.pathname=s(t.pathname)),t.search&&(t.search=s(t.search)),t.hash&&(t.hash=s(t.hash)),c(t)}normalizeLinkText(e){let t=b(e,!0);if(t.hostname&&(!t.protocol||Sr.indexOf(t.protocol)>=0))try{t.hostname=vr.toUnicode(t.hostname)}catch(e){}return i(c(t),i.defaultChars+`%`)}constructor(...e){D(this,`inline`,new Ln),D(this,`block`,new Qt),D(this,`core`,new Dt),D(this,`renderer`,new Ze),D(this,`linkify`,new Xn),D(this,`utils`,ke),D(this,`helpers`,Object.assign({},Xe));let[t,n]=e;typeof t==`string`?(this.configure(t),n&&this.set(n)):(this.configure(`default`),this.set(t||{}))}set(e){return Object.assign(this.options,e),this}configure(e){let t;if(typeof e==`string`){let n=e;if(t=yr[n],!t)throw Error(`Wrong 'markdown-it' preset "${n}", check name`)}else t=e;if(!t)throw Error("Wrong `markdown-it` preset, can't be empty");t.options&&(this.options=q({},t.options));let n=t.components;if(n){var r;[`core`,`block`,`inline`].forEach(e=>{var t;let r=(t=n[e])==null?void 0:t.rules;r&&this[e].ruler.enableOnly(r)});let e=(r=n.inline)==null?void 0:r.rules2;e&&this.inline.ruler2.enableOnly(e)}return this}enable(e,t=!1){let n=[];Array.isArray(e)||(e=[e]),[`core`,`block`,`inline`].forEach(t=>{n=n.concat(this[t].ruler.enable(e,!0))}),n=n.concat(this.inline.ruler2.enable(e,!0));let r=e.filter(e=>n.indexOf(e)<0);if(r.length&&!t)throw Error(`MarkdownIt. Failed to enable unknown rule(s): ${r}`);return this}disable(e,t=!1){let n=[];Array.isArray(e)||(e=[e]),[`core`,`block`,`inline`].forEach(t=>{n=n.concat(this[t].ruler.disable(e,!0))}),n=n.concat(this.inline.ruler2.disable(e,!0));let r=e.filter(e=>n.indexOf(e)<0);if(r.length&&!t)throw Error(`MarkdownIt. Failed to disable unknown rule(s): ${r}`);return this}use(e,...t){return e.apply(e,[this,...t]),this}parse(e,t){if(typeof e!=`string`)throw Error(`Input data should be a String`);let n=new this.core.State(e,this,t);return this.core.process(n),n.tokens}render(e,t={}){return this.renderer.render(this.parse(e,t),this.options,t)}parseInline(e,t){let n=new this.core.State(e,this,t);return n.inlineMode=!0,this.core.process(n),n.tokens}renderInline(e,t={}){return this.renderer.render(this.parseInline(e,t),this.options,t)}};return D($,`Token`,z),D($,`Ruler`,B),D($,`Renderer`,Ze),D($,`ParserCore`,Dt),D($,`StateCore`,Qe),D($,`ParserBlock`,Qt),D($,`StateBlock`,Ot),D($,`ParserInline`,Ln),D($,`StateInline`,$t),Ae($)});
 //# sourceMappingURL=markdown-it.umd.min.js.map
 </script>
+<script>
+/* assets/android.js를 대체한다. 본문은 원본 IndexedDB에, 작은 위치는 localStorage에 저장한다. */
+(function () {
+  'use strict';
+  const CHECKPOINT_KEY = 'ebookViewerBrowserCheckpointV1';
+  function readCheckpoint() {
+    try { return JSON.parse(localStorage.getItem(CHECKPOINT_KEY) || 'null'); }
+    catch { return null; }
+  }
+
+  window.__browserCheckpoint = function (record) {
+    if (restoreInProgress || readerState.initializing) return;
+    try {
+      const open = record ? !!record.isOpen : viewerOverlay.classList.contains('active');
+      localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({
+        recentId: activeRecentId || '', isOpen: open, pageIndex,
+        pageAnchor: pageAnchors.length ? readerAnchor() : 0,
+        pageContext: readerState.context,
+        layoutSignature: pages.length ? readerState.layout : '',
+        updatedAt: Date.now()
+      }));
+    } catch (error) { console.error('Browser checkpoint:', error.message); }
+  };
+
+  window.__browserRecoverReading = async function (reading) {
+    try {
+      const saved = readCheckpoint();
+      if (!saved || !(Number(saved.updatedAt) >= Number(reading?.updatedAt || 0))) return reading;
+      if (!saved.isOpen) return reading ? { ...reading, isOpen: false } : reading;
+      if (!saved.recentId) return reading;
+      const book = readerState.hydratedBook?.id === saved.recentId ? readerState.hydratedBook.book : await getRecentBook(saved.recentId);
+      if (book) readerState.hydratedBook = { id: saved.recentId, book };
+      if (book && typeof book.text === 'string') return { ...saved, text: book.text, chapters: book.meta?.chapters || [], fileName: book.meta?.fileName || '' };
+    } catch (error) { console.error('Browser position recovery:', error.message); }
+    return reading;
+  };
+
+  window.__browserRecentMeta = function (meta) {
+    const saved = readCheckpoint();
+    if (saved?.recentId === meta.id && Number(saved.updatedAt) >= Number(meta.updatedAt || 0)) {
+      return { ...meta, pageIndex: saved.pageIndex, pageAnchor: saved.pageAnchor,
+        pageContext: saved.pageContext || meta.pageContext,
+        layoutSignature: saved.layoutSignature || meta.layoutSignature };
+    }
+    return meta;
+  };
+
+  window.__browserFlushState = async function () {
+    if (restoreInProgress || readerState.initializing) return;
+    flushReadingSessionSave(viewerOverlay.classList.contains('active'));
+    clearTimeout(recentSaveTimer); recentSaveTimer = 0;
+    await saveActiveRecentPosition();
+    const reading = parseReadingRecord(loadReadingSessionSync());
+    if (reading) await saveReadingSessionDB(reading);
+    await readerState.pendingCache;
+  };
+
+  /* 원본의 네이티브 종료 훅을 브라우저 생명주기 이벤트로 치환한다.
+     비동기 IndexedDB 저장보다 먼저 위 체크포인트가 동기 저장된다. */
+  addEventListener('pagehide', () => { void window.__browserFlushState(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void window.__browserFlushState();
+  });
+
+  /* Android 뒤로가기의 "열린 창 닫기"를 브라우저 뒤로가기/앞으로가기로 치환한다. */
+  document.addEventListener('DOMContentLoaded', () => {
+    readerReady.then(() => {
+      const PANEL_KEY = 'ebookViewerBrowserPanelV1';
+      let traversing = false;
+      const currentPanel = () => viewerOverlay.classList.contains('active') ? 'viewer' :
+        recentOverlay.classList.contains('active') ? 'recent' : '';
+      const markPanel = panel => {
+        try {
+          const state = history.state && typeof history.state === 'object' ? history.state : {};
+          const marked = state[PANEL_KEY] || '';
+          if (panel && marked !== panel) {
+            const next = { ...state, [PANEL_KEY]: panel };
+            marked ? history.replaceState(next, '') : history.pushState(next, '');
+          } else if (!panel && marked) history.back();
+        } catch { /* Escape/닫기 버튼은 History API 제한 시에도 원본대로 동작한다. */ }
+      };
+      /* 이전 세션에서 사용자가 입력을 고쳐 복원을 취소한 경우 오래된 창 표식을 제거한다. */
+      if (!currentPanel() && history.state?.[PANEL_KEY]) {
+        const state = { ...history.state }; delete state[PANEL_KEY];
+        try { history.replaceState(state, ''); } catch {}
+      }
+      markPanel(currentPanel());
+      const observer = new MutationObserver(() => {
+        if (!traversing) markPanel(currentPanel());
+      });
+      observer.observe(viewerOverlay, { attributes: true, attributeFilter: ['class'] });
+      observer.observe(recentOverlay, { attributes: true, attributeFilter: ['class'] });
+      addEventListener('popstate', () => {
+        traversing = true;
+        const target = history.state?.[PANEL_KEY] || '';
+        if (viewerOverlay.classList.contains('active') && target !== 'viewer') closeViewer();
+        if (recentOverlay.classList.contains('active') && target !== 'recent') hideRecentHistory();
+        if (target === 'recent' && !recentOverlay.classList.contains('active')) showRecentHistory();
+        if (target === 'viewer' && !viewerOverlay.classList.contains('active')) {
+          void openViewer().catch(error => setStatus(error.message, true));
+        }
+        queueMicrotask(() => { traversing = false; });
+      });
+    });
+  });
+})();
+
+</script>
+<script>
+/* Durable layout cache and a logical text anchor independent of changing page boundaries. */
+const readerState={initializing:true,logicalAnchor:null,context:null,layout:'',canonical:'',canonicalSource:null,
+  generation:0,fontId:'',fontPromise:Promise.resolve(),memory:new Map(),pendingCache:Promise.resolve(),cancelled:false};
+const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPaginationMs:0};
+let resolveReaderReady;
+const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
+const readerBrowserResume={away:false,settling:false,timer:0,frame:0};
+const READER_CACHE_VERSION=8;
+const READER_COUNT_VERSION='non-whitespace-v1';
+const READER_CACHE_DB='ebookViewerLayoutCacheV1';
+
+function readerCanonical(){
+  if(readerState.canonicalSource!==fullText){
+    getPaginationBlocks(fullText);
+    readerState.canonical=cachedBlockTexts.join('\n');
+    readerState.canonicalSource=fullText;
+  }
+  return readerState.canonical;
+}
+function readerContext(anchor){
+  const text=readerCanonical(),offset=Math.min(text.length,Math.max(0,Number(anchor)||0));
+  return {before:text.slice(Math.max(0,offset-32),offset),after:text.slice(offset,offset+96)};
+}
+function readerAnchor(){
+  return readerState.logicalAnchor===null ? Number(pageAnchors[pageIndex])||0 : readerState.logicalAnchor;
+}
+function readerChooseAnchor(anchor,context){
+  readerState.logicalAnchor=Math.max(0,Number(anchor)||0);
+  readerState.context=context||readerContext(readerState.logicalAnchor);
+}
+function readerResolveAnchor(record){
+  const text=readerCanonical();
+  const original=Math.min(text.length,Math.max(0,Number(record?.pageAnchor)||0));
+  const context=record?.pageContext;
+  if(!context||typeof context.before!=='string'||typeof context.after!=='string')return original;
+  const needle=context.before+context.after;
+  if(!needle||text.slice(Math.max(0,original-context.before.length),original+context.after.length)===needle)return original;
+  let best=original,distance=Infinity;
+  for(let hit=text.indexOf(needle);hit>=0;hit=text.indexOf(needle,hit+1)){
+    const target=hit+context.before.length,delta=Math.abs(target-original);
+    if(delta<distance){best=target;distance=delta;}
+  }
+  return best;
+}
+function readerSetLoading(loading,message){
+  if(message)viewerOverlay.setAttribute('data-reader-progress',message);else if(loading)viewerOverlay.setAttribute('data-reader-progress','불러오는 중…');
+  viewerOverlay.classList.toggle('reader-loading',loading);
+  viewerOverlay.setAttribute('aria-busy',String(loading));
+}
+function readerOversizedParagraph(html,text,box){
+  if(text.length<=4096||!/^<p(?:\s|>)/i.test(html))return false;
+  // Shape only a DOM-preserving prefix. A paragraph whose prefix overflows cannot fit whole.
+  const detached=document.createElement('div');detached.innerHTML=html;
+  const paragraph=detached.firstElementChild;
+  const walker=document.createTreeWalker(paragraph,NodeFilter.SHOW_TEXT);
+  let node,left=4096;
+  const range=document.createRange();range.selectNodeContents(paragraph);
+  while((node=walker.nextNode())){
+    if(node.length>=left){range.setEnd(node,left);break;}
+    left-=node.length;
+  }
+  const prefix=paragraph.cloneNode(false);prefix.appendChild(range.cloneContents());
+  box.replaceChildren(prefix);readerStats.measurements++;
+  return box.scrollHeight>box.clientHeight+1;
+}
+function readerCacheDatabase(){
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open(READER_CACHE_DB,2);
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      const store=db.objectStoreNames.contains('pages')?request.transaction.objectStore('pages'):db.createObjectStore('pages',{keyPath:'id'});
+      if(!store.indexNames.contains('updatedAt'))store.createIndex('updatedAt','updatedAt');
+    };
+    request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
+  });
+}
+function readerRememberCache(record){
+  readerState.memory.delete(record.id);readerState.memory.set(record.id,record);
+  // Disk retains recent books; small-memory readers need only a few live layouts.
+  while(readerState.memory.size>3)readerState.memory.delete(readerState.memory.keys().next().value);
+}
+async function readerReadCache(id){
+  if(readerState.memory.has(id))return readerState.memory.get(id);
+  try{
+    const db=await readerCacheDatabase();
+    try{return await new Promise((resolve,reject)=>{
+      const request=db.transaction('pages').objectStore('pages').get(id);
+      request.onsuccess=()=>{if(request.result)readerRememberCache(request.result);resolve(request.result);};request.onerror=()=>reject(request.error);
+    });}finally{db.close();}
+  }catch{return null;}
+}
+async function readerStoreCache(record){
+  readerRememberCache(record);
+  try{
+    const db=await readerCacheDatabase();
+    try{
+      const tx=db.transaction('pages','readwrite'),store=tx.objectStore('pages');
+      store.put(record);
+      // Keys and timestamps are sufficient for pruning; never load every book's page HTML.
+      let count=0;const cursor=store.index('updatedAt').openKeyCursor(null,'prev');
+      cursor.onsuccess=()=>{const entry=cursor.result;if(!entry)return;if(++count>RECENT_LIMIT)store.delete(entry.primaryKey);entry.continue();};
+      await transactionDone(tx);
+    }finally{db.close();}
+  }catch{/* A disposable cache failure never deletes or changes book/font data. */}
+}
+async function readerDeleteCache(id){
+  await readerLazyDeleteCache(id);
+  id ? readerState.memory.delete(id) : readerState.memory.clear();
+  try{
+    const db=await readerCacheDatabase();
+    try{const tx=db.transaction('pages','readwrite');id?tx.objectStore('pages').delete(id):tx.objectStore('pages').clear();await transactionDone(tx);}finally{db.close();}
+  }catch{}
+}
+function readerCacheBodyValid(cache,source){
+  return !!(cache&&cache.version===READER_CACHE_VERSION&&cache.length===source.length&&typeof cache.canonical==='string'&&(!readerSourceHasNotes(source)||cache.noteVersion===1)&&(!readerSourceHasPronunciations(source)||cache.pronunciationVersion===1));
+}
+function readerSameLayout(cache,signature){
+  if(cache.signature===signature)return true;
+  try{
+    const before=JSON.parse(cache.signature),after=JSON.parse(signature);
+    if(!Array.isArray(before)||!Array.isArray(after)||before.length!==after.length)return false;
+    // Only a small height change is compatible, and only when the original fit is safe.
+    const required=Number.isFinite(cache.fitHeight)?cache.fitHeight:before[4];
+    if(!Number.isFinite(before[4])||!Number.isFinite(after[4])||!Number.isFinite(required)||
+      required<=0||required>before[4]||Math.abs(before[4]-after[4])>4||after[4]<required)return false;
+    return before.every((value,index)=>index===4||value===after[index]);
+  }catch{return false;}
+}
+function readerValidCache(cache,signature,source){
+  return readerCacheBodyValid(cache,source)&&readerSameLayout(cache,signature)&&
+    Array.isArray(cache.pages)&&cache.pages.length>0&&Array.isArray(cache.anchors)&&cache.anchors.length===cache.pages.length&&
+    cache.anchors.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0||x>=cache.anchors[i-1]))&&cache.pages.every(x=>typeof x==='string');
+}
+function readerFindCachedLayout(cache,signature,source){
+  if(!readerCacheBodyValid(cache,source))return null;
+  const candidates=[cache,...(Array.isArray(cache.layouts)?cache.layouts.map(layout=>({...cache,...layout})):[])];
+  // Prefer an exact layout over a compatible one retained for another window height.
+  for(const exact of [true,false])for(const candidate of candidates){
+    if((candidate.signature===signature)===exact&&readerValidCache(candidate,signature,source))return candidate;
+  }
+  return null;
+}
+function readerCacheStructureValid(cache){
+  return readerCacheBodyValid(cache,fullText)&&cache.chapterSignature===chapterSignature&&
+    Array.isArray(cache.chapterStarts)&&cache.chapterStarts.length===bookChapters.length&&
+    cache.chapterStarts.every((x,i)=>Number.isFinite(x)&&x>=0&&(i===0?x===0:x>=cache.chapterStarts[i-1]));
+}
+function readerCountCacheValid(cache){
+  return cache?.countVersion===READER_COUNT_VERSION&&readerCacheStructureValid(cache)&&!(!Array.isArray(cache.chapterCounts)||cache.chapterCounts.length!==Math.max(1,bookChapters.length)||
+    !cache.chapterCounts.every(Number.isSafeInteger)||cache.chapterCounts.some(x=>x<0)||
+    !Number.isSafeInteger(cache.totalCount)||cache.chapterCounts.reduce((sum,x)=>sum+x,0)!==cache.totalCount);
+}
+function readerRestoreCountCache(cache){
+  if(!readerCountCacheValid(cache))return;
+  viewerCountSource=fullText;viewerCountSignature=chapterSignature;
+  viewerChapterCounts=cache.chapterCounts.slice();viewerTotalCount=cache.totalCount;
+}
+function readerCreatePageCache(id,signature,previous,used){
+  const layouts=[];
+  if(readerCacheBodyValid(previous,fullText))for(const layout of [previous,...(Array.isArray(previous.layouts)?previous.layouts:[])]){
+    if(layout.signature===signature||layouts.some(item=>item.signature===layout.signature))continue;
+    layouts.push({signature:layout.signature,fitHeight:layout.fitHeight,pages:layout.pages,anchors:layout.anchors});
+    if(layouts.length===1)break;
+  }
+  return {id,version:READER_CACHE_VERSION,noteVersion:1,pronunciationVersion:1,signature,length:fullText.length,pages:pages.slice(),anchors:pageAnchors.slice(),
+    fitHeight:used?(Number.isFinite(used.fitHeight)?used.fitHeight:JSON.parse(used.signature)[4]):paginationMeasureBox.clientHeight,
+    canonical:readerCanonical(),chapterSignature,chapterStarts:chapterCanonicalStarts.slice(),
+    chapterCounts:viewerChapterCounts.slice(),totalCount:viewerTotalCount,countVersion:READER_COUNT_VERSION,layouts,updatedAt:Date.now()};
+}
+
+async function readerHydrateReading(record){
+  if(record?.textRef){
+    const book=await getRecentBook(record.textRef).catch(()=>null);
+    if(book){readerState.hydratedBook={id:record.textRef,book};return {...record,text:book.text,chapters:book.meta?.chapters||[],fileName:record.fileName??book.meta?.fileName??''};}
+  }
+  return record;
+}
+async function readerFingerprintFont(record){
+  if(record.fingerprint)return record.fingerprint;
+  if(crypto?.subtle){
+    const digest=await crypto.subtle.digest('SHA-256',record.data);
+    record.fingerprint=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
+  }else{
+    const bytes=new Uint8Array(record.data);let hash=2166136261;
+    for(const byte of bytes)hash=Math.imul(hash^byte,16777619)>>>0;
+    record.fingerprint=bytes.length+':'+hash;
+  }
+  return record.fingerprint;
+}
+function readerBounded(promise,ms,label){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label+' 시간이 초과됐습니다. 다시 열어 주세요.')),ms);Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});});}
+async function readerWaitForLayout(){
+  await readerBounded(readerState.fontPromise,12000,'글꼴 준비');
+  await readerBounded(chapterImagesReady,12000,'이미지 준비');
+  const family=getComputedStyle(pageInnerLeft).fontFamily;
+  if(document.fonts){
+    await readerBounded(document.fonts.load(viewerSettings.fontSize+'px '+family,'가나다라마바사 ABC abc 0123456789'),12000,'본문 글꼴 준비');
+  }
+  let previous='',stable=0,frames=0;const waitStarted=performance.now();
+  while(stable<3&&frames++<90&&performance.now()-waitStarted<2500){
+    await readerBounded(nextFrame(),4000,'화면 준비');syncVisualViewport();
+    const current=getLayoutSignature();
+    stable=current===previous?stable+1:0;previous=current;
+  }
+  document.documentElement.style.setProperty('--reader-image-height',Math.max(1,pageInnerLeft.clientHeight-parseFloat(getComputedStyle(pageInnerLeft).lineHeight)*2)+'px');
+}
+async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.generation){
+  const started=performance.now(),source=fullText,id=activeRecentId;
+  restoreInProgress=true;readerSetLoading(true);clearTimeout(repaginateTimer);
+  readerStats.lastCacheReason='not-checked';
+  try{
+    // Read the stored layout before touching the book's paragraph DOM.
+    const cached=id?await readerBounded(readerReadCache(id),2000,'페이지 캐시 읽기').catch(()=>null):null;
+    if(generation!==readerState.generation)return;
+    readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();
+    if(readerCacheBodyValid(cached,source)){readerState.canonical=cached.canonical;readerState.canonicalSource=source;}
+    let signature,used=null,built=null,passes=0;
+    while(generation===readerState.generation){
+      if(++passes>3)throw Error('화면 크기가 계속 바뀌어 페이지 계산을 중단했습니다. 다시 열어 주세요.');
+      await readerWaitForLayout();
+      if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;
+      signature=getLayoutSignature();used=readerFindCachedLayout(built,signature,source)||readerFindCachedLayout(cached,signature,source);
+      if(used){
+        pages=used.pages.slice();pageAnchors=used.anchors.slice();
+        readerState.canonical=used.canonical;readerState.canonicalSource=source;readerStats.cacheHits++;
+        readerStats.lastCacheReason=used===built?'reflow-reused':used.signature===signature?'exact':'safe-height';
+      }else{
+        readerStats.lastCacheReason=!cached?'missing':!readerCacheBodyValid(cached,source)?'version-or-source':'layout-changed';
+        await readerPrepareChapterImages();
+        if(generation!==readerState.generation)return;
+        signature=getLayoutSignature();pages=splitIntoPages(source);readerCanonical();
+        built=readerCreatePageCache(id,signature,cached,null);
+      }
+      await readerBounded(nextFrame(),4000,'화면 표시');await readerBounded(nextFrame(),4000,'화면 표시');
+      if(generation!==readerState.generation)return;
+      if(signature!==getLayoutSignature())continue;
+      break;
+    }
+    if(generation!==readerState.generation)return;
+    readerState.layout=signature;
+    record=readerMigrateNotePosition(record,cached);
+    const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
+    const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
+    readerChooseAnchor(target,readerContext(target));pageIndex=findPageIndexForAnchor(target);
+    restoreInProgress=false;render();readerSetLoading(false);
+    if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();
+    readerStats.lastPaginationMs=performance.now()-started;
+    flushReadingSessionSave(true);flushActiveRecentPositionSave();
+    // Upgrade old cache metadata without invalidating its already correct page breaks.
+    if(id&&(built||!used||!readerCountCacheValid(cached))){
+      const cache=readerCreatePageCache(id,signature,cached,used);
+      readerState.pendingCache=readerStoreCache(cache);
+    }
+  }catch(error){
+    if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message||'전자책을 열지 못했습니다.',true);}
+    throw error;
+  }
+}
+
+/* Display-only breaks. Offsets always refer to the original visible text. */
+function readerBreakKey(){
+  return ['breakSentence','breakQuotes','breakAdverbs','sentenceSpacing'].map(key=>viewerSettings[key]?1:0).join('');
+}
+function readerQuoteRoles(text){
+  const roles=new Map(),stack=[];
+  for(let i=0;i<text.length;i++){
+    const quote=text[i];
+    if(!/["“”＂]/.test(quote))continue;
+    let slash=i-1;while(slash>=0&&text[slash]==='\\')slash--;
+    if((i-1-slash)%2)continue;
+    if(quote==='“'){roles.set(i,'open');stack.push('curly');continue;}
+    if(quote==='”'){
+      roles.set(i,'close');const match=stack.lastIndexOf('curly');if(match>=0)stack.splice(match,1);continue;
+    }
+    const match=stack.lastIndexOf(quote);
+    if(match>=0){roles.set(i,'close');stack.splice(match,1);}
+    else{roles.set(i,'open');stack.push(quote);}
+  }
+  return roles;
+}
+function readerBreakOffsets(text,settings=viewerSettings,quoteRoles=readerQuoteRoles(text),baseOffset=0){return readerBreakOffsetsV18(text,settings,quoteRoles,baseOffset);}
+function readerApplyBreaks(html,quoteRoles=null,baseOffset=0){return readerApplyBreaksV18(html,quoteRoles,baseOffset);}
+function readerSafeQuoteCut(text,cut,quoteRoles,baseOffset=0){
+  let next=cut;
+  while(next<text.length&&/[ \t]/.test(text[next]))next++;
+  if(quoteRoles.get(baseOffset+next)!=='close')return cut;
+  // Keep at least the preceding character with the closing quote when a page is full.
+  while(cut>1&&/[ \t]/.test(text[cut-1]))cut--;
+  if(cut>1)cut--;
+  if(cut>1&&/[\uDC00-\uDFFF]/.test(text[cut]))cut--;
+  while(cut>1&&quoteRoles.get(baseOffset+cut)==='close')cut--;
+  return cut;
+}
+function readerBlockSlicer(html){
+  const root=document.createElement('div');root.innerHTML=html;
+  const units=[],walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);
+  let node,length=0;
+  while((node=walker.nextNode())){
+    const size=node.nodeType===Node.TEXT_NODE?node.length:(node.tagName==='BR'&&!node.hasAttribute('data-reader-break')?1:0);
+    if(size){units.push({node,start:length,end:length+size});length+=size;}
+  }
+  function point(offset,end){
+    let lo=0,hi=units.length-1;
+    while(lo<hi){const mid=(lo+hi)>>1;if(units[mid].end<offset||(!end&&units[mid].end===offset))lo=mid+1;else hi=mid;}
+    const entry=units[lo];
+    if(entry.node.nodeType===Node.TEXT_NODE)return [entry.node,Math.min(entry.node.length,Math.max(0,offset-entry.start))];
+    const parent=entry.node.parentNode,index=Array.prototype.indexOf.call(parent.childNodes,entry.node);
+    return [parent,index+(offset>entry.start?1:0)];
+  }
+  return (start,end)=>{
+    if(!units.length)return html;
+    const range=document.createRange();range.setStart(...point(start,false));range.setEnd(...point(end,true));
+    let fragment=range.cloneContents(),ancestor=range.commonAncestorContainer;
+    if(ancestor.nodeType===Node.TEXT_NODE)ancestor=ancestor.parentNode;
+    while(ancestor!==root){const shell=ancestor.cloneNode(false);shell.appendChild(fragment);fragment=shell;ancestor=ancestor.parentNode;}
+    const output=document.createElement('div');output.appendChild(fragment);return output.innerHTML;
+  };
+}
+function readerSyncBreakButtons(){
+  const spacing=document.getElementById('sentenceSpacing');if(spacing)spacing.checked=!!viewerSettings.sentenceSpacing;
+  document.querySelectorAll('[data-break-option]').forEach(button=>button.setAttribute('aria-pressed',String(!!viewerSettings[button.dataset.breakOption])));
+}
+
+/* Paginate the requested section first; keep background work and cached layouts independent of the visible spread. */
+let readerLazySession=null,readerLazyPreparing=false,readerLazyDatabase=null;
+const readerLazyStats={sessions:0,chapterBuilds:0,chapterCacheHits:0,firstVisibleMs:0,yields:0};
+function readerLazyActive(){const s=readerLazySession;return !!s&&!s.cancelled&&!s.complete&&s.generation===readerState.generation&&s.source===fullText;}
+function readerLazyAlive(s){return s===readerLazySession&&!s.cancelled&&s.generation===readerState.generation&&s.source===fullText&&viewerOverlay.classList.contains('active');}
+function readerLazyCancel(){const s=readerLazySession;if(s){s.cancelled=true;for(const job of s.jobs.values())job.reject(Error('페이지 계산 취소'));}readerLazySession=null;}
+function readerLazyHash(text){let n=2166136261;for(let i=0;i<text.length;i++)n=Math.imul(n^text.charCodeAt(i),16777619)>>>0;return n.toString(36);}
+function readerLazyDB(){if(readerLazyDatabase)return readerLazyDatabase;readerLazyDatabase=new Promise((resolve,reject)=>{const q=indexedDB.open('ebookViewerChapterLayoutV1',1);q.onupgradeneeded=()=>{q.result.createObjectStore('chapters').createIndex('updatedAt','updatedAt');};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);q.onblocked=()=>reject(Error('구간 캐시 사용 불가'));});return readerLazyDatabase;}
+async function readerLazyDeleteCache(id){try{const db=await readerBounded(readerLazyDB(),1500,'구간 캐시 삭제'),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');if(!id)store.clear();else{const q=store.openKeyCursor(IDBKeyRange.bound(id+':',id+':\uffff'));q.onsuccess=()=>{const e=q.result;if(e){store.delete(e.primaryKey);e.continue();}};}await transactionDone(tx);}catch{}}
+function readerLazyKey(s,c){return s.id+':'+readerLazyHash(s.signature)+':'+c;}
+async function readerLazyRead(s,c){try{const db=await readerBounded(readerLazyDB(),1500,'구간 캐시');return await readerBounded(new Promise((resolve,reject)=>{const q=db.transaction('chapters').objectStore('chapters').get(readerLazyKey(s,c));q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);}),1500,'구간 캐시');}catch{return null;}}
+async function readerLazySave(s,c,result){if(!s.id)return;try{const db=await readerLazyDB(),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');store.put({...result,signature:s.signature,length:s.source.length,version:READER_CACHE_VERSION,updatedAt:Date.now()},readerLazyKey(s,c));let n=0;const q=store.index('updatedAt').openKeyCursor(null,'prev');q.onsuccess=()=>{const e=q.result;if(e){if(++n>512)store.delete(e.primaryKey);e.continue();}};await transactionDone(tx);}catch{}}
+async function readerLazyImages(chapter){const sources=new Set();for(const html of bookChapters[chapter]?.blocks||[]){if(!html.includes('<img'))continue;const root=document.createElement('div');root.innerHTML=html;root.querySelectorAll('img').forEach(image=>sources.add(image.src));}if(!sources.size)return;await readerBounded(Promise.all([...sources].map(src=>new Promise(resolve=>{const image=new Image();image.onload=resolve;image.onerror=resolve;image.src=src;if(image.complete)resolve();}))),12000,'구간 이미지 준비');}
+function readerLazyBlock(s,index){if(!s.formatted.has(index))s.formatted.set(index,readerApplyBreaks(cachedOriginalBlocks[index],cachedQuoteRoles,cachedBlockStarts[index]));return s.formatted.get(index);}
+function readerLazyChapter(anchor){const starts=readerLazySession?.starts||chapterCanonicalStarts;let c=0;for(let i=1;i<starts.length;i++){if(starts[i]>anchor)break;c=i;}return c;}
+function readerLazyAssemble(s,anchor=readerAnchor()){
+ const next=[],starts=[];for(let c=0;c<s.results.length;c++){const result=s.results[c];if(result){next.push(...result.pages);starts.push(...result.anchors);}else{next.push('<div class="reader-chapter-pending" data-reader-pending="'+c+'"></div>');starts.push(s.starts[c]);}if(readerVisiblePageCount()===2&&c+1<s.results.length&&next.length%2){next.push('<div class="chapter-spacer" aria-hidden="true"></div>');starts.push(Math.max(0,s.starts[c+1]-1));}}
+ pages=next;pageAnchors=starts;readerChooseAnchor(anchor);pageIndex=findPageIndexForAnchor(anchor);if(readerVisiblePageCount()===2)pageIndex-=pageIndex%2;
+}
+function readerLazyCounter(){const s=readerLazySession,c=readerLazyChapter(readerAnchor()),r=s.results[c],ordinal=r?Math.max(0,r.anchors.findIndex((a,i)=>a<=readerAnchor()&&(i+1===r.anchors.length||r.anchors[i+1]>readerAnchor()))):0;return '구간 '+(ordinal+1)+' / '+(r?.pages.length||'계산 중')+' · 전체 계산 '+s.done+'/'+s.results.length;}
+function readerLazyUpdateUI(){if(!readerLazySession||!pages.length)return;const end=Math.min(pages.length,pageIndex+readerVisiblePageCount());counter.textContent=readerLazyActive()?readerLazyCounter():`${end>pageIndex+1?(pageIndex+1)+'–'+end:pageIndex+1} / ${pages.length}`;pageJumpInput.max=String(pages.length);pageJumpInput.disabled=readerLazyActive();document.getElementById('pageJumpBtn').disabled=readerLazyActive();pageJumpInput.title=readerLazyActive()?'전체 페이지 계산 후 번호로 이동할 수 있습니다. 차례 이동은 바로 사용할 수 있습니다.':'';readerUpdateChapterPageCount();}
+function readerLazyEnsure(s,c,urgent=false){
+ if(s.results[c])return Promise.resolve(s.results[c]);let job=s.jobs.get(c);
+ if(!job){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});promise.catch(()=>{});job={c,promise,resolve,reject,generator:null,checked:false};s.jobs.set(c,job);s.queue.push(job);}
+ if(urgent){s.priority=c;s.queue=s.queue.filter(j=>j!==job);s.queue.unshift(job);}void readerLazyPump(s);return job.promise;
+}
+async function readerLazyPump(s){
+ if(s.running)return;s.running=true;
+ try{while(readerLazyAlive(s)&&s.queue.length){
+  if(readerBrowserLayoutPaused()||settingsPanelIsOpen()||pageJumpLayoutLocked()||pageGesture||readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen()||readerChapterIsOpen()){await new Promise(resolve=>setTimeout(resolve,180));continue;}
+  if(s.signature!==getLayoutSignature()){
+   const anchor=readerAnchor(),context=readerState.context;s.cancelled=true;for(const job of s.jobs.values())job.reject(Error('화면 크기 변경'));readerLazySession=null;
+   if(s.reflows>=3){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');setStatus('화면 크기가 계속 바뀌어 계산을 중단했습니다. 다시 열어 주세요.',true);break;}
+   await new Promise(resolve=>setTimeout(resolve,120));if(s.generation===readerState.generation&&viewerOverlay.classList.contains('active'))void readerDisplay({pageAnchor:anchor,pageContext:context,_lazyReflows:s.reflows+1});break;
+  }
+  const job=s.queue.shift();if(s.results[job.c])continue;
+  try{
+   let result=null;if(!job.checked){job.checked=true;await readerLazyImages(job.c);if(!readerLazyAlive(s))break;const saved=await readerLazyRead(s,job.c);if(!readerLazyAlive(s))break;if(saved&&saved.signature===s.signature&&saved.version===READER_CACHE_VERSION&&saved.length===s.source.length&&Array.isArray(saved.pages)&&saved.pages.length&&saved.pages.length===saved.anchors?.length&&saved.anchors[0]===s.starts[job.c]&&saved.pages.every(x=>typeof x==='string')&&saved.anchors.every((a,i)=>Number.isFinite(a)&&(!i||a>saved.anchors[i-1]))){result=saved;readerLazyStats.chapterCacheHits++;}else{job.generator=readerPaginateChapter(s.source,job.c,s);readerLazyStats.chapterBuilds++;}}
+   if(!result){const until=performance.now()+12;let step;do{step=job.generator.next();if(step.done){result=step.value;break;}}while(performance.now()<until);}
+   if(result){if(!readerLazyAlive(s))break;s.results[job.c]=result;s.done++;if(s.priority===job.c)s.priority=null;s.jobs.delete(job.c);for(let i=s.bounds[job.c];i<(s.bounds[job.c+1]??cachedOriginalBlocks.length);i++)s.formatted.delete(i);readerLazyAssemble(s);readerLazyUpdateUI();job.resolve(result);void readerLazySave(s,job.c,result);
+    if(s.done===s.results.length){s.complete=true;cachedBreakKey='';readerLazyUpdateUI();s.cacheWrite=readerState.pendingCache=readerStoreCache(readerCreatePageCache(s.id,s.signature,s.previous,null));flushReadingSessionSave(true);flushActiveRecentPositionSave();}
+   }else{s.queue=s.queue.filter(j=>j!==job);if(s.priority!==null&&s.priority!==job.c)s.queue.push(job);else s.queue.unshift(job);}
+  }catch(error){job.reject(error);s.jobs.delete(job.c);s.error=error;setStatus('구간 '+(job.c+1)+' 계산 실패: '+error.message,true);}
+  readerLazyStats.yields++;await new Promise(resolve=>setTimeout(resolve,0));
+ }}finally{s.running=false;}
+}
+async function readerLazyNavigate(anchor,lastPage=false){
+ const s=readerLazySession;if(!readerLazyAlive(s))return;const c=readerLazyChapter(anchor),ticket=++s.navigation;
+ restoreInProgress=true;readerSetLoading(true,'구간 '+(c+1)+' / '+s.results.length+' 페이지를 계산하는 중…');
+ try{const result=await readerLazyEnsure(s,c,true);if(!readerLazyAlive(s)||ticket!==s.navigation)return;if(lastPage)anchor=result.anchors[result.anchors.length-1];readerLazyAssemble(s,anchor);restoreInProgress=false;readerSetLoading(false);render();readerLazyUpdateUI();
+  if(!s.opened){s.opened=true;readerLazyStats.firstVisibleMs=performance.now()-s.started;if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();}
+  if(!s.backgroundQueued){s.backgroundQueued=true;const order=[];for(let n=1;n<s.results.length;n++){if(c+n<s.results.length)order.push(c+n);if(c-n>=0)order.push(c-n);}for(const index of order)void readerLazyEnsure(s,index).catch(()=>{});}
+ }catch(error){if(readerLazyAlive(s)&&ticket===s.navigation){restoreInProgress=false;readerSetLoading(false);if(!s.opened){viewerOverlay.classList.remove('active');readerLazyCancel();}setStatus(error.message,true);}}
+}
+function readerLazyPendingPage(){const html=pages[pageIndex]||'';if(!html.includes('data-reader-pending='))return false;void readerLazyNavigate(readerAnchor());return true;}
+async function readerLazyTurn(direction){if(restoreInProgress)return;const target=pageIndex+direction*readerVisiblePageCount();if(target<0||target>=pages.length)return;const html=pages[target],anchor=pageAnchors[target];if(html.includes('data-reader-pending=')){await readerLazyNavigate(anchor,direction<0);return;}pageIndex=target;readerChooseAnchor(anchor);render();}
+async function readerDisplay(record={pageAnchor:0},generation=++readerState.generation){
+ readerLazyCancel();
+ const started=performance.now();restoreInProgress=true;readerSetLoading(true,'책 구조와 읽던 구간을 준비하는 중…');await new Promise(resolve=>setTimeout(resolve,0));
+ try{
+  const cached=activeRecentId?await readerBounded(readerReadCache(activeRecentId),2000,'페이지 캐시').catch(()=>null):null;if(generation!==readerState.generation)return;
+  readerLazyPreparing=true;try{readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();if(readerCacheBodyValid(cached,fullText)){readerState.canonical=cached.canonical;readerState.canonicalSource=fullText;}else readerCanonical();}finally{readerLazyPreparing=false;}
+  await readerWaitForLayout();if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;const signature=getLayoutSignature();
+  if(readerFindCachedLayout(cached,signature,fullText))return readerDisplayFull(record,generation);
+  readerLazyPreparing=true;try{getPaginationBlocks(fullText);readerCanonical();}finally{readerLazyPreparing=false;}
+  readerStats.lastCacheReason='chapter-first';readerState.layout=signature;const bounds=bookChapters.length?[...chapterBlockBoundaries].sort((a,b)=>a-b):[0],starts=bookChapters.length?chapterCanonicalStarts.slice():[0];
+  const s=readerLazySession={generation,source:fullText,id:activeRecentId,signature,previous:cached,bounds,starts,results:Array(bounds.length).fill(null),queue:[],jobs:new Map(),formatted:new Map(),done:0,complete:false,cancelled:false,running:false,priority:null,navigation:0,started,reflows:record._lazyReflows||0};readerLazyStats.sessions++;
+  record=readerMigrateNotePosition(record,cached);const anchor=readerResolveAnchor(record);readerLazyAssemble(s,anchor);await readerLazyNavigate(anchor);
+ }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');readerLazyCancel();setStatus(error.message,true);}}
+}
+
+function* readerPaginateChapter(text,chapter,session){
+  const box=ensurePaginationMeasureBox(),blocks=cachedOriginalBlocks,texts=cachedBlockTexts;
+  const first=session.bounds[chapter],last=session.bounds[chapter+1]??blocks.length;
+  if(box.clientHeight<Math.min(24,parseFloat(getComputedStyle(box).lineHeight))||box.clientWidth<8)throw Error('본문 공간이 너무 작습니다. 글자 크기나 여백을 줄여 주세요.');
+  const result=[],anchors=[];let current=[],currentAnchor=0,base=cachedBlockStarts[first]||0;
+  readerStats.splits++;
+  const fits=items=>{readerStats.measurements++;box.innerHTML=items.join('');return box.scrollHeight<=box.clientHeight+1;};
+  const flush=()=>{if(current.length){result.push(current.join(''));anchors.push(currentAnchor);current=[];}};
+  for(let bi=first;bi<last;bi++){
+    const html=readerLazyBlock(session,bi),plain=texts[bi]||'',nextBase=base+plain.length+1;
+    const oversized=readerOversizedParagraph(html,plain,box);
+    if(!oversized&&fits([...current,html])){
+      if(!current.length)currentAnchor=base;current.push(html);base=nextBase;yield null;continue;
+    }
+    if(!oversized&&fits([html])){
+      flush();yield null;current=[html];currentAnchor=base;base=nextBase;yield null;continue;
+    }
+    const slice=readerBlockSlicer(html);
+    const sentenceEnds=readerSentenceEnds(plain,cachedQuoteRoles,base);
+    if(sentenceEnds[sentenceEnds.length-1]!==plain.length)sentenceEnds.push(plain.length);
+    if(!plain.length){flush();yield null;current=[html];currentAnchor=base;base=nextBase;yield null;continue;}
+    let start=0,lastBest=512;
+    while(start<plain.length){
+      const length=plain.length-start;
+      let lo=1,hi=Math.min(length,Math.max(64,Math.ceil(lastBest*1.4))),best=0;
+      while(true){
+        if(!fits([...current,slice(start,start+hi)]))break;
+        best=hi;lo=hi+1;if(hi===length)break;hi=Math.min(length,hi*2);
+      }
+      while(lo<=hi){
+        const mid=(lo+hi)>>1;
+        if(fits([...current,slice(start,start+mid)])){best=mid;lo=mid+1;}else hi=mid-1;
+      }
+      if(!best&&current.length){flush();yield null;continue;}
+      if(!best)best=1; // An extreme font/margin combination must still make progress.
+      lastBest=best;
+      // A complete fitting remainder stays whole, and its spare space remains available to the next paragraph.
+      if(best===length){if(!current.length)currentAnchor=base+start;current.push(slice(start,plain.length));start=plain.length;break;}
+      let cut=start+best;
+      let previousEnd=0,followingEnd=plain.length;
+      for(const end of sentenceEnds){if(end<=cut)previousEnd=end;else{followingEnd=end;break;}}
+      let sentenceStart=previousEnd;while(sentenceStart<plain.length&&/\s/.test(plain[sentenceStart]))sentenceStart++;
+      if(sentenceStart<=cut&&sentenceStart>=start&&followingEnd-sentenceStart<=Math.max(4096,best*2)&&fits([slice(sentenceStart,followingEnd)])){
+        // Move an interrupted sentence intact to the next page when it fits a fresh page.
+        if(sentenceStart===start&&current.length){flush();yield null;continue;}
+        if(sentenceStart>start)cut=sentenceStart;
+      }
+      if(cut===start+best){
+        if(previousEnd>start+best*.6)cut=previousEnd;
+        else{
+          const prefix=plain.slice(start,cut),space=prefix.search(/\s+\S*$/);
+          if(space>best*.65)cut=start+space+1;
+          // A sentence longer than a whole page can split, but should not leave a one-word final page.
+          const minimumTail=Math.min(80,Math.max(24,Math.floor(best*.12)));
+          if(plain.length-cut<minimumTail&&length>minimumTail*2){
+            const target=Math.max(start+1,plain.length-minimumTail),part=plain.slice(start,target);
+            const boundary=part.search(/\s+\S*$/);cut=boundary>best*.5?start+boundary+1:target;
+          }
+        }
+      }
+      cut=readerSafeQuoteCut(plain,cut,cachedQuoteRoles,base);
+      if(cut>start&&/[\uDC00-\uDFFF]/.test(plain[cut]||''))cut--;
+      if(cut<=start)cut=start+((/[\uD800-\uDBFF]/.test(plain[start])&&start+1<plain.length)?2:1);
+      if(!current.length)currentAnchor=base+start;
+      current.push(slice(start,cut));start=cut;flush();yield null;
+    }
+    base=nextBase;
+  }
+  flush();yield null;box.innerHTML='';return {pages:result,anchors};
+}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Arial,sans-serif' font-size='34' font-weight='700' fill='%23fff'%3E%EC%B1%85%3C/text%3E%3C/svg%3E">
 <script>
 /* Comparative timeline parsing. Historical years have no year zero. */
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.ReaderTimeline=factory();})(typeof window==='object'?window:this,function(){
@@ -510,7 +1082,7 @@ function setupReaderNotes(){
 /* Selection-to-ChatGPT UI. OAuth credentials stay in the native/PC runtime. */
 const READER_GPT_PREFS='readerChatGPTPreferencesV1',READER_GPT_LOCAL='http://127.0.0.1:17173';
 let readerGPTExternal=false;
-let readerGPTLayer=null,readerGPTMenu=null,readerGPTSelection='',readerGPTBusy=false,readerGPTJob='',readerGPTPoll=0,readerGPTAuthPoll=0,readerGPTEpoch=0;
+let readerGPTLayer=null,readerGPTMenu=null,readerInsightsSelectionAction=null,readerInsightsLookupAction=null,readerGPTSelection='',readerGPTBusy=false,readerGPTJob='',readerGPTPoll=0,readerGPTAuthPoll=0,readerGPTEpoch=0;
 let readerGPTAccount='',readerGPTConnected=false,readerGPTRefreshId=0,readerGPTPreviousFocus=null,readerGPTBodyOverflow='',readerGPTRootOverflow='',readerGPTPreviousAria=null;
 let readerGPTPairWindow=null,readerGPTRpcId=0;const readerGPTRpcPending=new Map();
 let readerGPTPrefs={prompt:'선택한 본문의 의미를 쉬운 한국어로 설명해 줘. 필요한 배경과 핵심 개념을 짚어 줘.',model:'',updatedAt:0};
@@ -706,11 +1278,36 @@ function readerGPTGetSelection(){
   return inside(range.startContainer)&&inside(range.endContainer)?selection.toString().trim():'';
 }
 function readerGPTUpdateSelection(){
-  if(!readerGPTMenu)return;const text=readerGPTGetSelection();if(text)readerGPTSelection=text;if(window.AndroidChatGPT?.usesNativeSelectionMenu?.()||readerGPTAndroidWeb()){readerGPTMenu.hidden=true;return;}
-  if(!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||readerTimelineIsOpen()||readerNoteIsOpen()||settingsPanelIsOpen()){readerGPTMenu.hidden=true;return;}
-  readerGPTSelection=text;readerGPTMenu.hidden=false;const r=getSelection().getRangeAt(0).getBoundingClientRect(),v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
-  const w=readerGPTMenu.offsetWidth,h=readerGPTMenu.offsetHeight,left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
-  readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=Math.max(v.offsetTop+6,Math.min(bottom+h<=v.offsetTop+v.height-6?bottom:r.top-h-8,v.offsetTop+v.height-h-6))+'px';
+  if(!readerGPTMenu)return;
+  const text=readerGPTGetSelection();
+  if(text)readerGPTSelection=text;
+  const nativeSelection=!!window.AndroidChatGPT?.usesNativeSelectionMenu?.();
+  const androidBrowser=readerGPTAndroidWeb();
+  if(nativeSelection||!text||!viewerOverlay.classList.contains('active')||readerGPTIsOpen()||
+    readerTimelineIsOpen()||readerNoteIsOpen()||settingsPanelIsOpen()){
+    readerGPTMenu.hidden=true;
+    if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;
+    if(readerInsightsLookupAction)readerInsightsLookupAction.hidden=true;
+    return;
+  }
+  readerGPTSelection=text;
+  // Android Chrome/Boox cannot add items to the OS selection menu.
+  // Surface the reader action alongside the selected text there, too.
+  readerGPTMenu.hidden=androidBrowser;
+  if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=false;
+  if(readerInsightsLookupAction)readerInsightsLookupAction.hidden=false;
+  const r=getSelection().getRangeAt(0).getBoundingClientRect();
+  const v=visualViewport||{offsetLeft:0,offsetTop:0,width:innerWidth,height:innerHeight};
+  const gap=5,side=readerInsightsSelectionAction,lookup=readerInsightsLookupAction;
+  const widthTop=(androidBrowser?0:readerGPTMenu.offsetWidth+gap)+(side?side.offsetWidth:0);
+  const topHeight=Math.max(androidBrowser?0:readerGPTMenu.offsetHeight,side?.offsetHeight||0);
+  const w=Math.max(widthTop,lookup?.offsetWidth||0);
+  const h=topHeight+(lookup?gap+lookup.offsetHeight:0);
+  const left=Math.max(v.offsetLeft+6,Math.min(r.left,v.offsetLeft+v.width-w-6)),bottom=r.bottom+8;
+  const top=Math.max(v.offsetTop+6,Math.min(bottom+h<=v.offsetTop+v.height-6?bottom:r.top-h-8,v.offsetTop+v.height-h-6));
+  if(!androidBrowser){readerGPTMenu.style.left=left+'px';readerGPTMenu.style.top=top+'px';}
+  if(side){side.style.left=left+(androidBrowser?0:readerGPTMenu.offsetWidth+gap)+'px';side.style.top=top+'px';}
+  if(lookup){lookup.style.left=left+'px';lookup.style.top=top+topHeight+gap+'px';}
 }
 function readerGPTSetBusy(busy){readerGPTBusy=busy;for(const id of ['readerGPTSend','readerGPTConnect','readerGPTAccounts','readerGPTModel','readerGPTDisconnect'])document.getElementById(id).disabled=busy;document.getElementById('readerGPTStop').hidden=!busy;}
 async function readerGPTRefresh(){
@@ -771,8 +1368,51 @@ function setupReaderChatGPT(){
   try{const key=new URLSearchParams(location.hash.slice(1)).get('reader-connect');if(key&&/^[A-Za-z0-9_-]{40,100}$/.test(key)){sessionStorage.setItem('readerGPTLocalKey',key);history.replaceState(null,'',location.pathname+location.search);}}catch{}
   readerGPTMenu=document.createElement('button');readerGPTMenu.id='readerGPTSelectionMenu';readerGPTMenu.type='button';readerGPTMenu.textContent='ChatGPT연결';readerGPTMenu.hidden=true;document.body.appendChild(readerGPTMenu);
   for(const type of ['pointerdown','mousedown','touchstart'])readerGPTMenu.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});readerGPTMenu.onclick=()=>readerOpenSelectedChatGPT();
+  // Keep the original ChatGPT button and add a second action to the same
+  // selection toolbar without disturbing the browser's selected Range.
+  readerInsightsSelectionAction=document.createElement('button');
+  readerInsightsSelectionAction.id='readerInsightsSelectionAction';
+  readerInsightsSelectionAction.type='button';
+  readerInsightsSelectionAction.textContent='읽은 지점 지정';
+  readerInsightsSelectionAction.hidden=true;
+  document.body.appendChild(readerInsightsSelectionAction);
+  for(const type of ['pointerdown','mousedown','touchstart'])readerInsightsSelectionAction.addEventListener(type,e=>{
+    if(e.cancelable)e.preventDefault();
+    e.stopPropagation();
+  },{passive:false});
+  readerInsightsSelectionAction.onclick=()=>{
+    if(window.readerInsights?.selectToRead?.()){
+      readerGPTSelection='';
+      readerGPTMenu.hidden=true;
+      readerInsightsSelectionAction.hidden=true;
+      if(readerInsightsLookupAction)readerInsightsLookupAction.hidden=true;
+    }
+  };
+  readerInsightsLookupAction=document.createElement('button');
+  readerInsightsLookupAction.id='readerInsightsLookupAction';
+  readerInsightsLookupAction.type='button';
+  readerInsightsLookupAction.textContent='독서정보 보기';
+  readerInsightsLookupAction.hidden=true;
+  document.body.appendChild(readerInsightsLookupAction);
+  for(const type of ['pointerdown','mousedown','touchstart'])
+    readerInsightsLookupAction.addEventListener(type,e=>{if(e.cancelable)e.preventDefault();e.stopPropagation();},{passive:false});
+  readerInsightsLookupAction.onclick=()=>{
+    const term=readerGPTGetSelection()||readerGPTSelection;
+    if(!term||!window.readerInsights?.openForSelection?.(term))return;
+    readerGPTSelection='';
+    readerGPTMenu.hidden=true;
+    readerInsightsSelectionAction.hidden=true;
+    readerInsightsLookupAction.hidden=true;
+    getSelection()?.removeAllRanges?.();
+  };
+  new MutationObserver(()=>{
+    if(readerGPTMenu.hidden&&!readerGPTAndroidWeb()){
+      if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;
+      if(readerInsightsLookupAction)readerInsightsLookupAction.hidden=true;
+    }
+  }).observe(readerGPTMenu,{attributes:true,attributeFilter:['hidden']});
   readerGPTLayer=document.createElement('div');readerGPTLayer.id='readerGPTLayer';readerGPTLayer.className='reader-gpt-layer';readerGPTLayer.hidden=true;
-  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
+  readerGPTLayer.innerHTML='<section class="reader-gpt-dialog" role="dialog" aria-modal="true" aria-labelledby="readerGPTTitle"><header class="reader-gpt-header"><h2 id="readerGPTTitle">ChatGPT 답변</h2><span id="readerGPTPageCounter" aria-live="polite">[1/1] 페이지</span><button id="closeReaderGPT" type="button">닫기</button></header><div id="readerGPTAnswer" tabindex="0" aria-label="ChatGPT 답변, 왼쪽 터치 이전 페이지, 오른쪽 터치 다음 페이지"><div id="readerGPTAnswerViewport"><div id="readerGPTAnswerFlow"></div></div></div><p id="readerGPTStatus" role="status" aria-live="polite"></p><details id="readerGPTSettings" class="reader-gpt-config"><summary>설정 · 계정 / 모델 / 프롬프트</summary><div class="reader-gpt-scroll"><p id="readerGPTAccountLabel"></p><div class="reader-gpt-row"><select id="readerGPTAccounts" aria-label="ChatGPT 계정"></select><button id="readerGPTConnect" type="button">Continue with ChatGPT</button><button id="readerGPTDisconnect" type="button">로그아웃</button><button id="readerGPTUsage" type="button">사용량 관리</button></div><div id="readerGPTPc"><button id="readerGPTPair" type="button">PC 연결</button><small>PC 연결 프로그램의 시작 파일을 먼저 실행해 주세요.</small><p><a href="https://github.com/narpheus-cpu/viewer/raw/refs/heads/main/downloads/EbookViewer_v1.30.apk" download>전자책뷰어 모바일 연결 업데이트 설치</a></p><small>모바일은 기존 전자책뷰어를 업데이트한 뒤 문장 선택 → 기본 메뉴의 ChatGPT연결 · 뷰어(또는 ⋮)를 사용하세요. 답변은 기존 앱에서 열립니다.</small></div><label class="reader-gpt-field">모델<select id="readerGPTModel"></select></label><details><summary>선택한 본문</summary><textarea id="readerGPTSelected" readonly rows="3" aria-label="선택한 본문"></textarea></details><label class="reader-gpt-field">프롬프트<textarea id="readerGPTPrompt" rows="4" maxlength="16000"></textarea></label><small id="readerGPTSaved"></small><small>프롬프트에 {{본문}}을 넣으면 그 자리에 선택한 문장을 넣습니다. 없으면 끝에 본문을 덧붙입니다.</small></div></details><footer class="reader-gpt-footer"><button id="readerGPTPrevPage" type="button" aria-label="이전 답변 페이지" disabled>‹</button><button id="readerGPTNextPage" type="button" aria-label="다음 답변 페이지" disabled>›</button><button id="readerGPTSend" type="button">질문 보내기</button><button id="readerGPTStop" type="button" hidden>중지</button></footer></section>';
   document.body.appendChild(readerGPTLayer);setupReaderGPTAnswerPages();document.getElementById('readerGPTPc').hidden=readerGPTNative();document.getElementById('closeReaderGPT').onclick=readerGPTClose;document.getElementById('readerGPTSend').onclick=readerGPTSend;document.getElementById('readerGPTStop').onclick=()=>{void readerGPTCancel();readerGPTStatus('질문을 중지했습니다.');};
   document.getElementById('readerGPTConnect').onclick=async()=>{try{readerGPTStatus('로그인 창을 여는 중…');await readerGPTRpc('signin',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
   document.getElementById('readerGPTAccounts').onchange=async()=>{try{await readerGPTRpc('switch',{account:document.getElementById('readerGPTAccounts').value});readerGPTAccount='';void readerGPTRefresh();}catch(e){readerGPTStatus(e.message);}};
@@ -958,7 +1598,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .booktitle{font-weight:900}
 .book-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .book-actions button{padding:7px 10px;font-size:12px}
-.book-actions button .button-note{display:block;margin-top:2px;font-size:10px;font-weight:600;line-height:1.26;color:var(--muted)}
+.book-actions button .button-note{display:block;margin-top:2px;font-size:10px;font-weight:600;line-height:1.27;color:var(--muted)}
 .viewer-settings{
   display:none;
   flex:0 0 auto;
@@ -1177,6 +1817,13 @@ textarea{min-height:42vh}
 .page{padding-bottom:max(var(--viewer-pad-bottom),calc(44px + env(safe-area-inset-bottom,0px)))}
 @media(max-width:360px){.reader-document-title{font-size:11px}}
 .page-right{display:none}
+/* Wide screens show a spread; equal column widths share the same pagination measure. */
+@media(min-width:1024px){
+  .page-spread{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1px;background:var(--line)}
+  .page-right{display:block}
+  .page-spread>.page{--viewer-pad-left:inherit;--viewer-pad-right:inherit}
+}
+
 .page + .page{border-left:0}
 .page{--viewer-pad-right:18px;--viewer-pad-left:18px}
 .page-inner{font-size:var(--viewer-font-size)}
@@ -1223,9 +1870,7 @@ textarea{min-height:42vh}
   padding:12px;
   border-bottom:1px solid var(--line);
 }
-.recent-head{flex-wrap:wrap}
 .recent-head strong{font-size:14px}
-#recentHistoryStatus{flex:0 0 auto;padding:8px 12px;font-size:12px;line-height:1.5}
 .recent-head-actions{display:flex;gap:6px}
 .recent-head-actions button{padding:6px 8px;font-size:11px}
 .recent-list{
@@ -1304,10 +1949,6 @@ textarea{min-height:42vh}
 .reader-spacing-option{display:block;margin:10px 0;font-size:13px;line-height:1.5}
 .reader-spacing-option small{display:block;margin-left:23px;color:var(--muted);font-size:11px}
 @media(max-width:480px){.bookhead{gap:4px}.book-actions{gap:4px}.book-actions button{font-size:10px;padding:5px}.top-page-nav{gap:4px}}
-
-/* Keep the book canvas fixed while the IME resizes WebView; only the floating search surface follows it. */
-.reader-search-panel{position:fixed;top:calc(var(--search-live-top,0px) + 42px);left:calc(var(--search-live-left,0px) + 6px);right:auto;width:calc(var(--search-live-width,100vw) - 12px);max-height:var(--search-live-height,72vh)}
-.reader-search-result{font-weight:400}
 .page-inner .reader-note{font-style:italic;cursor:pointer;border:0;background:#e5e5e5;color:#000;padding:0;margin:0;border-radius:0;
   text-decoration:underline;text-decoration-style:dotted;text-decoration-color:#000;text-underline-offset:.12em;
   -webkit-box-decoration-break:clone;box-decoration-break:clone}
@@ -1695,10 +2336,23 @@ async function loadReaderFile(file){
   const epub=/\.epub$/i.test(file.name);
   if(!epub&&!/\.txt$/i.test(file.name))throw new Error('TXT 또는 EPUB 파일을 선택해 주세요.');
   const imported=epub?await importEpub(file):{text:(await file.text()).replace(/^\uFEFF/,''),chapters:[]};
-  inputText.value=imported.text;inputBookChapters=imported.chapters;
-  inputFileName=file.name;userEditedAfterRestore=true;readerState.canCheckpoint=true;updateInputCharacterCount();
+  let text=imported.text;
+  if(!epub){
+    const unpacked=window.ReaderInsightsData.parse(text);
+    // HTML textareas normalize CRLF to LF; store metadata against the same text.
+    text=unpacked.body.replace(/\r\n?/g,'\n');
+    if(unpacked.hasInsights){
+      const normalized={...unpacked.metadata,records:unpacked.metadata.records.map(r=>({
+        ...r,evidence:r.evidence.replace(/\r\n?/g,'\n'),
+        reveal:{...r.reveal,quote:r.reveal.quote.replace(/\r\n?/g,'\n')}
+      }))};
+      await window.ReaderInsightsData.save(text,normalized);
+    }
+  }
+  inputText.value=text;inputBookChapters=imported.chapters;
+  inputFileName=file.name;userEditedAfterRestore=true;updateInputCharacterCount();
   flushReadingSessionSave(false);
-  const count=epub?imported.chapters.length:detectTextChapters(imported.text).length;
+  const count=epub?imported.chapters.length:detectTextChapters(text).length;
   setStatus(`불러옴: ${file.name}${count?` · ${count}개 챕터`:''}`);
 }
 
@@ -1878,6 +2532,52 @@ function readerPaginateV18(text){
 
 let readerSearchSource=null,readerSearchMatches=[],readerSearchSelected=-1,readerSearchQuery='',readerSearchTimer=0,readerSearchShown=0;
 function readerSearchIsOpen(){return !!document.getElementById('readerSearchPanel')&&!document.getElementById('readerSearchPanel').hidden;}
+function readerResetSearchForBook(){
+  if(readerSearchSource===fullText)return;
+  readerSearchSource=fullText;readerSearchMatches=[];readerSearchSelected=-1;readerSearchQuery='';
+  const input=document.getElementById('readerSearchInput');if(input)input.value='';
+  if(document.getElementById('readerSearchResults'))readerShowSearchResults(true);
+}
+function readerShowSearch(){
+  readerResetSearchForBook();document.getElementById('readerSearchPanel').hidden=false;
+  document.getElementById('readerSearchInput').focus();
+}
+function readerHideSearch(){
+  const panel=document.getElementById('readerSearchPanel');if(panel)panel.hidden=true;
+  document.getElementById('readerSearchInput')?.blur();
+}
+function readerFindInBook(){
+  clearTimeout(readerSearchTimer);
+  readerResetSearchForBook();readerSearchQuery=document.getElementById('readerSearchInput').value.trim();
+  readerSearchMatches=[];readerSearchSelected=-1;
+  if(readerSearchQuery){
+    const literal=readerSearchQuery.split(/\s+/).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s+');
+    const pattern=new RegExp(literal,'giu'),text=readerCanonical();
+    for(const match of text.matchAll(pattern))readerSearchMatches.push({start:match.index,end:match.index+match[0].length});
+  }
+  readerShowSearchResults(true);readerPaintSearch();
+}
+function readerShowSearchResults(reset=false){
+  const list=document.getElementById('readerSearchResults'),count=document.getElementById('readerSearchCount');
+  if(!list)return;
+  if(reset){list.replaceChildren();readerSearchShown=0;}
+  count.textContent=readerSearchQuery?`${readerSearchMatches.length.toLocaleString()}개 검색 결과`:'검색어를 입력하세요.';
+  const text=readerCanonical(),end=Math.min(readerSearchMatches.length,readerSearchShown+100);
+  list.querySelector('.search-more')?.remove();
+  for(let i=readerSearchShown;i<end;i++){
+    const match=readerSearchMatches[i],button=document.createElement('button');button.type='button';button.className='reader-search-result';
+    button.dataset.result=String(i);
+    const label=document.createElement('span');label.className='reader-search-result-label';
+    let chapter=0;for(let c=1;c<chapterCanonicalStarts.length;c++){if(chapterCanonicalStarts[c]>match.start)break;chapter=c;}
+    label.textContent=`${i+1}${bookChapters.length?' · '+bookChapters[chapter].title:''}`;
+    const snippet=document.createElement('span');snippet.className='reader-search-snippet';
+    const mark=document.createElement('mark');mark.textContent=text.slice(match.start,match.end);
+    snippet.append(text.slice(Math.max(0,match.start-40),match.start),mark,text.slice(match.end,match.end+70));
+    button.append(label,snippet);button.onclick=()=>readerGoSearchResult(i);list.appendChild(button);
+  }
+  readerSearchShown=end;
+  if(end<readerSearchMatches.length){const more=document.createElement('button');more.type='button';more.className='search-more';more.textContent='결과 더 보기';more.onclick=()=>readerShowSearchResults(false);list.appendChild(more);}
+}
 function readerGoSearchResult(index){
   if(restoreInProgress||!readerSearchMatches[index])return;
   readerSearchSelected=index;const match=readerSearchMatches[index];
@@ -1914,7 +2614,7 @@ function setupReaderTools(){
   document.getElementById('openReaderSearch').onclick=readerShowSearch;
   document.getElementById('closeReaderSearch').onclick=readerHideSearch;
   document.getElementById('readerSearchForm').onsubmit=e=>{e.preventDefault();readerFindInBook();};
-  document.getElementById('readerSearchInput').addEventListener('input',()=>{clearTimeout(readerSearchTimer);readerSearchTimer=setTimeout(readerFindInBook,80);});
+  document.getElementById('readerSearchInput').addEventListener('input',()=>{clearTimeout(readerSearchTimer);readerSearchTimer=setTimeout(readerFindInBook,180);});
   document.getElementById('sentenceSpacing').onchange=e=>{
     viewerSettings.sentenceSpacing=e.target.checked;repaginateDeferredBySettings=true;
     saveViewerSettings();scheduleRepaginate();
@@ -1922,202 +2622,8 @@ function setupReaderTools(){
 }
 
 </script>
-<script>
-/* Search has its own viewport lifetime and background text index, independent of book pagination. */
-let readerSearchFrozenViewport=null,readerSearchSettling=false,readerSearchSettleTimer=0,readerSearchSettleStarted=0;
-let readerSearchLiveViewport=null;
-function readerSearchLayoutLocked(){return !!readerSearchFrozenViewport&&(readerSearchIsOpen()||readerSearchSettling);}
-function readerSearchUpdateViewport(viewport){
-  readerSearchLiveViewport=viewport;
-  const style=document.documentElement.style;
-  style.setProperty('--search-live-top',viewport.top+'px');style.setProperty('--search-live-left',viewport.left+'px');
-  style.setProperty('--search-live-width',Math.max(1,viewport.width)+'px');
-  style.setProperty('--search-live-height',Math.max(80,viewport.height-58)+'px');
-  if(readerSearchSettling)readerSearchScheduleRelease();
-}
-function readerSearchBeginLayout(){
-  clearTimeout(readerSearchSettleTimer);clearTimeout(repaginateTimer);readerSearchSettling=false;
-  if(!readerSearchFrozenViewport){
-    const v=lastVisualViewport||{top:0,left:0,width:innerWidth,height:innerHeight};
-    readerSearchFrozenViewport={...v};
-  }
-}
-function readerSearchScheduleRelease(){
-  clearTimeout(readerSearchSettleTimer);
-  readerSearchSettleTimer=setTimeout(()=>{
-    if(readerSearchIsOpen())return;
-    const live=readerSearchLiveViewport,frozen=readerSearchFrozenViewport;
-    // Wait out the keyboard animation instead of paginating at its intermediate height.
-    if(live&&frozen&&Math.abs(live.width-frozen.width)<2&&live.height<frozen.height*.8&&performance.now()-readerSearchSettleStarted<2200){readerSearchScheduleRelease();return;}
-    readerSearchSettling=false;readerSearchFrozenViewport=null;syncVisualViewport();
-    if(viewerOverlay.classList.contains('active')&&readerState.layout!==getLayoutSignature())scheduleRepaginate(0);
-  },250);
-}
-function readerShowSearch(){
-  const started=performance.now();readerResetSearchForBook();readerSearchBeginLayout();
-  document.getElementById('readerSearchPanel').hidden=false;
-  syncVisualViewport();document.getElementById('readerSearchInput').focus({preventScroll:true});
-  readerSearchStats.opens++;readerSearchStats.lastOpenMs=performance.now()-started;
-}
-function readerHideSearch(){
-  const panel=document.getElementById('readerSearchPanel');if(panel)panel.hidden=true;
-  document.getElementById('readerSearchInput')?.blur();
-  if(readerSearchFrozenViewport){readerSearchSettling=true;readerSearchSettleStarted=performance.now();readerSearchScheduleRelease();}
-}
-
-/* The same bounded task kernel runs in a Worker, with a cooperative fallback for older WebViews. */
-function readerSearchKernel(scope){
-  let text='',revision=0,buckets=new Map(),keys=[],indexed=false,active=null,cache=new Map();
-  const clock=()=>performance.now(),later=fn=>setTimeout(fn,0);
-  const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  function buildIndex(at,rev){
-    if(revision!==rev)return;
-    const deadline=clock()+4;
-    while(at<text.length&&clock()<deadline){
-      const character=String.fromCodePoint(text.codePointAt(at));let list=buckets.get(character);
-      if(!list){list=[];buckets.set(character,list);keys.push(character);}list.push(at);at+=character.length;
-    }
-    if(at<text.length)later(()=>buildIndex(at,rev));
-    else{indexed=true;scope.postMessage({type:'indexed',revision});}
-  }
-  function emit(job,done=false){
-    if(active!==job||job.revision!==revision)return;
-    const available=Math.min(job.want,job.hits.length/2),now=clock();
-    if(!done&&available===job.sent&&now-job.lastSent<80)return;
-    const pairs=available!==job.sent?job.hits.slice(0,available*2):null;job.sent=available;job.lastSent=now;
-    scope.postMessage({type:'results',revision,token:job.token,count:job.hits.length/2,done,pairs});
-  }
-  function accept(job,at){
-    if(at<job.next)return;
-    job.pattern.lastIndex=at;const match=job.pattern.exec(text);
-    if(match){job.hits.push(at,at+match[0].length);job.next=at+match[0].length;}
-  }
-  function scan(job){
-    if(active!==job||revision!==job.revision)return;
-    const deadline=clock()+4;let done=false;
-    while(clock()<deadline){
-      if(job.lists){
-        let smallest=Infinity,chosen=-1;
-        for(let i=0;i<job.lists.length;i++){const at=job.lists[i][job.cursors[i]];if(at!==undefined&&at<smallest){smallest=at;chosen=i;}}
-        if(chosen<0){done=true;break;}job.cursors[chosen]++;accept(job,smallest);
-      }else{
-        if(!job.window||job.first.lastIndex>=job.window.length){
-          if(job.windowEnd>=text.length){done=true;break;}
-          job.windowStart=job.windowEnd;job.windowEnd=Math.min(text.length,job.windowStart+32768);
-          if(job.windowEnd<text.length&&/[\uDC00-\uDFFF]/.test(text[job.windowEnd]))job.windowEnd--;
-          job.window=text.slice(job.windowStart,job.windowEnd);job.first.lastIndex=0;
-        }
-        const match=job.first.exec(job.window);
-        if(match)accept(job,job.windowStart+match.index);else job.first.lastIndex=job.window.length;
-      }
-    }
-    job.done=done;emit(job,done);
-    if(!done)later(()=>scan(job));
-    else if(job.hits.length<=20000){cache.set(job.query,job.hits);while(cache.size>4)cache.delete(cache.keys().next().value);}
-  }
-  scope.onmessage=event=>{
-    const message=event.data;
-    if(message.type==='book'){
-      if(message.revision===revision&&message.text===text)return;
-      revision=message.revision;text=message.text;active=null;buckets=new Map();keys=[];indexed=false;cache=new Map();
-      const rev=revision;later(()=>buildIndex(0,rev));return;
-    }
-    if(message.revision!==revision)return;
-    if(message.type==='cancel'){active=null;return;}
-    if(message.type==='page'){
-      if(active&&active.token===message.token){active.want=message.limit;active.sent=-1;emit(active,active.done||false);}return;
-    }
-    if(message.type!=='query')return;
-    const query=message.query,first=String.fromCodePoint(query.codePointAt(0));
-    const job={query,revision,token:message.token,pattern:new RegExp(query.split(/\s+/).map(escape).join('\\s+'),'iyu'),
-      first:new RegExp(escape(first),'giu'),hits:[],next:0,want:100,sent:0,lastSent:0,window:null,windowEnd:0};
-    active=job;
-    if(cache.has(query)){job.hits=cache.get(query);job.done=true;emit(job,true);return;}
-    if(indexed){const test=new RegExp('^'+escape(first)+'$','iu');job.lists=keys.filter(key=>test.test(key)).map(key=>buckets.get(key));job.cursors=job.lists.map(()=>0);}
-    later(()=>{scan(job);});
-  };
-}
-
-let readerSearchEngine=null,readerSearchEngineURL='',readerSearchPreparedSource=null,readerSearchText='',readerSearchRevision=0,readerSearchToken=0;
-let readerSearchBusy=false,readerSearchTotal=0,readerSearchLimit=100;
-const readerSearchStats={opens:0,lastOpenMs:0,prepares:0,queries:0,indexed:false,mode:''};
-function readerSearchUseFallback(){
-  readerSearchEngine?.terminate?.();
-  if(readerSearchEngineURL){URL.revokeObjectURL(readerSearchEngineURL);readerSearchEngineURL='';}
-  const scope={postMessage:message=>setTimeout(()=>readerSearchReceive(message),0)};readerSearchKernel(scope);
-  readerSearchEngine={postMessage:message=>setTimeout(()=>scope.onmessage({data:message}),0)};readerSearchStats.mode='cooperative';
-  if(readerSearchPreparedSource!==null){readerSearchEngine.postMessage({type:'book',revision:readerSearchRevision,text:readerSearchText});if(readerSearchBusy)readerSearchSubmitCurrent();}
-}
-function readerSearchCreateEngine(){
-  if(readerSearchEngine)return;
-  try{
-    if(typeof Worker!=='function')throw Error('Worker unavailable');
-    readerSearchEngineURL=URL.createObjectURL(new Blob(['('+readerSearchKernel.toString()+')(self);'],{type:'text/javascript'}));
-    readerSearchEngine=new Worker(readerSearchEngineURL);readerSearchStats.mode='worker';
-    readerSearchEngine.onmessage=event=>readerSearchReceive(event.data);
-    readerSearchEngine.onerror=event=>{event.preventDefault?.();readerSearchUseFallback();};
-  }catch{readerSearchUseFallback();}
-}
-function readerPrepareSearchBook(){
-  if(!fullText||readerSearchPreparedSource===fullText)return;
-  // Called after the book has already produced its canonical text, never by the Find button.
-  if(readerState.canonicalSource!==fullText)return;
-  readerSearchText=readerState.canonical;readerSearchPreparedSource=fullText;readerSearchRevision++;
-  readerSearchStats.prepares++;readerSearchStats.indexed=false;readerSearchCreateEngine();
-  readerSearchEngine.postMessage({type:'book',revision:readerSearchRevision,text:readerSearchText});
-  if(readerSearchBusy)readerSearchSubmitCurrent();
-}
-function readerResetSearchForBook(){
-  if(readerSearchSource===fullText)return;
-  readerSearchSource=fullText;readerSearchMatches=[];readerSearchSelected=-1;readerSearchQuery='';readerSearchBusy=false;readerSearchTotal=0;
-  readerSearchToken++;readerSearchPreparedSource=null;readerSearchText='';
-  clearTimeout(readerSearchTimer);document.getElementById('readerSearchInput').value='';readerShowSearchResults(true);
-}
-function readerSearchSubmitCurrent(){
-  if(readerSearchPreparedSource!==fullText)return;
-  readerSearchEngine.postMessage({type:'query',revision:readerSearchRevision,token:readerSearchToken,query:readerSearchQuery});
-}
-function readerFindInBook(){
-  clearTimeout(readerSearchTimer);readerResetSearchForBook();readerSearchToken++;
-  readerSearchQuery=document.getElementById('readerSearchInput').value.trim();readerSearchMatches=[];readerSearchSelected=-1;
-  readerSearchTotal=0;readerSearchLimit=100;readerSearchBusy=!!readerSearchQuery;readerSearchStats.queries++;
-  readerShowSearchResults(true);readerPaintSearch();
-  if(readerSearchQuery)readerSearchSubmitCurrent();
-  else readerSearchEngine?.postMessage({type:'cancel',revision:readerSearchRevision});
-}
-function readerSearchReceive(message){
-  if(message.revision!==readerSearchRevision||readerSearchPreparedSource!==fullText)return;
-  if(message.type==='indexed'){readerSearchStats.indexed=true;return;}
-  if(message.type!=='results'||message.token!==readerSearchToken)return;
-  readerSearchTotal=message.count;readerSearchBusy=!message.done;
-  if(message.pairs){readerSearchMatches=[];for(let i=0;i<message.pairs.length;i+=2)readerSearchMatches.push({start:message.pairs[i],end:message.pairs[i+1]});readerShowSearchResults(true);}
-  else readerShowSearchResults(false);
-}
-function readerSearchUpdateCount(){
-  document.getElementById('readerSearchCount').textContent=!readerSearchQuery?'검색어를 입력하세요.':
-    readerSearchBusy?(readerSearchTotal?`${readerSearchTotal.toLocaleString()}개 이상 · 검색 중…`:'검색 중…'):`${readerSearchTotal.toLocaleString()}개 검색 결과`;
-}
-function readerShowSearchResults(reset=false){
-  const list=document.getElementById('readerSearchResults');if(!list)return;
-  if(reset){list.replaceChildren();readerSearchShown=0;}
-  readerSearchUpdateCount();list.querySelector('.search-more')?.remove();
-  for(let i=readerSearchShown;i<readerSearchMatches.length;i++){
-    const match=readerSearchMatches[i],button=document.createElement('button');button.type='button';button.className='reader-search-result';button.dataset.result=String(i);
-    const label=document.createElement('span');label.className='reader-search-result-label';let chapter=0;
-    for(let c=1;c<chapterCanonicalStarts.length;c++){if(chapterCanonicalStarts[c]>match.start)break;chapter=c;}
-    label.textContent=`${i+1}${bookChapters.length?' · '+bookChapters[chapter].title:''}`;
-    const snippet=document.createElement('span');snippet.className='reader-search-snippet';const mark=document.createElement('mark');
-    mark.textContent=readerSearchText.slice(match.start,match.end);
-    snippet.append(readerSearchText.slice(Math.max(0,match.start-40),match.start),mark,readerSearchText.slice(match.end,match.end+70));
-    button.append(label,snippet);button.onclick=()=>readerGoSearchResult(i);list.appendChild(button);
-  }
-  readerSearchShown=readerSearchMatches.length;
-  if(readerSearchShown<readerSearchTotal){const more=document.createElement('button');more.type='button';more.className='search-more';more.textContent='결과 더 보기';more.onclick=()=>{
-    readerSearchLimit+=100;readerSearchEngine.postMessage({type:'page',revision:readerSearchRevision,token:readerSearchToken,limit:readerSearchLimit});
-  };list.appendChild(more);}
-}
-
-</script>
+<link rel="stylesheet" href="./reader-insights.css?v=7">
+<script src="./reader-insights-data.js?v=6"></script>
 </head>
 <body>
 
@@ -2148,14 +2654,12 @@ function readerShowSearchResults(reset=false){
 <div class="recent-overlay" id="recentOverlay" aria-hidden="true">
   <section class="recent-panel" role="dialog" aria-modal="true" aria-labelledby="recentTitle">
     <div class="recent-head">
-      <strong id="recentTitle">읽을 책 선택 · 최근 20개</strong>
+      <strong id="recentTitle">최근 내역 · 최대 20개</strong>
       <div class="recent-head-actions">
-        <button class="secondary" id="chooseRecentFile" type="button">새 파일 열기</button>
         <button class="secondary" id="clearRecentHistory" type="button">전체 삭제</button>
         <button class="secondary" id="closeRecentHistory" type="button">닫기</button>
       </div>
     </div>
-    <div class="status" id="recentHistoryStatus" role="status" aria-live="polite">읽을 책을 선택해 주세요. 최근 책은 자동으로 열지 않습니다.</div>
     <div class="recent-list" id="recentList">
       <div class="recent-empty">저장된 내역이 없습니다.</div>
     </div>
@@ -2605,7 +3109,7 @@ async function pruneRecentHistory(){
   for(const meta of metas.slice(RECENT_LIMIT))await deleteRecentById(meta.id);
 }
 
-async function upsertRecentText(text,{resetPosition=true,fileName,generation=readerState.generation}={}){
+async function upsertRecentText(text,{resetPosition=true,fileName}={}){
   if(!resetPosition&&activeRecentId&&activeRecentMeta&&text===fullText&&
     (inputBookChapters===activeRecentMeta.chapters||(!inputBookChapters.length&&!activeRecentMeta.chapters?.length))){
     const meta=currentRecentPositionMeta();
@@ -2616,7 +3120,7 @@ async function upsertRecentText(text,{resetPosition=true,fileName,generation=rea
   let existing=null;
   try{existing=await getRecentMeta(id);}catch(e){}
   const now=Date.now();
-  if(!resetPosition&&existing)existing=window.__androidRecentMeta(existing);
+  if(!resetPosition&&existing)existing=window.__browserRecentMeta(existing);
   const live=!resetPosition&&id===activeRecentId&&text===fullText&&pages.length?currentRecentPositionMeta():null;
   if(live)existing=live;
   const meta={
@@ -2633,7 +3137,6 @@ async function upsertRecentText(text,{resetPosition=true,fileName,generation=rea
     layoutSignature:resetPosition?'':(typeof existing?.layoutSignature==='string'?existing.layoutSignature:'')
   };
   await putRecentTextAndMeta(text,meta);
-  if(generation!==readerState.generation)return meta;
   activeRecentId=id;
   activeRecentMeta=meta;
   await pruneRecentHistory();
@@ -2656,7 +3159,7 @@ function currentRecentPositionMeta(){
 }
 
 async function saveActiveRecentPosition(){
-  if(restoreInProgress||!readerState.canCheckpoint)return;
+  if(restoreInProgress)return;
   const meta=currentRecentPositionMeta();
   if(!meta)return;
   activeRecentMeta=meta;
@@ -2690,7 +3193,7 @@ async function activateRecentFromReading(reading){
 async function renderRecentHistory(){
   recentList.innerHTML='<div class="recent-empty">불러오는 중...</div>';
   try{
-    const metas=(await readerBounded(getRecentMetas(),3000,'최근 목록 읽기')).slice(0,RECENT_LIMIT);
+    const metas=(await getRecentMetas()).slice(0,RECENT_LIMIT);
     if(!metas.length){
       recentList.innerHTML='<div class="recent-empty">저장된 내역이 없습니다.</div>';
       return;
@@ -2732,13 +3235,12 @@ async function renderRecentHistory(){
       recentList.appendChild(row);
     }
   }catch(error){
-    recentList.innerHTML='<div class="recent-empty">최근 내역을 불러오지 못했습니다. 새 파일을 열거나 다시 시도해 주세요.</div>';const retry=document.createElement('button');retry.type='button';retry.textContent='다시 불러오기';retry.id='retryRecentHistory';retry.onclick=()=>void renderRecentHistory();recentList.appendChild(retry);
+    recentList.innerHTML='<div class="recent-empty">최근 내역을 불러오지 못했습니다.</div>';
     setStatus(error.message||'최근 내역을 불러오지 못했습니다.',true);
   }
 }
 
-function showRecentHistory(message=''){
-  $('#recentHistoryStatus').textContent=typeof message==='string'&&message?message:'읽을 책을 선택해 주세요. 최근 책은 자동으로 열지 않습니다.';
+function showRecentHistory(){
   recentOverlay.classList.add('active');
   recentOverlay.setAttribute('aria-hidden','false');
   void renderRecentHistory();
@@ -2749,13 +3251,15 @@ function hideRecentHistory(){
   recentOverlay.setAttribute('aria-hidden','true');
 }
 
+function visiblePageCount(){return getComputedStyle(pageInnerRight.parentElement).display==='none'?1:2;}
+
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
   return JSON.stringify(['layout-v8-uppercase-periods',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
-    navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[]),
+    ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[]),
     ...(readerSourceHasPronunciations(fullText)?['pronunciations-v1']:[])]);
 }
 let readingSaveTimer=0;
@@ -2778,7 +3282,7 @@ function flushReadingSessionSave(isOpen=viewerOverlay.classList.contains('active
 }
 
 function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
-  if(restoreInProgress||readerState.initializing||!readerState.canCheckpoint)return false;
+  if(restoreInProgress||readerState.initializing)return false;
   const text=isOpen&&fullText!==''?fullText:inputText.value;
   const safeIndex=Math.min(Math.max(0,pageIndex),Math.max(0,pageAnchors.length-1));
   const pageAnchor=pageAnchors.length?readerAnchor():0;
@@ -2795,7 +3299,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
     isOpen,
     updatedAt:Date.now()
   };
-  window.__androidCheckpoint?.(record);
+  window.__browserCheckpoint?.(record);
   const raw=JSON.stringify(record);
   let savedSomewhere=false;
   try{ localStorage.setItem(READING_STORAGE,raw); savedSomewhere=true; }catch(e){}
@@ -2814,7 +3318,7 @@ function saveReadingSession(isOpen=viewerOverlay.classList.contains('active')){
 inputText.addEventListener('input',()=>{
   inputFileName='';inputBookChapters=[];
   updateInputCharacterCount();
-  userEditedAfterRestore=true;readerState.canCheckpoint=true;
+  userEditedAfterRestore=true;
   scheduleReadingSessionSave(false,180);
 });
 
@@ -2855,10 +3359,7 @@ const viewerControls={
 };
 
 function loadViewerSettings(){
-  try{
-    const native=window.AndroidReader?.readSettings?.();
-    if(native){const parsed=JSON.parse(native);if(parsed&&typeof parsed==='object')return {...viewerDefaults,...parsed};}
-  }catch(e){}
+  /* Android SharedPreferences 설정 읽기는 아래 원본 localStorage 읽기로 대체. */
   try{
     const raw=localStorage.getItem(VIEWER_STORAGE);
     if(raw){
@@ -2870,7 +3371,7 @@ function loadViewerSettings(){
 }
 
 function saveViewerSettings(){
-  try{window.AndroidReader?.saveSettings?.(JSON.stringify(viewerSettings));}catch(e){}
+  /* Android SharedPreferences 설정 쓰기는 아래 원본 localStorage 쓰기로 대체. */
   try{ localStorage.setItem(VIEWER_STORAGE,JSON.stringify(viewerSettings)); }catch(e){}
 }
 
@@ -3131,8 +3632,9 @@ function settingsPanelIsOpen(){
   실제 페이지 재분할은 설정 패널을 닫을 때 한 번만 수행한다.
 */
 function scheduleRepaginate(delay=90){
+  if(readerBrowserLayoutPaused()){clearTimeout(repaginateTimer);return;}
   if(!viewerOverlay.classList.contains('active'))return;
-  if(pageJumpLayoutLocked()||readerSearchLayoutLocked()){clearTimeout(repaginateTimer);return;}
+  if(pageJumpLayoutLocked()){clearTimeout(repaginateTimer);return;}
   if(restoreInProgress){
     clearTimeout(repaginateTimer);
     return;
@@ -3473,9 +3975,14 @@ function render(){
   }
 
   readerStats.visibleRenders++;
+  const count=visiblePageCount();
+  // Keep the logical reading anchor even when its page is on the right of the spread.
+  if(count===2)pageIndex-=pageIndex%2;
   pageInnerLeft.innerHTML=pages[pageIndex]||'<div class="empty">표시할 내용이 없습니다.</div>';
-  pageInnerRight.innerHTML='';
-  counter.textContent=readerLazyActive()?readerLazyCounter():`${pageIndex+1} / ${pages.length}`;
+  pageInnerRight.innerHTML=count===2?(pages[pageIndex+1]||''):'';
+  pageInnerRight.parentElement.setAttribute('aria-hidden',String(count===1||!pages[pageIndex+1]));
+  const end=Math.min(pages.length,pageIndex+count);
+  counter.textContent=readerLazyActive()?readerLazyCounter():`${end>pageIndex+1?(pageIndex+1)+'–'+end:pageIndex+1} / ${pages.length}`;
   pageJumpInput.max=String(pages.length);
   pageJumpInput.disabled=readerLazyActive();
   $('#pageJumpBtn').disabled=readerLazyActive();
@@ -3485,16 +3992,18 @@ function render(){
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
   if(!restoreInProgress){
-    window.__androidCheckpoint?.();
+    window.__browserCheckpoint?.();
     scheduleReadingSessionSave(true);
     scheduleActiveRecentPositionSave();
+    window.readerInsights?.observe();
   }
 }
 
 async function repaginate(){
+  if(readerBrowserLayoutPaused())return;
   if(readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen())return;
   if(pageGesture){pageGestureLayoutDeferred=true;return;}
-  if(pageJumpLayoutLocked()||readerSearchLayoutLocked())return;
+  if(pageJumpLayoutLocked())return;
   if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
   if(readerState.layout===getLayoutSignature())return;
   const position={pageAnchor:readerAnchor(),pageContext:readerState.context,pageIndex};
@@ -3505,19 +4014,25 @@ function goPrevPage(){
   if(readerLazyActive()){void readerLazyTurn(-1);return;}
   if(restoreInProgress)return;
   if(pageIndex>0){
-    pageIndex-=1;
+    pageIndex=Math.max(0,pageIndex-visiblePageCount());
     readerChooseAnchor(pageAnchors[pageIndex]);
     render();
   }
 }
 
 function goNextPage(){
-  if(readerLazyActive()){void readerLazyTurn(1);return;}
   if(restoreInProgress)return;
-  if(pageIndex+1<pages.length){
-    pageIndex+=1;
+  const ticket=window.readerInsights?.prepareAdvance();
+  if(readerLazyActive()){
+    void readerLazyTurn(1).then(()=>window.readerInsights?.finishAdvance(ticket)).catch(()=>{});
+    return;
+  }
+  const count=visiblePageCount();
+  if(pageIndex+count<pages.length){
+    pageIndex+=count;
     readerChooseAnchor(pageAnchors[pageIndex]);
     render();
+    window.readerInsights?.finishAdvance(ticket);
   }
 }
 
@@ -3653,16 +4168,22 @@ txtFileInput.addEventListener('change',async()=>{
 async function openViewer(){
   userEditedAfterRestore=true;
   await readerReady;
-  const text=inputText.value;
+  let text=inputText.value;
+  try{
+    const unpacked=window.ReaderInsightsData.parse(text);
+    if(unpacked.hasInsights){
+      await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
+      text=unpacked.body;inputText.value=text;
+    }
+  }catch(error){setStatus(error.message,true);return;}
   updateInputCharacterCount();
   if(!text.trim()){setStatus('전자책으로 볼 텍스트를 입력하세요.',true);return;}
-  let generation=++readerState.generation;
-  setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;readerState.canCheckpoint=false;
+  const generation=++readerState.generation;
+  setStatus('');viewerOverlay.classList.add('active');readerSetLoading(true);restoreInProgress=true;
   let record=text===fullText&&pages.length?{pageAnchor:readerAnchor(),pageContext:readerState.context}: {pageAnchor:0};
   try{
-    await readerPrepareInitialFont();if(generation!==readerState.generation)return;
-    record=await readerBounded(upsertRecentText(text,{resetPosition:false,fileName:inputFileName,generation}),5000,'최근 내역 저장');
-  }catch(error){if(generation!==readerState.generation)return;generation=++readerState.generation;activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
+    record=await upsertRecentText(text,{resetPosition:false,fileName:inputFileName});
+  }catch(error){activeRecentId='';activeRecentMeta=null;setStatus('최근 내역을 저장하지 못했습니다.',true);}
   if(generation!==readerState.generation)return;
   fullText=text;
   $('#viewerSettings').classList.remove('open');
@@ -3670,10 +4191,11 @@ async function openViewer(){
 }
 
 function closeViewer(){
-  const wasLoading=restoreInProgress;
+  window.readerInsights?.close();
+  window.readerInsights?.cancelCorrection();
   readerLazyCancel();
   readerCloseTimeline();
-  readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;
+  readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;if(readerInsightsSelectionAction)readerInsightsSelectionAction.hidden=true;if(readerInsightsLookupAction)readerInsightsLookupAction.hidden=true;
   readerCloseNote();
   readerHideSearch();
   resetPageGesture();
@@ -3681,30 +4203,35 @@ function closeViewer(){
   readerState.cancelled=true;readerState.generation++;
   clearTimeout(repaginateTimer);
   restoreInProgress=false;
-  if(!wasLoading)flushActiveRecentPositionSave();
+  flushActiveRecentPositionSave();
   viewerOverlay.classList.remove('active');readerSetLoading(false);
   $('#viewerSettings').classList.remove('open');
-  if(!wasLoading)flushReadingSessionSave(false);else{readerState.canCheckpoint=false;showRecentHistory('불러오기를 취소했습니다. 다른 책을 선택할 수 있습니다.');}
+  flushReadingSessionSave(false);
 }
 
 async function openRecentBook(id){
-  userEditedAfterRestore=true;await readerReady;
-  const generation=++readerState.generation;readerState.cancelled=false;readerState.canCheckpoint=false;
-  hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
-  viewerOverlay.classList.add('active');restoreInProgress=true;readerSetLoading(true,'선택한 책을 불러오는 중…');
+  userEditedAfterRestore=true;
+  await readerReady;
+  const generation=++readerState.generation;
   try{
-    const [bookRecord]=await Promise.all([readerBounded(getRecentBook(id),8000,'책 읽기'),readerPrepareInitialFont()]);
+    const bookRecord=await getRecentBook(id);
     if(generation!==readerState.generation)return;
-    if(!bookRecord)throw Error('해당 최근 내역을 찾을 수 없습니다.');
-    const meta=window.__androidRecentMeta(bookRecord.meta||{id});
-    activeRecentId=id;activeRecentMeta=meta;inputText.value=bookRecord.text;fullText=bookRecord.text;
-    inputFileName=meta.fileName||'';inputBookChapters=meta.chapters||[];updateInputCharacterCount();
+    if(!bookRecord){setStatus('해당 최근 내역을 찾을 수 없습니다.',true);return;}
+    const meta=window.__browserRecentMeta(bookRecord.meta||{id});
+    activeRecentId=id;activeRecentMeta=meta;
+    const unpacked=window.ReaderInsightsData.parse(bookRecord.text);
+    const openText=unpacked.hasInsights?unpacked.body:bookRecord.text;
+    if(unpacked.hasInsights)await window.ReaderInsightsData.save(openText,unpacked.metadata);
+    inputText.value=openText;fullText=openText;
+    inputFileName=meta.fileName||'';inputBookChapters=meta.chapters||[];
+    updateInputCharacterCount();
+    hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
+    viewerOverlay.classList.add('active');
     await readerDisplay(meta,generation);
-  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerState.canCheckpoint=false;readerSetLoading(false);viewerOverlay.classList.remove('active');setStatus(error.message,true);showRecentHistory(error.message);}}
+  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);setStatus(error.message,true);}}
 }
 
 $('#recentHistoryBtn').onclick=showRecentHistory;
-$('#chooseRecentFile').onclick=()=>{hideRecentHistory();txtFileInput.click();};
 $('#closeRecentHistory').onclick=hideRecentHistory;
 $('#clearRecentHistory').onclick=async()=>{
   if(!confirm('최근 내역 20개를 모두 삭제할까요?'))return;
@@ -3738,14 +4265,14 @@ document.addEventListener('keydown',e=>{
 });
 
 function syncVisualViewport(){
+  if(readerBrowserLayoutPaused())return;
   const vv=window.visualViewport;
   const top=vv?Math.max(0,vv.offsetTop):0;
   const left=vv?Math.max(0,vv.offsetLeft):0;
   const width=vv?vv.width:window.innerWidth;
   const height=vv?vv.height:window.innerHeight;
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<1||height<1)return;
   let viewport={top,left,width,height};
-  readerSearchUpdateViewport(viewport);
-  if(readerSearchLayoutLocked()&&readerSearchFrozenViewport)viewport={...readerSearchFrozenViewport};
   if(pageJumpLayoutLocked()&&pageJumpViewport)viewport=pageJumpViewport;
   else lastVisualViewport=viewport;
   const root=document.documentElement;
@@ -3755,20 +4282,44 @@ function syncVisualViewport(){
   root.style.setProperty('--visual-viewport-height',Math.max(1,viewport.height)+'px');
 }
 
-syncVisualViewport();
-addEventListener('resize',()=>{
-  if(pageJumpSettling)settlePageJumpEdit();
-  syncVisualViewport();
-  scheduleRepaginate();
-});
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',()=>{
-    if(pageJumpSettling)settlePageJumpEdit();
-    syncVisualViewport();
-    scheduleRepaginate();
-  });
-  window.visualViewport.addEventListener('scroll',syncVisualViewport);
+/* Browser focus changes can temporarily report a smaller or empty viewport.
+   Keep the live DOM and pagination until the browser settles on its real size. */
+function readerBrowserLayoutPaused(){return readerBrowserResume.away||readerBrowserResume.settling||document.visibilityState==='hidden';}
+function readerBrowserPauseLayout(){
+ readerBrowserResume.away=true;readerBrowserResume.settling=true;
+ clearTimeout(repaginateTimer);clearTimeout(readerBrowserResume.timer);cancelAnimationFrame(readerBrowserResume.frame);readerBrowserResume.frame=0;
 }
+function readerBrowserScheduleResume(){
+ if(document.visibilityState==='hidden')return;
+ readerBrowserResume.away=false;readerBrowserResume.settling=true;
+ clearTimeout(repaginateTimer);clearTimeout(readerBrowserResume.timer);cancelAnimationFrame(readerBrowserResume.frame);readerBrowserResume.frame=0;
+ readerBrowserResume.timer=setTimeout(()=>{
+  let previous='',stable=0;
+  const sample=()=>{
+   readerBrowserResume.frame=0;if(readerBrowserResume.away||document.visibilityState==='hidden')return;
+   const v=window.visualViewport,w=v?.width||innerWidth,h=v?.height||innerHeight;
+   if(!Number.isFinite(w)||!Number.isFinite(h)||w<1||h<1){readerBrowserScheduleResume();return;}
+   const current=[w,h,v?.offsetTop||0,v?.offsetLeft||0,devicePixelRatio].join(':');stable=current===previous?stable+1:0;previous=current;
+   if(stable<2){readerBrowserResume.frame=requestAnimationFrame(sample);return;}
+   readerBrowserResume.settling=false;
+   if(pageJumpSettling)settlePageJumpEdit();syncVisualViewport();
+   if(viewerOverlay.classList.contains('active')&&pages.length&&readerState.layout!==getLayoutSignature())scheduleRepaginate(0);
+  };
+  readerBrowserResume.frame=requestAnimationFrame(sample);
+ },250);
+}
+function readerBrowserViewportChanged(){
+ if(readerBrowserResume.away||document.visibilityState==='hidden')return;
+ if(readerBrowserResume.settling){readerBrowserScheduleResume();return;}
+ if(pageJumpSettling)settlePageJumpEdit();syncVisualViewport();scheduleRepaginate();
+}
+syncVisualViewport();
+addEventListener('blur',readerBrowserPauseLayout);
+addEventListener('focus',()=>{if(readerBrowserResume.away||readerBrowserResume.settling)readerBrowserScheduleResume();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')readerBrowserPauseLayout();else readerBrowserScheduleResume();});
+addEventListener('pageshow',event=>{if(event.persisted)readerBrowserScheduleResume();});
+addEventListener('resize',readerBrowserViewportChanged);
+if(window.visualViewport){window.visualViewport.addEventListener('resize',readerBrowserViewportChanged);window.visualViewport.addEventListener('scroll',()=>{if(!readerBrowserLayoutPaused())syncVisualViewport();});}
 
 
 /* 초기화 */
@@ -3793,6 +4344,11 @@ function applyReadingRecordToInput(reading){
 
 async function restoreReadingSession(reading){
   if(!reading||typeof reading.text!=='string')return;
+  const unpacked=window.ReaderInsightsData.parse(reading.text);
+  if(unpacked.hasInsights){
+    await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
+    reading={...reading,text:unpacked.body};
+  }
   applyReadingRecordToInput(reading);
   await activateRecentFromReading(reading);
   if(reading.isOpen&&reading.text.trim()){
@@ -3809,25 +4365,44 @@ setupReaderNotes();
 setupReaderChatGPT();
 setupChapterNavigation();
 setupReaderTools();
-// Startup is deliberately independent of book bodies, saved fonts and pagination.
-// Existing sessions and native checkpoints stay untouched until an explicit choice.
-let readerInitialFontPromise=null;
-function readerPrepareInitialFont(){
-  if(readerInitialFontPromise)return readerInitialFontPromise;
-  readerInitialFontPromise=(async()=>{
-    try{
-      const savedFont=await readerBounded(getSavedFont(),3000,'저장된 글꼴 읽기');
-      if(savedFont){
-        await readerBounded(installCustomFont(savedFont,{select:false,repaginateAfter:false}),15000,'저장된 글꼴 준비');
-        setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
-      }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
-    }catch(error){if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}setFontUploadStatus(error.message,true);}
-    applyViewerSettings(false);
-  })();
-  return readerInitialFontPromise;
+const syncReading=loadReadingSessionSync();
+if(syncReading){
+  applyReadingRecordToInput(syncReading);
+  if(syncReading.isOpen){viewerOverlay.classList.add('active');readerSetLoading(true);}
 }
-readerState.initializing=false;restoreInProgress=false;readerSetLoading(false);resolveReaderReady();showRecentHistory();
-
+(async()=>{
+  try{
+    const [dbReading,savedFont]=await Promise.all([loadReadingSessionDB(),getSavedFont().catch(()=>null)]);
+    let reading=newestReadingRecord([syncReading,dbReading]);
+    reading=await readerHydrateReading(reading);
+    reading=await window.__browserRecoverReading(reading);
+    if(!userEditedAfterRestore&&reading)applyReadingRecordToInput(reading);
+    if(savedFont){
+      if(viewerSettings.font==='custom'){
+        try{
+          const oldFingerprint=savedFont.fingerprint;
+          await installCustomFont(savedFont,{select:false,repaginateAfter:false});
+          if(!oldFingerprint)void saveFontRecord(savedFont);
+          setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
+        }catch(error){viewerSettings.font='serif';saveViewerSettings();setFontUploadStatus(error.message,true);}
+      }else{
+        // Registration is deferred until initialization finishes, and cannot trigger a reflow.
+        void installCustomFont(savedFont,{select:false,repaginateAfter:false}).catch(error=>setFontUploadStatus(error.message,true));
+      }
+    }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
+    applyViewerSettings(false);
+    readerState.initializing=false;
+    // On an e-ink Android device, do not automatically load a large recent book at launch.
+    // The user chooses a book from recent history, preventing uninterruptible startup loops.
+    if(!window.AndroidReader&&reading&&!userEditedAfterRestore&&!readerState.cancelled)
+      await restoreReadingSession(reading);
+    else readerSetLoading(false);
+    if(window.AndroidReader)queueMicrotask(()=>{try{showRecentHistory();}catch(e){console.warn('Recent history:',e.message);}});
+  }catch(error){readerSetLoading(false);restoreInProgress=false;setStatus(error.message,true);}
+  finally{readerState.hydratedBook=null;readerState.initializing=false;resolveReaderReady();}
+})();
 </script>
+<script src="./reader-insights.js?v=7" defer></script>
+<script src="./reader-insights-nav.js?v=2" defer></script>
 </body>
 </html>
