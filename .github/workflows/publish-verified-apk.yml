@@ -1,0 +1,76 @@
+name: Publish verified 1.31 preview APK artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Build run containing verified APK artifact
+        required: false
+        default: '43007716777'
+  push:
+    paths:
+      - '.github/workflows/publish-verified-apk.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: narpheus-cpu/viewer
+    steps:
+      - name: Download APK from the already-tested Gradle job
+        run: |
+          SOURCE_RUN="${{ inputs.run_id || '43007716777' }}"
+          gh run download "$SOURCE_RUN" --repo "$GH_REPO" -n EbookViewer_v1.31_debug -D /tmp/verified-apk
+          test -s /tmp/verified-apk/app-debug.apk
+      - name: Recheck archive and required embedded source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib
+          p=Path('/tmp/verified-apk/app-debug.apk')
+          with ZipFile(p) as z:
+              entries=set(z.namelist())
+              required={'AndroidManifest.xml','classes.dex','assets/index.html','assets/reader-insights-data.js',
+                        'assets/reader-insights-nav.js','assets/reader-insights.js','assets/reader-insights.css',
+                        'assets/android.js'}
+              assert required<=entries, sorted(required-entries)
+              assert 'reader-insights-nav.js' in z.read('assets/index.html').decode('utf-8')
+          digest=hashlib.sha256(p.read_bytes()).hexdigest()
+          Path('/tmp/verified-apk/SHA256.txt').write_text(digest+'  EbookViewer_v1.31-debug.apk\n')
+          print('Verified APK:',p.stat().st_size,'bytes',digest)
+          PY
+      - name: Publish binary on current main branch without stale git push
+        run: |
+          python3 - <<'PY'
+          import base64,json,subprocess
+          from pathlib import Path
+          endpoint='repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.31-debug.apk'
+          result=subprocess.run(['gh','api',endpoint,'--jq','.sha'],capture_output=True,text=True)
+          obj={'message':'Publish verified signed EbookViewer 1.31 preview APK [skip ci]',
+               'branch':'main',
+               'content':base64.b64encode(Path('/tmp/verified-apk/app-debug.apk').read_bytes()).decode('ascii')}
+          if result.returncode==0:obj['sha']=result.stdout.strip()
+          Path('/tmp/apk-upload.json').write_text(json.dumps(obj),encoding='utf-8')
+          PY
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.31-debug.apk --input /tmp/apk-upload.json --jq '.content.download_url'
+      - name: Publish SHA256 checksum
+        run: |
+          python3 - <<'PY'
+          import base64,json,subprocess
+          from pathlib import Path
+          endpoint='repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.31-debug.sha256'
+          r=subprocess.run(['gh','api',endpoint,'--jq','.sha'],capture_output=True,text=True)
+          obj={'message':'Add checksum for verified EbookViewer 1.31 preview [skip ci]',
+               'branch':'main',
+               'content':base64.b64encode(Path('/tmp/verified-apk/SHA256.txt').read_bytes()).decode('ascii')}
+          if r.returncode==0:obj['sha']=r.stdout.strip()
+          Path('/tmp/hash-upload.json').write_text(json.dumps(obj),encoding='utf-8')
+          PY
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.31-debug.sha256 --input /tmp/hash-upload.json --jq '.content.download_url'
