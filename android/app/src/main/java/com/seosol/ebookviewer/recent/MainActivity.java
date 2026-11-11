@@ -223,7 +223,9 @@ public final class MainActivity extends Activity {
 
     private static boolean isReaderAssetPath(String path) {
         return "/assets/index.html".equals(path) || "/assets/android.js".equals(path) ||
-            "/assets/reader-core.js".equals(path) || (path != null &&
+            "/assets/reader-core.js".equals(path) || "/assets/reader-insights-data.js".equals(path) ||
+            "/assets/reader-insights.js".equals(path) || "/assets/reader-insights-nav.js".equals(path) ||
+            "/assets/reader-insights.css".equals(path) || (path != null &&
             path.matches("/assets/timelines/default/(?:index|part-[0-9]{3})\\.json"));
     }
 
@@ -234,7 +236,8 @@ public final class MainActivity extends Activity {
             if (isReaderAssetPath(path)) {
                 try {
                     String mime = path.endsWith(".json") ? "application/json" :
-                        path.endsWith(".js") ? "application/javascript" : "text/html";
+                        path.endsWith(".js") ? "application/javascript" :
+                        path.endsWith(".css") ? "text/css" : "text/html";
                     HashMap<String, String> headers = new HashMap<>();
                     headers.put("Cache-Control", "no-cache");
                     headers.put("X-Content-Type-Options", "nosniff");
