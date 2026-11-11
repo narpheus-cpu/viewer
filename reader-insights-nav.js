@@ -7,7 +7,7 @@ const confidence={fact:'확인된 사실',strong_inference:'근거 있는 해석
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const norm=value=>String(value??'').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/g,' ').trim();
 let nav=null,active=false,mode='home',query='',pendingQuery='',chosen=null,recordId='',page=0;
-let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),sections=[],navPages=[],visible=0,cacheKey='',lastRead=-1;
+let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),cacheKey='';
 function api(){return window.readerInsights;}
 function snapshot(){return api()?.navigationSnapshot?.()||{records:[],readEnd:0,bookLength:0,currentAnchor:0,pageText:'',bookKey:''};}
 function hasData(){return records.length>0;}
@@ -35,14 +35,19 @@ function fallbackEntities(record){
 }
 function indexVisible(){
  const s=snapshot();
- cacheKey=s.bookKey+':'+s.readEnd+':'+s.records.length;
+ const nextKey=s.bookKey+':'+s.readEnd+':'+s.records.length;
+ if(cacheKey===nextKey)return s;
+ cacheKey=nextKey;
  records=s.records;
  byId=new Map(records.map(r=>[r.id,r]));
- entityById.clear();
+ entityById.clear();recordNames.clear();
  for(const record of records){
   const linked=Array.isArray(record.entities)&&record.entities.length?record.entities:fallbackEntities(record);
   for(const item of linked){
    linkEntity(makeEntity(item.id,item.name,item.type,item.aliases||[]),record);
+   const names=recordNames.get(record.id)||[];
+   names.push(item.name,...(item.aliases||[]));
+   recordNames.set(record.id,names);
   }
  }
  entities=[...entityById.values()].sort((a,b)=>{
@@ -58,6 +63,7 @@ function forEntity(entity){
 }
 function onLoaded(){
  if(!nav)return;
+ cacheKey='';
  const s=indexVisible();
  if(!hasData()){
   active=false;mode='home';pendingQuery='';setVisibility(false);
@@ -138,11 +144,7 @@ function lens(s){
  const snippet=norm(s.pageText);
  const anchor=Number(s.currentAnchor)||s.readEnd;
  const matches=[];
- const namesFor=id=>{
-  const r=byId.get(id);if(!r)return [];
-  return [...entityById.values()].filter(e=>e.recordIds.has(id))
-   .flatMap(e=>[e.name,...e.aliases]).filter(t=>norm(t).length>=2);
- };
+ const namesFor=id=>(recordNames.get(id)||[]).filter(t=>norm(t).length>=2);
  for(const r of records){
   const personMatch=snippet&&namesFor(r.id).some(alias=>snippet.includes(norm(alias)));
   const nearby=Math.abs(r.revealOffset-anchor)<Math.min(5000,Math.max(600,s.bookLength*.01));
@@ -169,9 +171,9 @@ function rankSearch(queryText){
   if(title.includes(q))score+=65;
   if(description.includes(q))score+=25;
   if(proof.includes(q))score+=10;
-  const referenced=entities.filter(e=>e.recordIds.has(r.id));
-  if(referenced.some(e=>[e.name,...e.aliases].some(name=>norm(name)===q)))score+=125;
-  else if(referenced.some(e=>[e.name,...e.aliases].some(name=>norm(name).includes(q))))score+=50;
+  const referenced=recordNames.get(r.id)||[];
+  if(referenced.some(name=>norm(name)===q))score+=125;
+  else if(referenced.some(name=>norm(name).includes(q)))score+=50;
   if(score)scored.push({...r,score:score+(r.importance||3)*2});
  }
  return scored.sort((a,b)=>b.score-a.score||b.revealOffset-a.revealOffset);
@@ -238,7 +240,7 @@ function renderList(s){
  page=Math.max(0,Math.min(page,total-1));
  const selected=list.slice(page*size,(page+1)*size);
  const hint=mode==='home'?'현재까지 공개된 기록 '+records.length+'건':mode==='lens'?
-  '읽은 위치 가까이에서 확인된 사실':mode==='search'?
+  '읽은 위치 가까이에서 확인된 사실':mode==='entity'?'현재 상태 · 최신 판단 중심':mode==='search'?
   (query?'검색 결과 '+list.length+'건':'검색어를 입력해 줘'):'총 '+list.length+'건';
  const extra=mode==='entity'?
   '<button class="insights-nav-inline" type="button" data-nav-kind="route" data-nav-id="history">변화 이력 ('+recordsForEntity(chosen).length+'건)</button>':'';
@@ -249,7 +251,7 @@ function cardHtml(r,content,part,total){
  return '<div class="insights-type">'+esc(labels[r.category])+' · '+esc(confidence[r.confidence])+'</div>'+
   '<h3 class="insights-title">'+esc(r.title)+(total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
   '<div class="insights-body">'+esc(content)+'</div>'+
-  '<div class="insights-proof">'+esc(r.evidence)+'</div>';
+  '<div class="insights-proof">원문 근거와 추론 수준을 구별해 표시</div>';
 }
 function fits(r,portion){
  const surface=$('insightsPaper');
@@ -260,7 +262,7 @@ function fits(r,portion){
  const okay=probe.scrollHeight<=usable;probe.remove();return okay;
 }
 function splitDetail(r){
- const text=String(r.text||'');
+ const text=String(r.text||'')+'\n\n근거: '+String(r.evidence||'');
  let offset=0,pieces=[],guard=0;
  while(offset<text.length&&guard++<300){
   const possible=Math.min(12000,text.length-offset);
