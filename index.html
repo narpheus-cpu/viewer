@@ -2270,9 +2270,14 @@ async function loadReaderFile(file){
   let text=imported.text;
   if(!epub){
     const unpacked=window.ReaderInsightsData.parse(text);
+    // HTML textareas normalize CRLF to LF; store metadata against the same text.
+    text=unpacked.body.replace(/\r\n?/g,'\n');
     if(unpacked.hasInsights){
-      await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
-      text=unpacked.body;
+      const normalized={...unpacked.metadata,records:unpacked.metadata.records.map(r=>({
+        ...r,evidence:r.evidence.replace(/\r\n?/g,'\n'),
+        reveal:{...r.reveal,quote:r.reveal.quote.replace(/\r\n?/g,'\n')}
+      }))};
+      await window.ReaderInsightsData.save(text,normalized);
     }
   }
   inputText.value=text;inputBookChapters=imported.chapters;
