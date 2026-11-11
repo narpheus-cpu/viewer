@@ -15,6 +15,15 @@ async function pageFor(browser){
  await page.evaluate(()=>readerReady);
  return {context,page,errors};
 }
+async function clickNavRoute(page,id){
+  for(let attempt=0;attempt<12;attempt++){
+   const item=page.locator('#insightsPaper [data-nav-id="'+id+'"]');
+   if(await item.count()){await item.click();return;}
+   if(!(await page.locator('#insightsNext').isEnabled()))break;
+   await page.locator('#insightsNext').click();
+  }
+  throw Error('Navigator route not found: '+id);
+}
 (async()=>{
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let checks=0;
@@ -45,7 +54,7 @@ async function pageFor(browser){
   const sourceAnchor=await page.evaluate(()=>readerAnchor());
   await page.locator('#insightsPaper [data-nav-kind=record]').first().click();
   await page.locator('#insightsNavReturn').click();
-  await page.locator('#insightsPaper [data-nav-id=recent]').click();
+  await clickNavRoute(page,'recent');
   assert.equal(await page.locator('#insightsNext').isEnabled(),true);
   await page.locator('#insightsNext').click();
   assert.equal(await page.evaluate(()=>readerAnchor()),sourceAnchor,'The insights pager must not advance book pages');checks++;
@@ -54,7 +63,7 @@ async function pageFor(browser){
     if(!await page.locator('#insightsNext').isEnabled())break;
     await page.locator('#insightsNext').click();
   }
-  await page.locator('#insightsPaper [data-nav-id=all]').click();
+  await clickNavRoute(page,'all');
   assert.equal(await page.locator('#insightsPanel .insights-tabs').isVisible(),true);checks++;
   await page.locator('#insightsNavReturn').click();
   assert.equal(await page.locator('#insightsNavigatorBar').isVisible(),true);checks++;
