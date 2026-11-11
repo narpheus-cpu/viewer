@@ -6,7 +6,7 @@ const END='<<<READER_INSIGHTS_V2_END>>>';
 const CATEGORIES=new Set(['event','relation','character','clue']);
 const CONFIDENCE=new Set(['fact','strong_inference','tentative']);
 const MAX_RECORDS=3000, MAX_JSON_BYTES=2*1024*1024, MAX_TEXT=12000;
-const DB_NAME='ebookViewerInsightsDBV2', STORE='books', PROGRESS='ebookViewerInsightsSeenV2:';
+const DB_NAME='ebookViewerInsightsDBV2', STORE='books', PROGRESS='ebookViewerInsightsReadCursorV3:';
 let dbPromise=null, lastText=null,lastKey=null;
 const memory=new Map();
 
@@ -108,19 +108,34 @@ async function load(body){
   memory.set(id,parsed);return parsed;
  }catch(e){return null;}
 }
-function getSeen(body){
+/* v3: the old v2 "furthest displayed anywhere" key is intentionally not migrated.
+   It could be 100% after an accidental end-of-book jump. */
+function getReadState(body){
  const id=key(body);
- try{return Math.max(0,Number(localStorage.getItem(PROGRESS+id))||0);}catch{return 0;}
+ try{
+  const raw=localStorage.getItem(PROGRESS+id);
+  if(raw===null)return {seen:0,hasRecord:false,mode:'none'};
+  const value=JSON.parse(raw);
+  if(!value||!Number.isSafeInteger(value.seen)||value.seen<0)return {seen:0,hasRecord:false,mode:'invalid'};
+  return {seen:Math.max(0,value.seen),hasRecord:true,mode:value.mode==='manual'?'manual':'sequential'};
+ }catch{return {seen:0,hasRecord:false,mode:'unavailable'};}
+}
+function getSeen(body){return getReadState(body).seen;}
+function writeSeen(body,at,mode){
+ const n=Math.max(0,Math.floor(Number(at)||0));
+ const id=key(body);
+ try{localStorage.setItem(PROGRESS+id,JSON.stringify({seen:n,mode,updatedAt:Date.now()}));}
+ catch{/* Keep in-memory accuracy if storage is unavailable. */}
+ return n;
 }
 function markSeen(body,at){
- const id=key(body),n=Math.max(0,Math.floor(Number(at)||0));
- const prev=getSeen(body);
- if(n>prev){try{localStorage.setItem(PROGRESS+id,String(n));}catch{}}
- return Math.max(n,prev);
+ const prev=getReadState(body),n=Math.max(0,Math.floor(Number(at)||0));
+ if(!prev.hasRecord||n>prev.seen)return writeSeen(body,n,'sequential');
+ return prev.seen;
 }
-function resetSeen(body){
- const id=key(body);try{localStorage.removeItem(PROGRESS+id);}catch{}
-}
+/* Explicit human correction may move the cursor backward as well as forward. */
+function setSeen(body,at){return writeSeen(body,at,'manual');}
+function resetSeen(body){return setSeen(body,0);}
 function clearCache(body){memory.delete(key(body));}
-window.ReaderInsightsData={BEGIN,END,key,parse,validate,save,load,getSeen,markSeen,resetSeen,clearCache,occurrenceEnd};
+window.ReaderInsightsData={BEGIN,END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd};
 })();
