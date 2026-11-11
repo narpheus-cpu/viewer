@@ -37,10 +37,10 @@ jobs:
       - name: Install SDK 36 and Build Tools
         run: |
           sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Configure Gradle 9.6 for Android Gradle Plugin 9.4
+      - name: Configure Gradle 8.13 for Android Gradle Plugin 8.13.2
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.6.0'
+          gradle-version: '8.13'
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
