@@ -52,18 +52,19 @@ const fn=index.slice(start,end);
 function evaluateMenu(android,native){
  const menu={hidden:true,offsetWidth:100,offsetHeight:40,style:{}};
  const action={hidden:true,offsetWidth:123,offsetHeight:40,style:{}};
- const run=new Function('window','readerGPTMenu','readerInsightsSelectionAction','readerGPTGetSelection','readerGPTAndroidWeb','viewerOverlay',
+ const lookup={hidden:true,offsetWidth:120,offsetHeight:38,style:{}};
+ const run=new Function('window','readerGPTMenu','readerInsightsSelectionAction','readerInsightsLookupAction','readerGPTGetSelection','readerGPTAndroidWeb','viewerOverlay',
    'readerGPTIsOpen','readerTimelineIsOpen','readerNoteIsOpen','settingsPanelIsOpen','getSelection','visualViewport',
-   "let readerGPTSelection='';"+fn+";readerGPTUpdateSelection();return {menu:readerGPTMenu,action:readerInsightsSelectionAction};");
- return run({AndroidChatGPT:{usesNativeSelectionMenu:()=>native}},menu,action,()=>word,()=>android,
+   "let readerGPTSelection='';"+fn+";readerGPTUpdateSelection();return {menu:readerGPTMenu,action:readerInsightsSelectionAction,lookup:readerInsightsLookupAction};");
+ return run({AndroidChatGPT:{usesNativeSelectionMenu:()=>native}},menu,action,lookup,()=>word,()=>android,
   {classList:{contains:()=>true}},()=>false,()=>false,()=>false,()=>false,
   ()=>({getRangeAt:()=>({getBoundingClientRect:()=>({left:100,top:80,bottom:110})})}),
   {offsetLeft:0,offsetTop:0,width:390,height:700});
 }
 const desktop=evaluateMenu(false,false);
-check('Desktop Web shows original ChatGPT and new read action',!desktop.menu.hidden&&!desktop.action.hidden);
+check('Desktop Web shows all three selection actions',!desktop.menu.hidden&&!desktop.action.hidden&&!desktop.lookup.hidden);
 const android=evaluateMenu(true,false);
-check('Android browser shows read action without injecting into native menu',android.menu.hidden&&!android.action.hidden);
+check('Android browser shows two reader actions without injecting into native menu',android.menu.hidden&&!android.action.hidden&&!android.lookup.hidden);
 const native=evaluateMenu(false,true);
-check('Native APK selection menu is left to Android',native.menu.hidden&&native.action.hidden);
+check('Native APK selection menu is left to Android',native.menu.hidden&&native.action.hidden&&native.lookup.hidden);
 console.log(checks+' reading selection action unit assertions passed.');
