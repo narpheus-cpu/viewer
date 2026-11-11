@@ -1,0 +1,3172 @@
+{
+  "schema_version": 2,
+  "records": [
+    {
+      "scene_id": "scene-01",
+      "importance": 3,
+      "id": "EV01",
+      "category": "event",
+      "title": "01장 발견한 기록",
+      "subject": "옛 역",
+      "text": "옛 역에서 번호 01의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제01차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 01가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제01차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 01가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 1,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "place:옛 역",
+          "name": "옛 역",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL01"
+      ]
+    },
+    {
+      "scene_id": "scene-01",
+      "importance": 3,
+      "id": "RE01",
+      "category": "relation",
+      "title": "01장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 은빛 열쇠에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제01차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제01차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV01",
+        "CH01"
+      ]
+    },
+    {
+      "scene_id": "scene-01",
+      "importance": 3,
+      "id": "CH01",
+      "category": "character",
+      "title": "01장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 의심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제01차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제01차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV01",
+        "RE01"
+      ]
+    },
+    {
+      "scene_id": "scene-01",
+      "importance": 3,
+      "id": "CL01",
+      "category": "clue",
+      "title": "01장 은빛 열쇠의 무늬",
+      "subject": "은빛 열쇠",
+      "text": "은빛 열쇠의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 01의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 01의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:은빛 열쇠",
+          "name": "은빛 열쇠",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV01"
+      ]
+    },
+    {
+      "scene_id": "scene-02",
+      "importance": 3,
+      "id": "EV02",
+      "category": "event",
+      "title": "02장 발견한 기록",
+      "subject": "강변 창고",
+      "text": "강변 창고에서 번호 02의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제02차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 02가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제02차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 02가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 2,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "place:강변 창고",
+          "name": "강변 창고",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL02",
+        "EV01"
+      ]
+    },
+    {
+      "scene_id": "scene-02",
+      "importance": 3,
+      "id": "RE02",
+      "category": "relation",
+      "title": "02장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 붉은 장부에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제02차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제02차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE01",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV02",
+        "CH02"
+      ]
+    },
+    {
+      "scene_id": "scene-02",
+      "importance": 3,
+      "id": "CH02",
+      "category": "character",
+      "title": "02장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 긴장을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제02차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제02차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH01",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV02",
+        "RE02"
+      ]
+    },
+    {
+      "scene_id": "scene-02",
+      "importance": 3,
+      "id": "CL02",
+      "category": "clue",
+      "title": "02장 붉은 장부의 무늬",
+      "subject": "붉은 장부",
+      "text": "붉은 장부의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 02의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 02의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:붉은 장부",
+          "name": "붉은 장부",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV02"
+      ]
+    },
+    {
+      "scene_id": "scene-03",
+      "importance": 3,
+      "id": "EV03",
+      "category": "event",
+      "title": "03장 발견한 기록",
+      "subject": "시립 도서관",
+      "text": "시립 도서관에서 번호 03의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제03차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 03가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제03차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 03가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 3,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "place:시립 도서관",
+          "name": "시립 도서관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL03",
+        "EV02"
+      ]
+    },
+    {
+      "scene_id": "scene-03",
+      "importance": 3,
+      "id": "RE03",
+      "category": "relation",
+      "title": "03장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 낡은 편지에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제03차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제03차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE02",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV03",
+        "CH03"
+      ]
+    },
+    {
+      "scene_id": "scene-03",
+      "importance": 3,
+      "id": "CH03",
+      "category": "character",
+      "title": "03장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 기대을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제03차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제03차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH02",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV03",
+        "RE03"
+      ]
+    },
+    {
+      "scene_id": "scene-03",
+      "importance": 3,
+      "id": "CL03",
+      "category": "clue",
+      "title": "03장 낡은 편지의 무늬",
+      "subject": "낡은 편지",
+      "text": "낡은 편지의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 03의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 03의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:낡은 편지",
+          "name": "낡은 편지",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV03"
+      ]
+    },
+    {
+      "scene_id": "scene-04",
+      "importance": 3,
+      "id": "EV04",
+      "category": "event",
+      "title": "04장 발견한 기록",
+      "subject": "언덕 기록관",
+      "text": "언덕 기록관에서 번호 04의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제04차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 04가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제04차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 04가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 4,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "place:언덕 기록관",
+          "name": "언덕 기록관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL04",
+        "EV03"
+      ]
+    },
+    {
+      "scene_id": "scene-04",
+      "importance": 3,
+      "id": "RE04",
+      "category": "relation",
+      "title": "04장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 푸른 지도에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제04차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제04차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE03",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV04",
+        "CH04"
+      ]
+    },
+    {
+      "scene_id": "scene-04",
+      "importance": 3,
+      "id": "CH04",
+      "category": "character",
+      "title": "04장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 망설임을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제04차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제04차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH03",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV04",
+        "RE04"
+      ]
+    },
+    {
+      "scene_id": "scene-04",
+      "importance": 3,
+      "id": "CL04",
+      "category": "clue",
+      "title": "04장 푸른 지도의 무늬",
+      "subject": "푸른 지도",
+      "text": "푸른 지도의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 04의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 04의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:푸른 지도",
+          "name": "푸른 지도",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV04"
+      ]
+    },
+    {
+      "scene_id": "scene-05",
+      "importance": 3,
+      "id": "EV05",
+      "category": "event",
+      "title": "05장 발견한 기록",
+      "subject": "닫힌 우체국",
+      "text": "닫힌 우체국에서 번호 05의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제05차 조사에서 은서는 닫힌 우체국에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 05가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제05차 조사에서 은서는 닫힌 우체국에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 05가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 5,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:닫힌 우체국",
+          "name": "닫힌 우체국",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL05",
+        "EV04"
+      ]
+    },
+    {
+      "scene_id": "scene-05",
+      "importance": 3,
+      "id": "RE05",
+      "category": "relation",
+      "title": "05장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 검은 수첩에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제05차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제05차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE04",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV05",
+        "CH05"
+      ]
+    },
+    {
+      "scene_id": "scene-05",
+      "importance": 3,
+      "id": "CH05",
+      "category": "character",
+      "title": "05장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 결심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제05차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제05차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH04",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV05",
+        "RE05"
+      ]
+    },
+    {
+      "scene_id": "scene-05",
+      "importance": 3,
+      "id": "CL05",
+      "category": "clue",
+      "title": "05장 검은 수첩의 무늬",
+      "subject": "검은 수첩",
+      "text": "검은 수첩의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 05의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 05의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:검은 수첩",
+          "name": "검은 수첩",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV05"
+      ]
+    },
+    {
+      "scene_id": "scene-06",
+      "importance": 5,
+      "id": "EV06",
+      "category": "event",
+      "title": "06장 발견한 기록",
+      "subject": "서쪽 공원",
+      "text": "서쪽 공원에서 번호 06의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제06차 조사에서 은서는 서쪽 공원에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 06가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제06차 조사에서 은서는 서쪽 공원에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 06가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 6,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:서쪽 공원",
+          "name": "서쪽 공원",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL06",
+        "EV05"
+      ]
+    },
+    {
+      "scene_id": "scene-06",
+      "importance": 5,
+      "id": "RE06",
+      "category": "relation",
+      "title": "06장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 은빛 열쇠에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제06차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제06차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE05",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV06",
+        "CH06"
+      ]
+    },
+    {
+      "scene_id": "scene-06",
+      "importance": 5,
+      "id": "CH06",
+      "category": "character",
+      "title": "06장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 의심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제06차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제06차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH05",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV06",
+        "RE06"
+      ]
+    },
+    {
+      "scene_id": "scene-06",
+      "importance": 5,
+      "id": "CL06",
+      "category": "clue",
+      "title": "06장 은빛 열쇠의 무늬",
+      "subject": "은빛 열쇠",
+      "text": "은빛 열쇠의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 06의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 06의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:은빛 열쇠",
+          "name": "은빛 열쇠",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV06"
+      ]
+    },
+    {
+      "scene_id": "scene-07",
+      "importance": 3,
+      "id": "EV07",
+      "category": "event",
+      "title": "07장 발견한 기록",
+      "subject": "차량기지",
+      "text": "차량기지에서 번호 07의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제07차 조사에서 은서는 차량기지에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 07가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제07차 조사에서 은서는 차량기지에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 07가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 7,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:차량기지",
+          "name": "차량기지",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL07",
+        "EV06"
+      ]
+    },
+    {
+      "scene_id": "scene-07",
+      "importance": 3,
+      "id": "RE07",
+      "category": "relation",
+      "title": "07장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 붉은 장부에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제07차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제07차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE06",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV07",
+        "CH07"
+      ]
+    },
+    {
+      "scene_id": "scene-07",
+      "importance": 3,
+      "id": "CH07",
+      "category": "character",
+      "title": "07장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 긴장을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제07차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제07차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH06",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV07",
+        "RE07"
+      ]
+    },
+    {
+      "scene_id": "scene-07",
+      "importance": 3,
+      "id": "CL07",
+      "category": "clue",
+      "title": "07장 붉은 장부의 무늬",
+      "subject": "붉은 장부",
+      "text": "붉은 장부의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 07의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 07의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:붉은 장부",
+          "name": "붉은 장부",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV07"
+      ]
+    },
+    {
+      "scene_id": "scene-08",
+      "importance": 3,
+      "id": "EV08",
+      "category": "event",
+      "title": "08장 발견한 기록",
+      "subject": "중앙 문서실",
+      "text": "중앙 문서실에서 번호 08의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제08차 조사에서 은서는 중앙 문서실에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 08가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제08차 조사에서 은서는 중앙 문서실에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 08가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 8,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:중앙 문서실",
+          "name": "중앙 문서실",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL08",
+        "EV07"
+      ]
+    },
+    {
+      "scene_id": "scene-08",
+      "importance": 3,
+      "id": "RE08",
+      "category": "relation",
+      "title": "08장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 낡은 편지에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제08차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제08차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE07",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV08",
+        "CH08"
+      ]
+    },
+    {
+      "scene_id": "scene-08",
+      "importance": 3,
+      "id": "CH08",
+      "category": "character",
+      "title": "08장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 기대을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제08차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제08차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH07",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV08",
+        "RE08"
+      ]
+    },
+    {
+      "scene_id": "scene-08",
+      "importance": 3,
+      "id": "CL08",
+      "category": "clue",
+      "title": "08장 낡은 편지의 무늬",
+      "subject": "낡은 편지",
+      "text": "낡은 편지의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 08의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 08의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:낡은 편지",
+          "name": "낡은 편지",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV08"
+      ]
+    },
+    {
+      "scene_id": "scene-09",
+      "importance": 3,
+      "id": "EV09",
+      "category": "event",
+      "title": "09장 발견한 기록",
+      "subject": "해안 등대",
+      "text": "해안 등대에서 번호 09의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제09차 조사에서 은서는 해안 등대에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 09가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제09차 조사에서 은서는 해안 등대에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 09가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 9,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:해안 등대",
+          "name": "해안 등대",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL09",
+        "EV08"
+      ]
+    },
+    {
+      "scene_id": "scene-09",
+      "importance": 3,
+      "id": "RE09",
+      "category": "relation",
+      "title": "09장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 푸른 지도에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제09차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제09차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE08",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV09",
+        "CH09"
+      ]
+    },
+    {
+      "scene_id": "scene-09",
+      "importance": 3,
+      "id": "CH09",
+      "category": "character",
+      "title": "09장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 망설임을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제09차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제09차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH08",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV09",
+        "RE09"
+      ]
+    },
+    {
+      "scene_id": "scene-09",
+      "importance": 3,
+      "id": "CL09",
+      "category": "clue",
+      "title": "09장 푸른 지도의 무늬",
+      "subject": "푸른 지도",
+      "text": "푸른 지도의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 09의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 09의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:푸른 지도",
+          "name": "푸른 지도",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV09"
+      ]
+    },
+    {
+      "scene_id": "scene-10",
+      "importance": 3,
+      "id": "EV10",
+      "category": "event",
+      "title": "10장 발견한 기록",
+      "subject": "작은 연구소",
+      "text": "작은 연구소에서 번호 10의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제10차 조사에서 은서는 작은 연구소에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 10가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제10차 조사에서 은서는 작은 연구소에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 10가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 10,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:작은 연구소",
+          "name": "작은 연구소",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL10",
+        "EV09"
+      ]
+    },
+    {
+      "scene_id": "scene-10",
+      "importance": 3,
+      "id": "RE10",
+      "category": "relation",
+      "title": "10장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 검은 수첩에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제10차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제10차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE09",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV10",
+        "CH10"
+      ]
+    },
+    {
+      "scene_id": "scene-10",
+      "importance": 3,
+      "id": "CH10",
+      "category": "character",
+      "title": "10장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 결심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제10차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제10차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH09",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV10",
+        "RE10"
+      ]
+    },
+    {
+      "scene_id": "scene-10",
+      "importance": 3,
+      "id": "CL10",
+      "category": "clue",
+      "title": "10장 검은 수첩의 무늬",
+      "subject": "검은 수첩",
+      "text": "검은 수첩의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 10의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 10의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:검은 수첩",
+          "name": "검은 수첩",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV10"
+      ]
+    },
+    {
+      "scene_id": "scene-11",
+      "importance": 3,
+      "id": "EV11",
+      "category": "event",
+      "title": "11장 발견한 기록",
+      "subject": "옛 역",
+      "text": "옛 역에서 번호 11의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제11차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 11가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제11차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 11가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 11,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:옛 역",
+          "name": "옛 역",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL11",
+        "EV10"
+      ]
+    },
+    {
+      "scene_id": "scene-11",
+      "importance": 3,
+      "id": "RE11",
+      "category": "relation",
+      "title": "11장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 은빛 열쇠에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제11차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제11차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE10",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV11",
+        "CH11"
+      ]
+    },
+    {
+      "scene_id": "scene-11",
+      "importance": 3,
+      "id": "CH11",
+      "category": "character",
+      "title": "11장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 의심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제11차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제11차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH10",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV11",
+        "RE11"
+      ]
+    },
+    {
+      "scene_id": "scene-11",
+      "importance": 3,
+      "id": "CL11",
+      "category": "clue",
+      "title": "11장 은빛 열쇠의 무늬",
+      "subject": "은빛 열쇠",
+      "text": "은빛 열쇠의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 11의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 11의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:은빛 열쇠",
+          "name": "은빛 열쇠",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV11"
+      ]
+    },
+    {
+      "scene_id": "scene-12",
+      "importance": 5,
+      "id": "EV12",
+      "category": "event",
+      "title": "12장 발견한 기록",
+      "subject": "강변 창고",
+      "text": "강변 창고에서 번호 12의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제12차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 12가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제12차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 12가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 12,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:강변 창고",
+          "name": "강변 창고",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL12",
+        "EV11"
+      ]
+    },
+    {
+      "scene_id": "scene-12",
+      "importance": 5,
+      "id": "RE12",
+      "category": "relation",
+      "title": "12장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 붉은 장부에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제12차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제12차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE11",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV12",
+        "CH12"
+      ]
+    },
+    {
+      "scene_id": "scene-12",
+      "importance": 5,
+      "id": "CH12",
+      "category": "character",
+      "title": "12장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 긴장을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제12차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제12차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH11",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV12",
+        "RE12"
+      ]
+    },
+    {
+      "scene_id": "scene-12",
+      "importance": 5,
+      "id": "CL12",
+      "category": "clue",
+      "title": "12장 붉은 장부의 무늬",
+      "subject": "붉은 장부",
+      "text": "붉은 장부의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 12의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 12의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:붉은 장부",
+          "name": "붉은 장부",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV12"
+      ]
+    },
+    {
+      "scene_id": "scene-13",
+      "importance": 3,
+      "id": "EV13",
+      "category": "event",
+      "title": "13장 발견한 기록",
+      "subject": "시립 도서관",
+      "text": "시립 도서관에서 번호 13의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제13차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 13가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제13차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 13가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 13,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:시립 도서관",
+          "name": "시립 도서관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL13",
+        "EV12"
+      ]
+    },
+    {
+      "scene_id": "scene-13",
+      "importance": 3,
+      "id": "RE13",
+      "category": "relation",
+      "title": "13장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 낡은 편지에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제13차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제13차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE12",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV13",
+        "CH13"
+      ]
+    },
+    {
+      "scene_id": "scene-13",
+      "importance": 3,
+      "id": "CH13",
+      "category": "character",
+      "title": "13장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 기대을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제13차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제13차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH12",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV13",
+        "RE13"
+      ]
+    },
+    {
+      "scene_id": "scene-13",
+      "importance": 3,
+      "id": "CL13",
+      "category": "clue",
+      "title": "13장 낡은 편지의 무늬",
+      "subject": "낡은 편지",
+      "text": "낡은 편지의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 13의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 13의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:낡은 편지",
+          "name": "낡은 편지",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV13"
+      ]
+    },
+    {
+      "scene_id": "scene-14",
+      "importance": 3,
+      "id": "EV14",
+      "category": "event",
+      "title": "14장 발견한 기록",
+      "subject": "언덕 기록관",
+      "text": "언덕 기록관에서 번호 14의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제14차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 14가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제14차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 14가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 14,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:언덕 기록관",
+          "name": "언덕 기록관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL14",
+        "EV13"
+      ]
+    },
+    {
+      "scene_id": "scene-14",
+      "importance": 3,
+      "id": "RE14",
+      "category": "relation",
+      "title": "14장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 푸른 지도에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제14차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제14차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE13",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV14",
+        "CH14"
+      ]
+    },
+    {
+      "scene_id": "scene-14",
+      "importance": 3,
+      "id": "CH14",
+      "category": "character",
+      "title": "14장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 망설임을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제14차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제14차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH13",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV14",
+        "RE14"
+      ]
+    },
+    {
+      "scene_id": "scene-14",
+      "importance": 3,
+      "id": "CL14",
+      "category": "clue",
+      "title": "14장 푸른 지도의 무늬",
+      "subject": "푸른 지도",
+      "text": "푸른 지도의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 14의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 14의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:푸른 지도",
+          "name": "푸른 지도",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV14"
+      ]
+    },
+    {
+      "scene_id": "scene-15",
+      "importance": 3,
+      "id": "EV15",
+      "category": "event",
+      "title": "15장 발견한 기록",
+      "subject": "닫힌 우체국",
+      "text": "닫힌 우체국에서 번호 15의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제15차 조사에서 은서는 닫힌 우체국에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 15가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제15차 조사에서 은서는 닫힌 우체국에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 15가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 15,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:닫힌 우체국",
+          "name": "닫힌 우체국",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL15",
+        "EV14"
+      ]
+    },
+    {
+      "scene_id": "scene-15",
+      "importance": 3,
+      "id": "RE15",
+      "category": "relation",
+      "title": "15장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 검은 수첩에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제15차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제15차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE14",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV15",
+        "CH15"
+      ]
+    },
+    {
+      "scene_id": "scene-15",
+      "importance": 3,
+      "id": "CH15",
+      "category": "character",
+      "title": "15장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 결심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제15차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제15차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH14",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV15",
+        "RE15"
+      ]
+    },
+    {
+      "scene_id": "scene-15",
+      "importance": 3,
+      "id": "CL15",
+      "category": "clue",
+      "title": "15장 검은 수첩의 무늬",
+      "subject": "검은 수첩",
+      "text": "검은 수첩의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 15의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 15의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:검은 수첩",
+          "name": "검은 수첩",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV15"
+      ]
+    },
+    {
+      "scene_id": "scene-16",
+      "importance": 3,
+      "id": "EV16",
+      "category": "event",
+      "title": "16장 발견한 기록",
+      "subject": "서쪽 공원",
+      "text": "서쪽 공원에서 번호 16의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제16차 조사에서 은서는 서쪽 공원에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 16가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제16차 조사에서 은서는 서쪽 공원에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 16가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 16,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:서쪽 공원",
+          "name": "서쪽 공원",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL16",
+        "EV15"
+      ]
+    },
+    {
+      "scene_id": "scene-16",
+      "importance": 3,
+      "id": "RE16",
+      "category": "relation",
+      "title": "16장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 은빛 열쇠에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제16차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제16차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE15",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV16",
+        "CH16"
+      ]
+    },
+    {
+      "scene_id": "scene-16",
+      "importance": 3,
+      "id": "CH16",
+      "category": "character",
+      "title": "16장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 의심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제16차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제16차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH15",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV16",
+        "RE16"
+      ]
+    },
+    {
+      "scene_id": "scene-16",
+      "importance": 3,
+      "id": "CL16",
+      "category": "clue",
+      "title": "16장 은빛 열쇠의 무늬",
+      "subject": "은빛 열쇠",
+      "text": "은빛 열쇠의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 16의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 16의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:은빛 열쇠",
+          "name": "은빛 열쇠",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV16"
+      ]
+    },
+    {
+      "scene_id": "scene-17",
+      "importance": 3,
+      "id": "EV17",
+      "category": "event",
+      "title": "17장 발견한 기록",
+      "subject": "차량기지",
+      "text": "차량기지에서 번호 17의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제17차 조사에서 은서는 차량기지에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 17가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제17차 조사에서 은서는 차량기지에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 17가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 17,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:차량기지",
+          "name": "차량기지",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL17",
+        "EV16"
+      ]
+    },
+    {
+      "scene_id": "scene-17",
+      "importance": 3,
+      "id": "RE17",
+      "category": "relation",
+      "title": "17장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 붉은 장부에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제17차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제17차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE16",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV17",
+        "CH17"
+      ]
+    },
+    {
+      "scene_id": "scene-17",
+      "importance": 3,
+      "id": "CH17",
+      "category": "character",
+      "title": "17장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 긴장을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제17차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제17차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH16",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV17",
+        "RE17"
+      ]
+    },
+    {
+      "scene_id": "scene-17",
+      "importance": 3,
+      "id": "CL17",
+      "category": "clue",
+      "title": "17장 붉은 장부의 무늬",
+      "subject": "붉은 장부",
+      "text": "붉은 장부의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 17의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 17의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:붉은 장부",
+          "name": "붉은 장부",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV17"
+      ]
+    },
+    {
+      "scene_id": "scene-18",
+      "importance": 5,
+      "id": "EV18",
+      "category": "event",
+      "title": "18장 발견한 기록",
+      "subject": "중앙 문서실",
+      "text": "중앙 문서실에서 번호 18의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제18차 조사에서 은서는 중앙 문서실에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 18가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제18차 조사에서 은서는 중앙 문서실에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 18가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 18,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:중앙 문서실",
+          "name": "중앙 문서실",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL18",
+        "EV17"
+      ]
+    },
+    {
+      "scene_id": "scene-18",
+      "importance": 5,
+      "id": "RE18",
+      "category": "relation",
+      "title": "18장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 낡은 편지에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제18차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제18차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE17",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV18",
+        "CH18"
+      ]
+    },
+    {
+      "scene_id": "scene-18",
+      "importance": 5,
+      "id": "CH18",
+      "category": "character",
+      "title": "18장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 기대을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제18차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제18차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH17",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV18",
+        "RE18"
+      ]
+    },
+    {
+      "scene_id": "scene-18",
+      "importance": 5,
+      "id": "CL18",
+      "category": "clue",
+      "title": "18장 낡은 편지의 무늬",
+      "subject": "낡은 편지",
+      "text": "낡은 편지의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 18의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 18의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:낡은 편지",
+          "name": "낡은 편지",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV18"
+      ]
+    },
+    {
+      "scene_id": "scene-19",
+      "importance": 3,
+      "id": "EV19",
+      "category": "event",
+      "title": "19장 발견한 기록",
+      "subject": "해안 등대",
+      "text": "해안 등대에서 번호 19의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제19차 조사에서 은서는 해안 등대에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 19가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제19차 조사에서 은서는 해안 등대에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 19가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 19,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:해안 등대",
+          "name": "해안 등대",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL19",
+        "EV18"
+      ]
+    },
+    {
+      "scene_id": "scene-19",
+      "importance": 3,
+      "id": "RE19",
+      "category": "relation",
+      "title": "19장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 푸른 지도에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제19차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제19차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE18",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV19",
+        "CH19"
+      ]
+    },
+    {
+      "scene_id": "scene-19",
+      "importance": 3,
+      "id": "CH19",
+      "category": "character",
+      "title": "19장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 망설임을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제19차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제19차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH18",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV19",
+        "RE19"
+      ]
+    },
+    {
+      "scene_id": "scene-19",
+      "importance": 3,
+      "id": "CL19",
+      "category": "clue",
+      "title": "19장 푸른 지도의 무늬",
+      "subject": "푸른 지도",
+      "text": "푸른 지도의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 19의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 19의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:푸른 지도",
+          "name": "푸른 지도",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV19"
+      ]
+    },
+    {
+      "scene_id": "scene-20",
+      "importance": 3,
+      "id": "EV20",
+      "category": "event",
+      "title": "20장 발견한 기록",
+      "subject": "작은 연구소",
+      "text": "작은 연구소에서 번호 20의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제20차 조사에서 은서는 작은 연구소에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 20가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제20차 조사에서 은서는 작은 연구소에 남아 있는 검은 수첩의 기록을 확인했다. 문서에는 번호 20가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 20,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:작은 연구소",
+          "name": "작은 연구소",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL20",
+        "EV19"
+      ]
+    },
+    {
+      "scene_id": "scene-20",
+      "importance": 3,
+      "id": "RE20",
+      "category": "relation",
+      "title": "20장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 검은 수첩에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제20차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제20차 현장에서 검은 수첩에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE19",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV20",
+        "CH20"
+      ]
+    },
+    {
+      "scene_id": "scene-20",
+      "importance": 3,
+      "id": "CH20",
+      "category": "character",
+      "title": "20장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 결심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제20차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제20차 조사를 마치며 결심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH19",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV20",
+        "RE20"
+      ]
+    },
+    {
+      "scene_id": "scene-20",
+      "importance": 3,
+      "id": "CL20",
+      "category": "clue",
+      "title": "20장 검은 수첩의 무늬",
+      "subject": "검은 수첩",
+      "text": "검은 수첩의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 20의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 20의 검은 수첩에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:검은 수첩",
+          "name": "검은 수첩",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV20"
+      ]
+    },
+    {
+      "scene_id": "scene-21",
+      "importance": 3,
+      "id": "EV21",
+      "category": "event",
+      "title": "21장 발견한 기록",
+      "subject": "옛 역",
+      "text": "옛 역에서 번호 21의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제21차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 21가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제21차 조사에서 은서는 옛 역에 남아 있는 은빛 열쇠의 기록을 확인했다. 문서에는 번호 21가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 21,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:옛 역",
+          "name": "옛 역",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL21",
+        "EV20"
+      ]
+    },
+    {
+      "scene_id": "scene-21",
+      "importance": 3,
+      "id": "RE21",
+      "category": "relation",
+      "title": "21장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 은빛 열쇠에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제21차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제21차 현장에서 은빛 열쇠에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE20",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV21",
+        "CH21"
+      ]
+    },
+    {
+      "scene_id": "scene-21",
+      "importance": 3,
+      "id": "CH21",
+      "category": "character",
+      "title": "21장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 의심을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제21차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제21차 조사를 마치며 의심을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH20",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV21",
+        "RE21"
+      ]
+    },
+    {
+      "scene_id": "scene-21",
+      "importance": 3,
+      "id": "CL21",
+      "category": "clue",
+      "title": "21장 은빛 열쇠의 무늬",
+      "subject": "은빛 열쇠",
+      "text": "은빛 열쇠의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 21의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 21의 은빛 열쇠에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:은빛 열쇠",
+          "name": "은빛 열쇠",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV21"
+      ]
+    },
+    {
+      "scene_id": "scene-22",
+      "importance": 3,
+      "id": "EV22",
+      "category": "event",
+      "title": "22장 발견한 기록",
+      "subject": "강변 창고",
+      "text": "강변 창고에서 번호 22의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제22차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 22가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제22차 조사에서 은서는 강변 창고에 남아 있는 붉은 장부의 기록을 확인했다. 문서에는 번호 22가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 22,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:강변 창고",
+          "name": "강변 창고",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL22",
+        "EV21"
+      ]
+    },
+    {
+      "scene_id": "scene-22",
+      "importance": 3,
+      "id": "RE22",
+      "category": "relation",
+      "title": "22장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 붉은 장부에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제22차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제22차 현장에서 붉은 장부에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE21",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV22",
+        "CH22"
+      ]
+    },
+    {
+      "scene_id": "scene-22",
+      "importance": 3,
+      "id": "CH22",
+      "category": "character",
+      "title": "22장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 긴장을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제22차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제22차 조사를 마치며 긴장을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH21",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV22",
+        "RE22"
+      ]
+    },
+    {
+      "scene_id": "scene-22",
+      "importance": 3,
+      "id": "CL22",
+      "category": "clue",
+      "title": "22장 붉은 장부의 무늬",
+      "subject": "붉은 장부",
+      "text": "붉은 장부의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 22의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 22의 붉은 장부에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:붉은 장부",
+          "name": "붉은 장부",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV22"
+      ]
+    },
+    {
+      "scene_id": "scene-23",
+      "importance": 3,
+      "id": "EV23",
+      "category": "event",
+      "title": "23장 발견한 기록",
+      "subject": "시립 도서관",
+      "text": "시립 도서관에서 번호 23의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제23차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 23가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제23차 조사에서 은서는 시립 도서관에 남아 있는 낡은 편지의 기록을 확인했다. 문서에는 번호 23가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 23,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:시립 도서관",
+          "name": "시립 도서관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL23",
+        "EV22"
+      ]
+    },
+    {
+      "scene_id": "scene-23",
+      "importance": 3,
+      "id": "RE23",
+      "category": "relation",
+      "title": "23장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 낡은 편지에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제23차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제23차 현장에서 낡은 편지에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE22",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV23",
+        "CH23"
+      ]
+    },
+    {
+      "scene_id": "scene-23",
+      "importance": 3,
+      "id": "CH23",
+      "category": "character",
+      "title": "23장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 기대을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제23차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제23차 조사를 마치며 기대을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH22",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV23",
+        "RE23"
+      ]
+    },
+    {
+      "scene_id": "scene-23",
+      "importance": 3,
+      "id": "CL23",
+      "category": "clue",
+      "title": "23장 낡은 편지의 무늬",
+      "subject": "낡은 편지",
+      "text": "낡은 편지의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 23의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 23의 낡은 편지에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:낡은 편지",
+          "name": "낡은 편지",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV23"
+      ]
+    },
+    {
+      "scene_id": "scene-24",
+      "importance": 5,
+      "id": "EV24",
+      "category": "event",
+      "title": "24장 발견한 기록",
+      "subject": "언덕 기록관",
+      "text": "언덕 기록관에서 번호 24의 기록이 발견되었다. 그 기록이 빠져 있었던 원인은 아직 밝혀지지 않았다.",
+      "confidence": "fact",
+      "evidence": "제24차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 24가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+      "reveal": {
+        "quote": "제24차 조사에서 은서는 언덕 기록관에 남아 있는 푸른 지도의 기록을 확인했다. 문서에는 번호 24가 적혀 있었지만 기록이 빠진 이유는 밝혀지지 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 24,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "place:언덕 기록관",
+          "name": "언덕 기록관",
+          "type": "place",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "CL24",
+        "EV23"
+      ]
+    },
+    {
+      "scene_id": "scene-24",
+      "importance": 5,
+      "id": "RE24",
+      "category": "relation",
+      "title": "24장 두 사람의 견해",
+      "subject": "은서 ↔ 태민",
+      "text": "은서와 태민은 푸른 지도에 관한 해석을 달리했지만 원자료를 함께 대조하기로 했다. 현재까지 확인된 것은 의견 차이와 협력뿐이다.",
+      "confidence": "fact",
+      "evidence": "태민은 제24차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+      "reveal": {
+        "quote": "태민은 제24차 현장에서 푸른 지도에 관한 해석을 놓고 은서와 다른 의견을 냈다. 두 사람은 서둘러 결론을 내리기보다 원자료부터 대조하기로 했다.",
+        "occurrence": 1
+      },
+      "replaces": "RE23",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        },
+        {
+          "id": "person:태민",
+          "name": "태민",
+          "type": "person",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV24",
+        "CH24"
+      ]
+    },
+    {
+      "scene_id": "scene-24",
+      "importance": 5,
+      "id": "CH24",
+      "category": "character",
+      "title": "24장 은서의 목표",
+      "subject": "은서",
+      "text": "은서는 망설임을 느끼면서도 기록을 찾는 목표를 포기하지 않았다. 다음 장소를 방문하겠다는 발언은 목표가 계속 유지됨을 뒷받침한다.",
+      "confidence": "strong_inference",
+      "evidence": "은서는 제24차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+      "reveal": {
+        "quote": "은서는 제24차 조사를 마치며 망설임을 느꼈다. 그래도 잃어버린 기록을 끝까지 찾기 위해 다음 장소를 방문하겠다고 직접 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH23",
+      "story_order": null,
+      "entities": [
+        {
+          "id": "person:은서",
+          "name": "은서",
+          "type": "person",
+          "aliases": [
+            "서 연구원"
+          ]
+        }
+      ],
+      "related_ids": [
+        "EV24",
+        "RE24"
+      ]
+    },
+    {
+      "scene_id": "scene-24",
+      "importance": 5,
+      "id": "CL24",
+      "category": "clue",
+      "title": "24장 푸른 지도의 무늬",
+      "subject": "푸른 지도",
+      "text": "푸른 지도의 표면에서 확인된 무늬는 조사 기록에 남겨 둘 대상이다. 그 의미는 이 지점까지의 원문만으로 특정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "조사 번호 24의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+      "reveal": {
+        "quote": "조사 번호 24의 푸른 지도에는 작은 무늬가 남아 있었다. 은서는 무늬가 있다는 사실만 확인했으며 그 상징의 의미까지 단정하지는 않았다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null,
+      "entities": [
+        {
+          "id": "object:푸른 지도",
+          "name": "푸른 지도",
+          "type": "object",
+          "aliases": []
+        }
+      ],
+      "related_ids": [
+        "EV24"
+      ]
+    }
+  ]
+}
