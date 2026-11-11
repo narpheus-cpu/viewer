@@ -3952,13 +3952,18 @@ function goPrevPage(){
 }
 
 function goNextPage(){
-  if(readerLazyActive()){void readerLazyTurn(1);return;}
   if(restoreInProgress)return;
+  const ticket=window.readerInsights?.prepareAdvance();
+  if(readerLazyActive()){
+    void readerLazyTurn(1).then(()=>window.readerInsights?.finishAdvance(ticket)).catch(()=>{});
+    return;
+  }
   const count=visiblePageCount();
   if(pageIndex+count<pages.length){
     pageIndex+=count;
     readerChooseAnchor(pageAnchors[pageIndex]);
     render();
+    window.readerInsights?.finishAdvance(ticket);
   }
 }
 
