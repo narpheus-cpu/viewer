@@ -8,7 +8,7 @@ const navigatorSource=content('reader-insights-nav.js');
 const example=content('tests/fixtures/insights-navigator-demo.txt');
 const temp={};new Function('window',dataSource)(temp);
 const parsed=temp.ReaderInsightsData.parse(example);
-const all=parsed.metadata.records,book=parsed.body;
+const all=parsed.metadata.records.map(r=>({...r,revealOffset:r.rawOffset})),book=parsed.body;
 let checks=0;
 const yes=(condition,message)=>{assert.ok(condition,message);checks++;};
 yes(all.length===96,'96 sourced records');
