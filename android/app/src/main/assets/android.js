@@ -69,6 +69,13 @@
         document.getElementById('insightsMarkDialog')?.classList.contains('is-open')) {
       window.readerInsights?.cancelCorrection?.(); return true;
     }
+    if (window.readerInsights?.isOpen?.()) { window.readerInsights.close(); return true; }
+    if (document.getElementById('insightsMarkDialog')?.classList.contains('is-open')) {
+      document.getElementById('insightsMarkCancel')?.click(); return true;
+    }
+    if (document.body.classList.contains('insights-correcting')) {
+      window.readerInsights?.cancelCorrection?.(); return true;
+    }
     if (readerChapterIsOpen()) { readerChapterClose(); return true; }
     if (readerTimelineIsOpen()) { readerCloseTimeline(); return true; }
     if (readerGPTIsOpen()) { readerGPTClose(); return true; }
