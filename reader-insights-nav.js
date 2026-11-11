@@ -7,7 +7,7 @@ const confidence={fact:'확인된 사실',strong_inference:'근거 있는 해석
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const norm=value=>String(value??'').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/g,' ').trim();
 let nav=null,active=false,mode='home',query='',pendingQuery='',chosen=null,recordId='',page=0;
-let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),cacheKey='';
+let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),detailCache=new Map(),cacheKey='';
 function api(){return window.readerInsights;}
 function snapshot(){return api()?.navigationSnapshot?.()||{records:[],readEnd:0,bookLength:0,currentAnchor:0,pageText:'',bookKey:''};}
 function hasData(){return records.length>0;}
@@ -63,7 +63,7 @@ function forEntity(entity){
 }
 function onLoaded(){
  if(!nav)return;
- cacheKey='';
+ cacheKey='';detailCache.clear();
  const s=indexVisible();
  if(!hasData()){
   active=false;mode='home';pendingQuery='';setVisibility(false);
@@ -143,6 +143,8 @@ function latestForEntity(e){
 function lens(s){
  const snippet=norm(s.pageText);
  const anchor=Number(s.currentAnchor)||s.readEnd;
+ const currentScene=records.filter(r=>r.scene_id&&r.revealOffset<=anchor)
+  .sort((a,b)=>b.revealOffset-a.revealOffset)[0]?.scene_id||null;
  const matches=[];
  const superseded=new Set(records.filter(r=>r.replaces).map(r=>r.replaces));
  const namesFor=id=>(recordNames.get(id)||[]).filter(t=>norm(t).length>=2);
@@ -150,8 +152,9 @@ function lens(s){
   if(superseded.has(r.id))continue;
   const personMatch=snippet&&namesFor(r.id).some(alias=>snippet.includes(norm(alias)));
   const nearby=Math.abs(r.revealOffset-anchor)<Math.min(5000,Math.max(600,s.bookLength*.01));
-  if(!personMatch&&!nearby)continue;
-  const score=(personMatch?100:0)+(nearby?35:0)+(r.importance||3)*5-Math.min(20,Math.abs(r.revealOffset-anchor)/1200);
+  const sameScene=!!currentScene&&r.scene_id===currentScene;
+  if(!personMatch&&!nearby&&!sameScene)continue;
+  const score=(sameScene?170:0)+(personMatch?90:0)+(nearby?35:0)+(r.importance||3)*5-Math.min(35,Math.abs(r.revealOffset-anchor)/900);
   matches.push({...r,score});
  }
  matches.sort((a,b)=>b.score-a.score||b.revealOffset-a.revealOffset);
@@ -264,6 +267,9 @@ function fits(r,portion){
  const okay=probe.scrollHeight<=usable;probe.remove();return okay;
 }
 function splitDetail(r){
+ const surface=$('insightsPaper');
+ const key=r.id+'|'+r.text.length+'|'+r.evidence.length+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ if(detailCache.has(key))return detailCache.get(key);
  const text=String(r.text||'')+'\n\n근거: '+String(r.evidence||'');
  let offset=0,pieces=[],guard=0;
  while(offset<text.length&&guard++<300){
@@ -286,7 +292,7 @@ function splitDetail(r){
   pieces.push(text.slice(offset,end));offset=end;
   while(offset<text.length&&/\s/.test(text[offset]))offset++;
  }
- return pieces.length?pieces:[''];
+ const result=pieces.length?pieces:[''];detailCache.set(key,result);return result;
 }
 function renderRecord(){
  const r=byId.get(recordId);
