@@ -12,24 +12,63 @@ function bookText(){try{return fullText||'';}catch{return '';}}
 function bookCanonical(){try{return readerCanonical();}catch{return bookText();}}
 function panelOpen(){return !!overlay?.classList.contains('is-open');}
 function readerOpen(){return !!el('viewerOverlay')?.classList.contains('active');}
-function visibleEnd(){
- let anchor=0;try{anchor=Number(readerAnchor())||0;}catch{}
- try{
-  const count=typeof visiblePageCount==='function'?visiblePageCount():1;
-  const last=pageIndex+count-1;
-  if(!pages?.[pageIndex]?.includes('data-reader-pending=')&&!pages?.[last]?.includes('data-reader-pending=')){
-   const next=Number(pageAnchors?.[pageIndex+count]);
-   if(Number.isFinite(next)&&next>anchor)anchor=next;
-   else if(pageIndex+count>=pages.length&&!readerLazyActive())anchor=bookCanonical().length;
-  }
- }catch{}
- return Math.max(0,anchor);
+/* Only the real rendered spread is eligible. An unloaded chapter placeholder
+   or a direct jump cannot certify unseen content. */
+function pageWindow(){
+ const text=bookCanonical();
+ if(!text||!readerOpen()||typeof pageIndex==='undefined'||!Array.isArray(pages)||!pages.length)return null;
+ const count=typeof visiblePageCount==='function'?visiblePageCount():1;
+ const shown=pages.slice(pageIndex,pageIndex+count);
+ if(!shown.length||shown.some(html=>!html||html.includes('data-reader-pending=')))return null;
+ const realIndices=[];
+ for(let i=0;i<shown.length;i++)if(!shown[i].includes('chapter-spacer'))realIndices.push(pageIndex+i);
+ if(!realIndices.length)return null;
+ const first=realIndices[0],last=realIndices[realIndices.length-1];
+ const start=Math.max(0,Number(pageAnchors[first])||0),lastStart=Math.max(start,Number(pageAnchors[last])||start);
+ const next=Number(pageAnchors[last+1]);
+ let end=lastStart;
+ if(Number.isFinite(next)&&next>lastStart)end=next;
+ else{
+  // Use only visible text if a lazy chapter has no subsequent measured page.
+  const rendered=typeof htmlToStableText==='function'?htmlToStableText(pages[last]):'';
+  end=lastStart+rendered.length;
+ }
+ return {first,last,start,end:Math.min(text.length,Math.max(end,start))};
 }
+function visibleEnd(){return pageWindow()?.end??0;}
 function observe(){
  const text=bookText();
  if(!D()||!readerOpen()||!text||typeof restoreInProgress!=='undefined'&&restoreInProgress)return;
- D().markSeen(text,visibleEnd());
- if(panelOpen()&&currentKey!==D().key(text))close();
+ const view=pageWindow();
+ if(!view)return;
+ const progress=D().getReadState(text);
+ // First visible page of a new book only. Do not interpret a restored late page
+ // or a jump-to-end as proof of reading the preceding chapters.
+ if(!progress.hasRecord&&view.start===0&&view.first===0)D().markSeen(text,view.end);
+ if(panelOpen()){
+  if(currentKey!==D().key(text)){close();return;}
+  layoutKey='';paint();
+ }
+}
+function prepareAdvance(){
+ const text=bookText(),view=pageWindow();
+ if(!D()||!view||!text)return null;
+ const progress=D().getReadState(text);
+ return {key:D().key(text),start:view.start,end:view.end,
+  permitted:view.start<=progress.seen+1&&(progress.hasRecord||view.start===0)};
+}
+function finishAdvance(ticket){
+ if(!ticket||!ticket.permitted||!D()||ticket.key!==D().key(bookText()))return;
+ const next=pageWindow();
+ if(!next||next.start<=ticket.start||next.start>ticket.end+2)return;
+ D().markSeen(bookText(),next.end);
+ if(panelOpen()){layoutKey='';paint();}
+}
+function correctTo(offset){
+ if(!D()||!bookText())return;
+ D().setSeen(bookText(),Math.min(bookCanonical().length,Math.max(0,Math.round(offset))));
+ layoutKey='';pageNumber=0;
+ if(panelOpen())paint();
 }
 function lookupEnd(text,phrase,occ){
  let end=D().occurrenceEnd(text,phrase,occ);
@@ -162,23 +201,114 @@ async function importJson(file){
   entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;paint();
  }catch(e){alert(e.message||String(e));}
 }
+
+/* A reader can explicitly correct an accidental jump, including backward.
+   A selected sentence is mapped to the canonical text of that displayed page. */
+let markDialog=null,selectedCursor=null;
+function getSelectedCursor(){
+ const sel=window.getSelection();
+ if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
+ const range=sel.getRangeAt(0);
+ const node=range.endContainer.nodeType===1?range.endContainer:range.endContainer.parentElement;
+ const pageEl=node?.closest?.('#pageInnerLeft, #pageInnerRight');
+ if(!pageEl)return null;
+ const index=pageIndex+(pageEl.id==='pageInnerRight'?1:0);
+ if(!pages[index]||pages[index].includes('data-reader-pending=')||pages[index].includes('chapter-spacer'))return null;
+ const novel=bookCanonical();
+ const start=Math.max(0,Number(pageAnchors[index])||0);
+ const next=Number(pageAnchors[index+1]);
+ const upper=Number.isFinite(next)&&next>start?Math.min(novel.length,next):novel.length;
+ const quote=String(range.toString()||'').trim();
+ if(quote.length<6||quote.length>1000)return null;
+ const prefix=document.createRange();
+ prefix.setStart(pageEl,0);
+ try{prefix.setEnd(range.endContainer,range.endOffset);}catch{return null;}
+ const guessed=start+prefix.toString().length;
+ const candidates=[];
+ let at=novel.indexOf(quote,start);
+ while(at>=0&&at<upper&&candidates.length<50){
+  const ending=at+quote.length;
+  if(ending<=upper)candidates.push(ending);
+  at=novel.indexOf(quote,at+1);
+ }
+ if(!candidates.length)return null;
+ const match=candidates.reduce((best,end)=>Math.abs(end-guessed)<Math.abs(best-guessed)?end:best);
+ return {end:match,quote:quote.length>75?quote.slice(-75):quote};
+}
+function toggleMarkDialog(show){
+ if(!markDialog)return;
+ markDialog.classList.toggle('is-open',!!show);
+ markDialog.setAttribute('aria-hidden',String(!show));
+ if(show)el('insightsMarkCancel').focus({preventScroll:true});
+}
+function finishCorrection(at){
+ if(at===null||at===undefined)return;
+ correctTo(at);
+ toggleMarkDialog(false);
+ window.getSelection()?.removeAllRanges?.();
+ const n=bookCanonical().length,seen=D().getSeen(bookText());
+ const pct=n?Math.min(100,Math.floor(seen/n*100)):0;
+ const note=el('insightsMarkNotice');
+ if(note){note.textContent='읽은 지점을 '+pct+'%로 수정했어. 독서정보도 이 지점까지만 공개돼.';}
+ if(panelOpen()){layoutKey='';paint();}
+}
+function openMarkDialog(){
+ if(!readerOpen())return;
+ selectedCursor=getSelectedCursor();
+ const current=pageWindow();
+ const before=D().getSeen(bookText()),n=bookCanonical().length;
+ const pct=n?Math.min(100,Math.floor(before/n*100)):0;
+ el('insightsMarkCurrent').textContent='현재 설정된 읽은 범위: '+pct+'%';
+ el('insightsMarkSelected').disabled=!selectedCursor;
+ el('insightsMarkSelected').textContent=selectedCursor?'선택 문장 끝으로 지정':'선택 문장 끝으로 지정 (본문 선택 필요)';
+ el('insightsMarkPage').disabled=!current;
+ el('insightsMarkTarget').textContent=current?
+  '이 페이지의 마지막 문장까지: '+(n?Math.min(100,Math.floor(current.end/n*100)):0)+'%':'현재 페이지를 측정할 수 없어.';
+ el('insightsMarkNotice').textContent=selectedCursor?'선택한 구절: '+selectedCursor.quote:'';
+ toggleMarkDialog(true);
+}
 function init(){
  if(el('insightsOpen')||!el('openReaderSearch')||!D())return;
  const b=document.createElement('button');b.type='button';b.id='insightsOpen';b.className='secondary';b.textContent='독서 정보';
  el('openReaderSearch').before(b);b.onclick=()=>void open();
+ const readButton=document.createElement('button');
+ readButton.id='insightsMarkRead';readButton.type='button';readButton.className='secondary';readButton.textContent='읽은 곳 지정';
+ el('openReaderSearch').before(readButton);readButton.onclick=openMarkDialog;
+ markDialog=document.createElement('section');markDialog.id='insightsMarkDialog';markDialog.className='insights-mark-dialog';
+ markDialog.setAttribute('role','dialog');markDialog.setAttribute('aria-label','읽은 위치 직접 지정');
+ markDialog.setAttribute('aria-modal','true');markDialog.setAttribute('aria-hidden','true');
+ markDialog.innerHTML='<div class="insights-mark-box"><h2>읽은 지점 직접 지정</h2>'+
+ '<div id="insightsMarkCurrent"></div><div id="insightsMarkTarget"></div>'+
+ '<p>실제로 읽은 페이지로 이동한 뒤 지정해. 문장 일부를 선택하면 그 문장 끝까지 정확히 지정할 수 있어. 책 마지막에 잘못 갔다면 읽은 곳으로 돌아와 다시 지정해.</p>'+
+ '<button id="insightsMarkSelected" type="button">선택 문장 끝으로 지정</button>'+
+ '<button id="insightsMarkPage" type="button">이 페이지 끝으로 지정</button>'+
+ '<button id="insightsMarkZero" type="button">처음부터 다시 읽음 (0%)</button>'+
+ '<button id="insightsMarkCancel" type="button">취소</button><div id="insightsMarkNotice" role="status"></div></div>';
+ document.body.append(markDialog);
+ el('insightsMarkSelected').onclick=()=>{if(selectedCursor)finishCorrection(selectedCursor.end);};
+ el('insightsMarkPage').onclick=()=>finishCorrection(pageWindow()?.end);
+ el('insightsMarkZero').onclick=()=>finishCorrection(0);
+ el('insightsMarkCancel').onclick=()=>toggleMarkDialog(false);
+
  overlay=document.createElement('section');overlay.id='insightsPanel';overlay.className='insights-shell';
  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','독서 정보');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-hidden','true');
  overlay.innerHTML='<header class="insights-head"><h2>독서 정보</h2><button id="insightsClose" type="button">닫기</button></header>'+
  '<nav class="insights-tabs" aria-label="독서정보 종류">'+tabs.map(([k,v])=>'<button type="button" data-insight-tab="'+k+'" aria-pressed="false">'+v+'</button>').join('')+'</nav>'+
- '<div class="insights-toolbar"><span id="insightsSeen"></span><span id="insightsStatus"></span><button type="button" id="insightsImportBtn">정보 불러오기</button><input type="file" id="insightsImportInput" accept=".json,application/json" hidden></div>'+
+ '<div class="insights-toolbar"><span id="insightsSeen"></span><span id="insightsStatus"></span><button type="button" id="insightsGoMark">읽은 지점 수정</button><button type="button" id="insightsImportBtn">정보 불러오기</button><input type="file" id="insightsImportInput" accept=".json,application/json" hidden></div>'+
  '<main id="insightsPaper" class="insights-paper" tabindex="0" aria-label="독서정보 페이지"></main>'+
  '<footer class="insights-footer"><button id="insightsPrev" type="button">〈 이전</button><strong id="insightsPageCount">0 / 0</strong><button id="insightsNext" type="button">다음 〉</button></footer>';
  document.body.append(overlay);paper=el('insightsPaper');
  el('insightsClose').onclick=close;el('insightsPrev').onclick=()=>turn(-1);el('insightsNext').onclick=()=>turn(1);
  overlay.querySelectorAll('[data-insight-tab]').forEach(tab=>tab.onclick=()=>setTab(tab.dataset.insightTab));
  el('insightsImportBtn').onclick=()=>el('insightsImportInput').click();
+ el('insightsGoMark').onclick=()=>{close();el('insightsMarkRead').focus({preventScroll:true});openMarkDialog();};
  el('insightsImportInput').onchange=e=>{void importJson(e.target.files[0]);e.target.value='';};
  window.addEventListener('keydown',e=>{
+  if(markDialog?.classList.contains('is-open')){
+   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();toggleMarkDialog(false);}
+   else if(['ArrowLeft','ArrowRight','PageUp','PageDown'].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();}
+   return;
+  }
   if(!panelOpen())return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close();return;}
   const tag=e.target?.tagName||'';
@@ -200,7 +330,7 @@ function init(){
  new MutationObserver(()=>{if(panelOpen()&&(!readerOpen()||D().key(bookText())!==currentKey))close();})
   .observe(el('viewerOverlay'),{attributes:true,attributeFilter:['class']});
  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(panelOpen()){layoutKey='';pageNumber=0;paint();}}).observe(paper);
- window.readerInsights={open,close,observe,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
+ window.readerInsights={open,close,observe,prepareAdvance,finishAdvance,correctTo,visibleEnd,pageWindow,isOpen:panelOpen,refresh:()=>{layoutKey='';paint();}};
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
