@@ -24,7 +24,7 @@ for name in ("reader-insights.css","reader-insights-data.js","reader-insights.js
     check(name in index,f"APK HTML does not reference {name}")
     check('"/assets/'+name+'"' in main,f"APK request handler does not whitelist {name}")
 check('path.endsWith(".css") ? "text/css"' in main,"Missing CSS MIME type")
-check('blockNetworkLoads(true)' in main,"Network requests unexpectedly enabled")
+check('setBlockNetworkLoads(true)' in main,"Network requests unexpectedly enabled")
 check('showRecentHistory()' in index,"Android startup must display the file chooser")
 check('const syncReading=loadReadingSessionSync();' not in index,"Old automatic book reopening remains")
 check('readerState.initializing=false;' in index,"Reader initialization never finishes")
