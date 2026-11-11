@@ -180,8 +180,11 @@ function init(){
  window.addEventListener('keydown',e=>{
   if(!panelOpen())return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close();return;}
-  if(['ArrowLeft','ArrowRight','PageUp','PageDown',' '].includes(e.key)&&!e.target.closest('button,input,select,textarea')){
+  const tag=e.target?.tagName||'';
+  if(['ArrowLeft','ArrowRight','PageUp','PageDown'].includes(e.key)&&!['INPUT','TEXTAREA','SELECT'].includes(tag)){
    e.preventDefault();e.stopImmediatePropagation();turn(['ArrowLeft','PageUp'].includes(e.key)?-1:1);
+  }else if(e.key===' '&&!['BUTTON','INPUT','TEXTAREA','SELECT'].includes(tag)){
+   e.preventDefault();e.stopImmediatePropagation();turn(1);
   }
  },true);
  paper.addEventListener('pointerdown',e=>gesture={x:e.clientX,y:e.clientY},{passive:true});
