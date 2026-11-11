@@ -64,6 +64,11 @@
 
   window.__androidBack = function () {
     if (typeof viewerOverlay === 'undefined') return false;
+    if (window.readerInsights?.isOpen?.()) { window.readerInsights.close(); return true; }
+    if (document.body.classList.contains('insights-correcting') ||
+        document.getElementById('insightsMarkDialog')?.classList.contains('is-open')) {
+      window.readerInsights?.cancelCorrection?.(); return true;
+    }
     if (readerChapterIsOpen()) { readerChapterClose(); return true; }
     if (readerTimelineIsOpen()) { readerCloseTimeline(); return true; }
     if (readerGPTIsOpen()) { readerGPTClose(); return true; }
