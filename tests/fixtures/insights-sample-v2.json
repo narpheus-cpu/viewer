@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "records": [
+    {
+      "id": "EV01",
+      "category": "event",
+      "subject": "파란 공책",
+      "title": "공책 발견이 만든 새로운 과제",
+      "text": "서윤은 동생의 이름이 적힌 공책을 발견하면서, 공책을 단순한 분실물로 취급하기 어렵게 된다.",
+      "confidence": "fact",
+      "evidence": "첫 장에는 십 년 전 헤어진 동생의 이름이 적혀 있었다.",
+      "reveal": {
+        "quote": "마지막 장에 그려진 강가의 집을 보고 마음을 바꾸었다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 1
+    },
+    {
+      "id": "CL01",
+      "category": "clue",
+      "subject": "강가의 집 그림",
+      "title": "방문해야 할 장소가 된 그림",
+      "text": "공책의 마지막 장에 있는 집 그림은 서윤이 안내소 대신 특정 장소를 찾아가게 만든 단서다. 이 시점에서 누가 그림을 그렸는지는 확인되지 않았다.",
+      "confidence": "fact",
+      "evidence": "마지막 장에 그려진 강가의 집을 보고 마음을 바꾸었다.",
+      "reveal": {
+        "quote": "마지막 장에 그려진 강가의 집을 보고 마음을 바꾸었다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null
+    },
+    {
+      "id": "RE01",
+      "category": "relation",
+      "subject": "서윤 ↔ 민재",
+      "title": "어린 시절 친구이지만 뜻밖의 긴장",
+      "text": "두 사람은 어린 시절 친구다. 민재가 공책을 알아보고도 침묵하는 상황에서 서윤은 민재를 의심하기 시작한다. 침묵의 이유는 아직 확인되지 않았다.",
+      "confidence": "fact",
+      "evidence": "문을 연 사람은 어린 시절 친구 민재였다.",
+      "reveal": {
+        "quote": "민재는 파란 공책을 알아보고도 한동안 아무 말이 없었다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null
+    },
+    {
+      "id": "CH01",
+      "category": "character",
+      "subject": "서윤",
+      "title": "동생의 흔적을 직접 확인하려는 욕망",
+      "text": "그림 속 장소를 직접 찾는 선택을 보면, 서윤은 공책을 돌려주는 일보다 동생의 행방을 확인하는 일을 더 중요하게 여기기 시작한 것으로 해석할 수 있다.",
+      "confidence": "strong_inference",
+      "evidence": "서윤은 공책을 돌려주기 위해 기차역 안내소에 맡길까 생각했지만",
+      "reveal": {
+        "quote": "서윤은 민재가 공책을 숨기려 한다고 의심했다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": null
+    },
+    {
+      "id": "CH02",
+      "category": "character",
+      "subject": "서윤",
+      "title": "의심보다 협력으로 바뀐 목표",
+      "text": "서윤은 민재를 의심하는 데 머무르지 않고, 함께 동생에게 연락할 방법을 찾자는 방향으로 행동 목표를 바꾼다.",
+      "confidence": "fact",
+      "evidence": "동생에게 닿을 길을 함께 찾아보자고 말했다.",
+      "reveal": {
+        "quote": "그는 민재를 탓하기보다 동생에게 닿을 길을 함께 찾아보자고 말했다.",
+        "occurrence": 1
+      },
+      "replaces": "CH01",
+      "story_order": null
+    },
+    {
+      "id": "EV02",
+      "category": "event",
+      "subject": "동생의 편지",
+      "title": "동생이 떠난 이유에 관한 새 사실",
+      "text": "동생이 스스로 집을 떠났고 연락 방법을 찾지 못했다는 편지의 내용이 드러난다. 실제로 연락이 불가능했는지는 편지의 진술 범위를 넘어서 확정할 수 없다.",
+      "confidence": "fact",
+      "evidence": "편지에는 동생이 스스로 집을 떠났으며, 돌아오고 싶어도 연락할 방법을 찾지 못했다는 내용이 담겨 있었다.",
+      "reveal": {
+        "quote": "편지에는 동생이 스스로 집을 떠났으며, 돌아오고 싶어도 연락할 방법을 찾지 못했다는 내용이 담겨 있었다.",
+        "occurrence": 1
+      },
+      "replaces": null,
+      "story_order": 2
+    }
+  ]
+}
