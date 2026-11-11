@@ -41,6 +41,8 @@ async function openReader(page){
    await openReader(page);
    assert.equal(await page.evaluate(()=>fullText.includes('READER_INSIGHTS_V2_BEGIN')),false);checks++;
    assert.ok(await page.evaluate(async()=>{const d=await window.ReaderInsightsData.load(fullText);return d.records.length===6;}));checks++;
+   const initial=await page.evaluate(()=>({seen:ReaderInsightsData.getSeen(fullText),total:readerCanonical().length}));
+   assert.ok(initial.seen>0&&initial.seen<initial.total,'First page may not unlock the whole novel');checks++;
    await page.locator('#insightsOpen').click();
    assert.equal(await page.locator('[data-insight-tab]').count(),4);checks++;
    await page.locator('[data-insight-tab=character]').click();
@@ -51,19 +53,23 @@ async function openReader(page){
    await page.locator('#insightsClose').click();
    await page.evaluate(()=>readerGoChapter(2));
    await page.waitForFunction(()=>!restoreInProgress);
-   // Advance through the last chapter to make its final quote visible.
-   await page.evaluate(async()=>{
-    for(let n=0;n<30;n++){
-     if(readerLazyActive())await readerLazyTurn(1);
-     else goNextPage();
-     if(!restoreInProgress&&readerAnchor()>=readerCanonical().length-1)break;
-    }
-    window.readerInsights?.observe();
-   });
+   assert.equal(await page.evaluate(()=>ReaderInsightsData.getSeen(fullText)),initial.seen,'Direct chapter jump must not increase read progress');checks++;
+   await page.evaluate(()=>window.readerInsights.correctTo(readerCanonical().length));
+   assert.equal(await page.evaluate(()=>ReaderInsightsData.getSeen(fullText)),initial.total,'Manual correction may move forward');checks++;
    await page.locator('#insightsOpen').click();
    await page.locator('[data-insight-tab=character]').click();
    assert.ok(await page.locator('#insightsPageCount').innerText().then(t=>t!=='0 / 0'));checks++;
+   await page.locator('#insightsGoMark').click();
+   assert.equal(await page.evaluate(()=>document.body.classList.contains('insights-correcting')),true);checks++;
+   await page.locator('#insightsMarkRead').click();
+   await page.locator('#insightsMarkZero').click();
+   assert.equal(await page.evaluate(()=>ReaderInsightsData.getSeen(fullText)),0);checks++;
+   await page.locator('#insightsOpen').click();
+   await page.locator('[data-insight-tab=character]').click();
+   assert.equal((await page.locator('#insightsPageCount').innerText()).trim(),'0 / 0','Later records must re-lock immediately after correction');checks++;
    await page.locator('#insightsClose').click();
+   await page.reload();await page.evaluate(()=>readerReady);
+   assert.equal(await page.evaluate(()=>ReaderInsightsData.getSeen(inputText.value)),0,'Manual correction persists after reload');checks++;
    assert.deepEqual(errors,[]);checks++;
    await context.close();
   }
@@ -88,6 +94,6 @@ async function openReader(page){
    assert.deepEqual(errors,[]);checks++;
    await context.close();
   }
-  console.log('reader insights v2 passed '+checks+' browser regression assertions');
+  console.log('reader insights v3 passed '+checks+' browser regression assertions');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
