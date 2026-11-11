@@ -16,7 +16,7 @@ yes(parsed.body===example.split('\n\n<<<READER_INSIGHTS_V2_BEGIN>>>')[0],'Novel 
 const tail=navigatorSource.lastIndexOf("if(document.readyState==='loading')");
 yes(tail>=0,'Pure navigator script layout');
 const exposed=navigatorSource.slice(0,tail)+
- "window.__test={indexVisible,rankSearch,lens,latestForEntity,filterPerson,filterClue,newest,homeItems,itemsFor,entities:()=>entities,recordById:id=>byId.get(id),choose:e=>chosen=e,mode:m=>mode=m};\n})();";
+ "window.__test={indexVisible,rankSearch,lens,latestForEntity,filterPerson,filterClue,newest,homeItems,itemsFor,entities:()=>entities,recordById:id=>byId.get(id),choose:e=>chosen=e,mode:m=>mode=m,modeValue:()=>mode};\n})();";
 let cutoff=all[4].rawOffset-1;
 let seen=all.filter(r=>r.rawOffset<=cutoff);
 let snap=()=>({records:seen,readEnd:cutoff,bookLength:book.length,currentAnchor:cutoff,
@@ -51,4 +51,10 @@ yes(nav.itemsFor(snap()).some(x=>x.id==='CH24'),'Recent changes are indexed');
 const lens=nav.lens(snap());
 yes(lens.length<=10,'Full novel does not flood lens');
 yes(lens.every(r=>seen.includes(all.find(item=>item.id===r.id))),'Context has no unknown entries');
+const futureObject=nav.filterClue().find(e=>e.name==='검은 수첩');
+yes(!!futureObject,'Later-only item exists in fully read catalog');
+nav.choose(futureObject);nav.mode('entity');
+cutoff=all[4].rawOffset-1;seen=all.filter(r=>r.revealOffset<=cutoff);nav.indexVisible();
+yes(nav.modeValue()==='home','Reducing read cursor removes stale future-only entity view');
+yes(nav.rankSearch('검은 수첩').length===0,'Past cursor never exposes a future-only object');
 console.log(checks+' long-novel navigation unit assertions passed');
