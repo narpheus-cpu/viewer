@@ -19,6 +19,49 @@ function key(body){
  return lastKey;
 }
 function validError(message){throw new Error('독서정보 검증 실패: '+message);}
+/* Render-only evidence excerpt for both legacy tabs and the long-novel navigator.
+   Keep the original evidence untouched for exact source validation/search. */
+function evidenceSentences(source){
+ const text=String(source??'');
+ if(!text.trim())return [];
+ // Intl.Segmenter understands Korean closing quotes, decimals, abbreviations,
+ // and sentence punctuation more reliably than splitting at each dot.
+ if(typeof Intl==='object'&&typeof Intl.Segmenter==='function'){
+  try{
+   const segmenter=new Intl.Segmenter('ko',{granularity:'sentence'});
+   return [...segmenter.segment(text)].map(x=>x.segment.trim()).filter(Boolean);
+  }catch{/* Older Android WebView: use the guarded fallback below. */}
+ }
+ const parts=[];let start=0;
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(!/[.!?。！？]/.test(ch))continue;
+  // Do not turn decimal numbers or initials/abbreviations into sentences.
+  if(ch==='.'&&/\d/.test(text[i-1]||'')&&/\d/.test(text[i+1]||''))continue;
+  if(ch==='.'&&/[A-Za-z]/.test(text[i-1]||'')&&/[A-Za-z]/.test(text[i+1]||''))continue;
+  if(ch==='.'&&/[A-Za-z]/.test(text[i-1]||'')){
+   const before=text.slice(Math.max(0,i-12),i+1);
+   if(/(?:\b(?:Dr|Mr|Mrs|Ms|Prof|Jr|Sr|St|vs|etc|e\.g|i\.e)\.|\b[A-Z]\.)$/i.test(before))continue;
+  }
+  // Keep repeated punctuation and closing quotation marks with the sentence.
+  let end=i+1;
+  while(end<text.length&&/[.!?。！？"”’'」』)\]]/.test(text[end]))end++;
+  if(end<text.length&&!/\s/.test(text[end])){i=end-1;continue;}
+  const part=text.slice(start,end).trim();
+  if(part)parts.push(part);
+  start=end;i=end-1;
+ }
+ const tail=text.slice(start).trim();
+ if(tail)parts.push(tail);
+ return parts;
+}
+function formatEvidence(source){
+ const text=String(source??'');
+ const sentences=evidenceSentences(text);
+ if(sentences.length<=6)return text;
+ return sentences.slice(0,3).join(' ')+' (중략) '+sentences.slice(-3).join(' ');
+}
+
 function occurrenceEnd(text,phrase,occurrence){
  if(!phrase)return -1;
  let start=0,found=-1;
@@ -152,5 +195,5 @@ function markSeen(body,at){
 function setSeen(body,at){return writeSeen(body,at,'manual');}
 function resetSeen(body){return setSeen(body,0);}
 function clearCache(body){memory.delete(key(body));}
-window.ReaderInsightsData={BEGIN,END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd};
+window.ReaderInsightsData={BEGIN,END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd,evidenceSentences,formatEvidence};
 })();
