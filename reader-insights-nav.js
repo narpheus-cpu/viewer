@@ -273,9 +273,9 @@ function fits(r,portion){
 }
 function splitDetail(r){
  const surface=$('insightsPaper');
- const key=r.id+'|'+r.text.length+'|'+r.evidence.length+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ const key='ev3|'+r.id+'|'+r.text.length+'|'+r.evidence.length+'|'+surface.clientWidth+'x'+surface.clientHeight;
  if(detailCache.has(key))return detailCache.get(key);
- const text=String(r.text||'')+'\n\n근거: '+String(r.evidence||'');
+ const text=String(r.text||'')+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
  let offset=0,pieces=[],guard=0;
  while(offset<text.length&&guard++<300){
   const possible=Math.min(12000,text.length-offset);
