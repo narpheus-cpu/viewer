@@ -2267,10 +2267,18 @@ async function loadReaderFile(file){
   const epub=/\.epub$/i.test(file.name);
   if(!epub&&!/\.txt$/i.test(file.name))throw new Error('TXT 또는 EPUB 파일을 선택해 주세요.');
   const imported=epub?await importEpub(file):{text:(await file.text()).replace(/^\uFEFF/,''),chapters:[]};
-  inputText.value=imported.text;inputBookChapters=imported.chapters;
+  let text=imported.text;
+  if(!epub){
+    const unpacked=window.ReaderInsightsData.parse(text);
+    if(unpacked.hasInsights){
+      await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
+      text=unpacked.body;
+    }
+  }
+  inputText.value=text;inputBookChapters=imported.chapters;
   inputFileName=file.name;userEditedAfterRestore=true;updateInputCharacterCount();
   flushReadingSessionSave(false);
-  const count=epub?imported.chapters.length:detectTextChapters(imported.text).length;
+  const count=epub?imported.chapters.length:detectTextChapters(text).length;
   setStatus(`불러옴: ${file.name}${count?` · ${count}개 챕터`:''}`);
 }
 
@@ -2540,7 +2548,8 @@ function setupReaderTools(){
 }
 
 </script>
-<link rel="stylesheet" href="./reader-insights.css?v=1">
+<link rel="stylesheet" href="./reader-insights.css?v=2">
+<script src="./reader-insights-data.js?v=2"></script>
 </head>
 <body>
 
@@ -3912,6 +3921,7 @@ function render(){
     window.__browserCheckpoint?.();
     scheduleReadingSessionSave(true);
     scheduleActiveRecentPositionSave();
+    window.readerInsights?.observe();
   }
 }
 
@@ -4079,7 +4089,14 @@ txtFileInput.addEventListener('change',async()=>{
 async function openViewer(){
   userEditedAfterRestore=true;
   await readerReady;
-  const text=inputText.value;
+  let text=inputText.value;
+  try{
+    const unpacked=window.ReaderInsightsData.parse(text);
+    if(unpacked.hasInsights){
+      await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
+      text=unpacked.body;inputText.value=text;
+    }
+  }catch(error){setStatus(error.message,true);return;}
   updateInputCharacterCount();
   if(!text.trim()){setStatus('전자책으로 볼 텍스트를 입력하세요.',true);return;}
   const generation=++readerState.generation;
@@ -4121,7 +4138,10 @@ async function openRecentBook(id){
     if(!bookRecord){setStatus('해당 최근 내역을 찾을 수 없습니다.',true);return;}
     const meta=window.__browserRecentMeta(bookRecord.meta||{id});
     activeRecentId=id;activeRecentMeta=meta;
-    inputText.value=bookRecord.text;fullText=bookRecord.text;
+    const unpacked=window.ReaderInsightsData.parse(bookRecord.text);
+    const openText=unpacked.hasInsights?unpacked.body:bookRecord.text;
+    if(unpacked.hasInsights)await window.ReaderInsightsData.save(openText,unpacked.metadata);
+    inputText.value=openText;fullText=openText;
     inputFileName=meta.fileName||'';inputBookChapters=meta.chapters||[];
     updateInputCharacterCount();
     hideRecentHistory();setStatus('');$('#viewerSettings').classList.remove('open');
@@ -4243,6 +4263,11 @@ function applyReadingRecordToInput(reading){
 
 async function restoreReadingSession(reading){
   if(!reading||typeof reading.text!=='string')return;
+  const unpacked=window.ReaderInsightsData.parse(reading.text);
+  if(unpacked.hasInsights){
+    await window.ReaderInsightsData.save(unpacked.body,unpacked.metadata);
+    reading={...reading,text:unpacked.body};
+  }
   applyReadingRecordToInput(reading);
   await activateRecentFromReading(reading);
   if(reading.isOpen&&reading.text.trim()){
@@ -4292,6 +4317,6 @@ if(syncReading){
   finally{readerState.hydratedBook=null;readerState.initializing=false;resolveReaderReady();}
 })();
 </script>
-<script src="./reader-insights.js?v=1" defer></script>
+<script src="./reader-insights.js?v=2" defer></script>
 </body>
 </html>
