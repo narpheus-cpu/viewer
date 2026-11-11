@@ -10,6 +10,14 @@ android {
         versionCode 32
         versionName '1.31'
     }
-    buildTypes { debug { debuggable true }; release { minifyEnabled false } }
+    buildTypes {
+        debug {
+            debuggable true
+            // Preview signature differs from the private release key: install side by side.
+            applicationIdSuffix '.preview'
+            versionNameSuffix '-preview'
+        }
+        release { minifyEnabled false }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
