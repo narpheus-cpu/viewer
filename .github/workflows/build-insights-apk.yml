@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: insights-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify-build-and-publish:
     name: Verify web reader + Android, build APK
@@ -45,7 +49,8 @@ jobs:
           python3 android/tests/selection_menu.py
           python3 android/tests/chatgpt_entry.py
           python3 android/tests/timeline_assets.py
-      - uses: android-actions/setup-android@v3
+      # Ubuntu runners already ship with Android SDK command-line tools.
+      # setup-android@v3 currently tries to install the removed 'tools' package.
       - name: Install Android SDK 36
         run: |
           yes | sdkmanager --licenses >/dev/null || true
