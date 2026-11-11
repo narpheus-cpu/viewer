@@ -4122,6 +4122,8 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  window.readerInsights?.close();
+  window.readerInsights?.cancelCorrection();
   readerLazyCancel();
   readerCloseTimeline();
   readerGPTClose();readerGPTSelection='';if(readerGPTMenu)readerGPTMenu.hidden=true;
