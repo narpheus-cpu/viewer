@@ -1,0 +1,129 @@
+/* Ebook reading insights v2. Strictly paginated: no internal scrollbars. */
+#insightsOpen{white-space:nowrap}
+.insights-shell{position:fixed;inset:0;z-index:2147483150;background:#fff;color:#111;display:none;flex-direction:column;font:16px/1.45 system-ui,'Malgun Gothic',sans-serif;overscroll-behavior:contain}
+.insights-shell.is-open{display:flex}
+.insights-shell *{box-sizing:border-box}
+.insights-shell button{font:inherit;cursor:pointer;color:inherit;background:#fff;border:1px solid #555;border-radius:3px;min-height:40px;padding:5px 10px}
+.insights-shell button:disabled{opacity:.35;cursor:default}
+.insights-shell button:focus-visible{outline:2px solid #000;outline-offset:1px}
+.insights-head{padding:7px 10px;border-bottom:2px solid #111;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.insights-head h2{font-size:18px;margin:0;font-weight:700}
+.insights-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:7px 6px;border-bottom:1px solid #555;flex-shrink:0}
+.insights-tabs button{font-size:clamp(11px,2.8vw,15px);padding:4px 3px;min-width:0;white-space:normal;line-height:1.25;min-height:40px}
+.insights-tabs button.selected{background:#111;color:#fff;border-color:#111;font-weight:bold}
+.insights-toolbar{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:5px 8px;flex-shrink:0;border-bottom:1px solid #999;min-height:43px}
+.insights-toolbar span{font-size:11px;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.insights-toolbar #insightsStatus{flex:1;text-align:right}
+.insights-toolbar button{font-size:12px;min-height:32px;padding:4px 8px;white-space:nowrap}
+.insights-paper{min-height:0;flex:1;overflow:hidden;position:relative;padding:12px 14px;touch-action:none}
+.insights-card{height:100%;display:flex;flex-direction:column;overflow:hidden;white-space:normal}
+.insights-type{font-size:12px;color:#555;flex:none;margin-bottom:5px;font-weight:600}
+.insights-title{flex:none;font-size:clamp(18px,3.6vw,24px);line-height:1.4;overflow-wrap:anywhere;margin:0 0 11px;font-weight:700}
+.insights-title small{font-size:12px;font-weight:400}
+.insights-body{flex:none;font-size:clamp(16px,3.4vw,21px);line-height:1.58;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+.insights-proof{flex:none;border-top:1px solid #bbb;color:#555;padding-top:6px;margin-top:auto;font-size:12px}
+.insights-measure{height:auto!important;position:absolute;visibility:hidden;pointer-events:none;width:calc(100% - 28px);left:14px;top:0}
+.insights-footer{display:flex;justify-content:space-between;align-items:center;gap:7px;padding:8px 10px max(8px,env(safe-area-inset-bottom));border-top:2px solid #111;flex:none}
+#insightsPageCount{font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-height:500px){.insights-head{padding:3px 8px}.insights-tabs{padding:3px}.insights-toolbar{padding:3px;min-height:34px}.insights-paper{padding:6px 10px}.insights-footer{padding:3px 8px}.insights-title{margin-bottom:5px}}
+
+/* Separate e-ink touch dialog for correcting an accidentally inflated read cursor. */
+#insightsMarkRead{white-space:nowrap}
+.insights-mark-dialog{display:none;position:fixed;inset:0;z-index:2147483170;background:rgba(255,255,255,.97);color:#111;align-items:center;justify-content:center;padding:12px;font:16px/1.55 system-ui,'Malgun Gothic',sans-serif;overscroll-behavior:contain}
+.insights-mark-dialog.is-open{display:flex}
+.insights-mark-dialog *{box-sizing:border-box}
+.insights-mark-box{border:2px solid #111;background:#fff;width:min(96vw,480px);max-height:calc(100dvh - 24px);padding:15px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.insights-mark-box h2{font-size:19px;margin:0 0 4px;flex-shrink:0}
+.insights-mark-box p{font-size:13px;line-height:1.4;margin:0;flex-shrink:1}
+.insights-mark-box button{font:inherit;min-height:42px;border:1px solid #333;border-radius:3px;background:#fff;color:#111;cursor:pointer;flex-shrink:0}
+.insights-mark-box button:disabled{opacity:.35}
+#insightsMarkCurrent{font-weight:700}
+#insightsMarkTarget,#insightsMarkNotice{font-size:12px;overflow:hidden;word-break:break-word}
+#insightsMarkNotice:empty{display:none}
+@media(max-height:520px){.insights-mark-box{padding:8px;gap:4px}.insights-mark-box h2{font-size:16px}.insights-mark-box p{font-size:11px}.insights-mark-box button{min-height:31px}}
+
+/* Keep only one top-level reader action; correction is an explicit temporary mode. */
+#insightsMarkRead{display:none!important}
+body.insights-correcting #insightsMarkRead{
+ display:block!important;position:fixed;right:12px;bottom:max(58px,calc(env(safe-area-inset-bottom) + 55px));
+ z-index:2147483040;background:#fff;color:#111;border:2px solid #111;
+ border-radius:4px;font-size:15px;min-height:46px;padding:6px 14px;
+ box-shadow:0 0 0 3px #fff;
+}
+body.insights-correcting .bookhead{z-index:110}
+body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
+.insights-toolbar button{font-size:11px;padding:4px 6px}
+@media(max-width:400px){#insightsOpen{font-size:10px;padding-left:4px;padding-right:4px}.insights-toolbar{gap:3px;padding:4px}.insights-toolbar button{padding:3px 5px}}
+
+/* Both selection actions share one visual toolbar on the Web/GitHub viewer. */
+#readerInsightsSelectionAction{
+ position:fixed;z-index:2147483050;background:var(--paper,#fff);
+ color:var(--ink,#000);border:1px solid currentColor;border-radius:5px;
+ padding:9px 11px;font-size:14px;line-height:normal;min-height:40px;
+ box-shadow:0 2px 8px #0003;white-space:nowrap;touch-action:manipulation
+}
+#readerInsightsSelectionAction[hidden]{display:none!important}
+#readerInsightsSelectionNotice{
+ position:fixed;left:50%;bottom:max(70px,calc(env(safe-area-inset-bottom) + 58px));
+ transform:translateX(-50%);z-index:2147483155;
+ padding:10px 14px;background:#fff;color:#111;border:2px solid #111;
+ border-radius:4px;max-width:calc(100vw - 20px);width:max-content;
+ font:14px/1.5 system-ui,'Malgun Gothic',sans-serif;text-align:center;
+ box-shadow:0 2px 6px #0002;pointer-events:none
+}
+#readerInsightsSelectionNotice[hidden]{display:none!important}
+#readerInsightsSelectionNotice.is-error{border-style:dashed}
+@media(max-width:370px){
+ #readerInsightsSelectionAction{font-size:12px;padding:7px 7px;min-height:38px}
+ #readerGPTSelectionMenu{font-size:12px!important;padding:7px 7px!important}
+}
+
+/* Reading navigator. All lists/cards occupy one e-ink page; nothing scrolls. */
+#insightsNavReturn[hidden],#insightsNavigatorBar[hidden],#insightsNavQueryWrap[hidden],
+#insightsNavRelated[hidden]{display:none!important}
+#insightsNavReturn{margin-left:auto;margin-right:7px}
+.insights-nav-active .insights-tabs{display:none!important}
+.insights-nav-bar{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;
+ align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #555;flex:0 0 auto}
+.insights-nav-bar strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.insights-nav-bar button{min-height:37px;padding:4px 8px;font-size:13px}
+#insightsNavQueryWrap{grid-column:1/-1;min-width:0}
+#insightsNavSearch{box-sizing:border-box;width:100%;min-height:37px;padding:6px 9px;font-size:16px;
+ color:#111;background:#fff;border:1px solid #555;border-radius:3px}
+.insights-nav-list{height:100%;overflow:hidden;display:flex;flex-direction:column;gap:3px}
+.insights-nav-hint{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+ gap:6px;min-height:25px;font-size:12px;color:#444}
+.insights-nav-inline{min-height:29px!important;padding:2px 7px!important;font-size:12px!important}
+.insights-nav-item{display:flex;flex:0 0 auto;flex-direction:column;justify-content:center;align-items:flex-start;
+ min-width:0;width:100%;height:60px;min-height:0!important;padding:6px 10px!important;
+ background:#fff!important;border:1px solid #666!important;border-radius:3px!important;text-align:left}
+.insights-nav-item:active{background:#eee!important}
+.insights-nav-name{font-weight:650;font-size:clamp(14px,3.3vw,17px);
+ line-height:1.28;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.insights-nav-caption{display:block;max-width:100%;font-size:11px;color:#555;
+ line-height:1.25;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.insights-nav-active .insights-paper{touch-action:manipulation}
+.insights-nav-active #insightsNavReturn{font-size:13px;min-height:36px}
+@media(max-height:560px){
+ .insights-nav-item{height:53px}
+ .insights-nav-bar{padding:3px 6px;gap:4px}
+ .insights-nav-hint{min-height:22px}
+}
+@media(max-width:360px){
+ .insights-nav-bar{gap:3px;padding:4px}
+ .insights-nav-bar button{padding:3px 5px;font-size:12px}
+ .insights-nav-bar strong{font-size:12px}
+ #insightsNavReturn{margin-right:3px}
+}
+
+/* Selection lookup: second line below the preexisting ChatGPT / read-position row. */
+#readerInsightsLookupAction{
+ position:fixed;z-index:2147483050;box-sizing:border-box;
+ background:var(--paper,#fff);color:var(--ink,#000);border:1px solid currentColor;
+ border-radius:5px;padding:8px 11px;font:13px/1.3 system-ui,'Malgun Gothic',sans-serif;
+ min-height:38px;white-space:nowrap;box-shadow:0 2px 8px #0003;touch-action:manipulation
+}
+#readerInsightsLookupAction[hidden]{display:none!important}
+@media(max-width:370px){
+ #readerInsightsLookupAction{font-size:12px;padding:6px 8px;min-height:36px}
+}
