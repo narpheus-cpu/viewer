@@ -1,4 +1,4 @@
-name: Build and verify EbookViewer 1.31 APK
+name: Build and verify EbookViewer 1.32 APK
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
       - 'reader-insights.css'
       - 'android/**'
       - 'tests/reading-insights*.cjs'
+      - 'tests/android-apk-file-open.cjs'
       - 'package.json'
 
 permissions:
@@ -66,6 +67,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Install Chromium for Android asset UI regression
         run: npx playwright install --with-deps chromium
+      - name: Reproduce and prevent frozen TXT import in packaged APK browser
+        run: npm run test:apk-open
       - name: Run all insights and navigation browser regressions
         run: npm run test:insights
       - name: Run native selection menu Java test
@@ -99,24 +102,37 @@ jobs:
               assert 'reader-insights-data.js' in html
               assert 'reader-insights.js' in html
               assert 'reader-insights.css' in html
+          assert '<script src="./reader-core.js"' not in html, 'Duplicate reader-core script will freeze TXT loader'
+          assert html.count('const readerReady=new Promise') == 1
           print('Validated APK size:',apk.stat().st_size,'bytes; all required assets present')
           PY
           "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
       - name: Publish APK as downloadable workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EbookViewer_v1.31_debug
+          name: EbookViewer_v1.32_debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
-      - name: Publish verified debug APK in downloads
+      - name: Publish verified APK and SHA256 with atomic GitHub Contents requests
         if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: narpheus-cpu/viewer
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/EbookViewer_v1.31-debug.apk
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/EbookViewer_v1.31-debug.apk
-          if ! git diff --cached --quiet; then
-            git commit -m 'Publish verified EbookViewer 1.31 debug APK [skip ci]'
-            git push
-          fi
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,base64,json
+          from pathlib import Path
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          filename='EbookViewer_v1.32-debug.apk'
+          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+          files={filename:apk.read_bytes(),filename+'.sha256':(digest+'  '+filename+'\\n').encode()}
+          for name,content in files.items():
+              payload={'branch':'main','message':'Publish verified '+name+' [skip ci]',
+                       'content':base64.b64encode(content).decode('ascii')}
+              Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
+          print('SHA256',digest)
+          PY
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.32-debug.apk --input /tmp/EbookViewer_v1.32-debug.apk.json --jq '.content.download_url'
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.32-debug.apk.sha256 --input /tmp/EbookViewer_v1.32-debug.apk.sha256.json --jq '.content.download_url'
