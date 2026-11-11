@@ -41,3 +41,16 @@
 #insightsMarkTarget,#insightsMarkNotice{font-size:12px;overflow:hidden;word-break:break-word}
 #insightsMarkNotice:empty{display:none}
 @media(max-height:520px){.insights-mark-box{padding:8px;gap:4px}.insights-mark-box h2{font-size:16px}.insights-mark-box p{font-size:11px}.insights-mark-box button{min-height:31px}}
+
+/* Keep only one top-level reader action; correction is an explicit temporary mode. */
+#insightsMarkRead{display:none!important}
+body.insights-correcting #insightsMarkRead{
+ display:block!important;position:fixed;right:12px;bottom:max(58px,calc(env(safe-area-inset-bottom) + 55px));
+ z-index:2147483040;background:#fff;color:#111;border:2px solid #111;
+ border-radius:4px;font-size:15px;min-height:46px;padding:6px 14px;
+ box-shadow:0 0 0 3px #fff;
+}
+body.insights-correcting .bookhead{z-index:110}
+body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
+.insights-toolbar button{font-size:11px;padding:4px 6px}
+@media(max-width:400px){#insightsOpen{font-size:10px;padding-left:4px;padding-right:4px}.insights-toolbar{gap:3px;padding:4px}.insights-toolbar button{padding:3px 5px}}
