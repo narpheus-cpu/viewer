@@ -21,6 +21,7 @@ async function pageFor(browser){
  try{
   const {context,page,errors}=await pageFor(browser);
   await page.locator('#txtFileInput').setInputFiles({name:'insights-navigator-demo.txt',mimeType:'text/plain',buffer:fixture});
+  await page.waitForFunction(()=>document.getElementById('inputText').value.includes('제01차 조사에서'),null,{timeout:20000});
   await page.locator('#openViewerBtn').click();
   await page.waitForFunction(()=>!restoreInProgress&&pages.length>0,null,{timeout:30000});
   await page.locator('#insightsOpen').click();
