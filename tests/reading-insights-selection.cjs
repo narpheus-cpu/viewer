@@ -42,7 +42,7 @@ async function setWordSelection(page){
  try{
   for(const userAgent of [undefined,'Mozilla/5.0 (Linux; Android 11; eReader) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36']){
    const {page,context,errors}=await create(browser,userAgent);
-   const plain=('[도입]\n'+'한 사람이 작은 단어 하나를 읽고 생각했습니다. 그리고 곧 다음 문장으로 넘어갔습니다.\n\n').repeat(220);
+   const plain=('한 사람이 작은 단어 하나를 읽고 생각했습니다. 그리고 곧 다음 문장으로 넘어갔습니다.\n\n').repeat(220);
    await page.locator('#inputText').fill(plain);
    await page.locator('#openViewerBtn').click();
    await page.waitForFunction(()=>pages.length>1&&!restoreInProgress,null,{timeout:25000});
@@ -56,8 +56,9 @@ async function setWordSelection(page){
    assert.match(await page.locator('#readerInsightsSelectionNotice').innerText(),/읽은 지점으로 지정됨/);checks++;
    assert.equal(await page.locator('#readerInsightsSelectionAction').isVisible(),false);checks++;
    const beforeNext=await page.evaluate(()=>ReaderInsightsData.getSeen(fullText));
+   const startingPage=await page.evaluate(()=>pageIndex);
    await page.evaluate(()=>goNextPage());
-   await page.waitForFunction(()=>!restoreInProgress,null,{timeout:25000});
+   await page.waitForFunction(start=>pageIndex>start&&!restoreInProgress,startingPage,{timeout:25000});
    const afterNext=await page.evaluate(()=>ReaderInsightsData.getSeen(fullText));
    assert.ok(afterNext>beforeNext,'Contiguous next page should update the cutoff');checks++;
    // A direct move to the final page must not expose unread intermediate content.
