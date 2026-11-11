@@ -32,6 +32,22 @@ def stage():
     source = source.replace("<head>", "<head>\n"
         '<script src="./android.js"></script>', 1)
 
+    # The previous 1.31 APK accidentally loaded reader-core.js *as well as*
+    # the Web HTML's inline reader-core definitions. Its duplicate readerState
+    # declaration aborted JS startup and left TXT import awaiting readerReady.
+    # Never allow that old failure mode to be staged again.
+    if '<script src="./reader-core.js"' in source or source.count('const readerReady=new Promise') != 1:
+        raise RuntimeError("Duplicate or missing reader startup module; abort APK packaging")
+
+    # Even if a future startup regression keeps readerReady unresolved, the
+    # chooser must release both disabled buttons and report a readable error.
+    ready_call = "try{await readerReady;await loadReaderFile(file);}"
+    guarded_call = ("try{await readerBounded(readerReady,12000,'뷰어 초기화');"
+                    "await readerBounded(loadReaderFile(file),90000,'파일 읽기');}")
+    if source.count(ready_call) != 1:
+        raise RuntimeError("Cannot install import timeout guard: file chooser changed")
+    source = source.replace(ready_call, guarded_call, 1)
+
     # The Web page eagerly reopens a last-read book. The Android UI deliberately
     # shows a chooser and defers large-book parsing until the user selects one.
     marker = "const syncReading=loadReadingSessionSync();"
@@ -53,6 +69,10 @@ def stage():
     ) + source[end:]
     if marker in source:
         raise RuntimeError("Unexpected eager book-opening logic remains")
+    if source.count('const readerReady=new Promise') != 1 or 'reader-core.js"></script>' in source:
+        raise RuntimeError("Refusing APK with duplicated readerReady lifecycle")
+    if guarded_call not in source:
+        raise RuntimeError("Reader import timeout protection is missing")
     for name in DEPENDENCIES:
         shutil.copy2(ROOT / name, ASSETS / name)
     (ASSETS / "index.html").write_text(source, encoding="utf-8", newline="\n")
