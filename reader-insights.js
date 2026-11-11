@@ -379,7 +379,9 @@ function init(){
  },true);
  paper.addEventListener('pointerdown',e=>gesture={x:e.clientX,y:e.clientY},{passive:true});
  paper.addEventListener('pointerup',e=>{
-  if(!gesture)return;const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;gesture=null;
+  if(!gesture)return;
+  if(e.target.closest?.('button,input,[data-nav-kind]')){gesture=null;return;}
+  const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;gesture=null;
   if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3){turn(dx<0?1:-1);return;}
   if(Math.abs(dx)<13&&Math.abs(dy)<13&&!String(window.getSelection()||'').trim()){
    const rect=paper.getBoundingClientRect();turn(e.clientX<rect.left+rect.width/2?-1:1);
