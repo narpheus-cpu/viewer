@@ -288,7 +288,7 @@ function fits(r,portion){
    for thousands of bullets and silently truncate after 20,000 iterations. */
 function splitDetail(r,requestedPage=0){
  const surface=$('insightsPaper');
- const key='ev5|'+r.id+'|'+recordText(r).length+'|'+recordEvidence(r).length+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ const key='ev6|'+r.id+'|'+r.category+'|'+(r.category==='plot'?r.bullets.length:(recordText(r).length+'-'+recordEvidence(r).length))+'|'+surface.clientWidth+'x'+surface.clientHeight;
  let state=detailCache.get(key);
  if(!state){
   const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):
