@@ -1,4 +1,4 @@
-name: Build and verify EbookViewer 1.41 APK
+name: Build and verify EbookViewer 1.42 APK
 
 on:
   workflow_dispatch:
@@ -12,6 +12,11 @@ on:
       - 'tests/reading-insights*.cjs'
       - 'tests/android-apk-file-open.cjs'
       - 'tests/chapter-modal-focus-regression.cjs'
+      - 'tests/reader-structure-audit.cjs'
+      - 'tests/character-count.cjs'
+      - 'tests/timeline*.cjs'
+      - 'tests/chatgpt*.cjs'
+      - 'tests/process-text.cjs'
       - 'package.json'
 
 permissions:
@@ -86,6 +91,10 @@ jobs:
         run: VERIFY_ANDROID_ASSETS=1 npm run test:evidence
       - name: Verify chapter-picker focus recovery and previous/next/select on Web/Android
         run: VERIFY_ANDROID_ASSETS=1 node tests/chapter-modal-focus-regression.cjs
+      - name: Audit other reader features in Web and staged Android assets
+        env:
+          VERIFY_ANDROID_ASSETS: '1'
+        run: npm run test:feature-audit
       - name: Run native selection menu Java test
         run: python3 android/tests/selection_menu.py
       - name: Run native bridge and timeline regression tests
@@ -125,7 +134,7 @@ jobs:
       - name: Publish APK as downloadable workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EbookViewer_v1.41_debug
+          name: EbookViewer_v1.42_debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -140,16 +149,23 @@ jobs:
           import hashlib,base64,json
           from pathlib import Path
           apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
-          filename='EbookViewer_v1.41-debug.apk'
-          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
-          files={filename:apk.read_bytes(),filename+'.sha256':(digest+'  '+filename+'\\n').encode()}
+          filename='EbookViewer_v1.42-debug.apk'
+          alias='EbookViewer_latest-debug.apk'
+          binary=apk.read_bytes()
+          digest=hashlib.sha256(binary).hexdigest()
+          files={
+              filename:binary,
+              filename+'.sha256':(digest+'  '+filename+'\\n').encode(),
+              alias:binary,
+              alias+'.sha256':(digest+'  '+alias+'\\n').encode(),
+          }
           for name,content in files.items():
               payload={'branch':'main','message':'Publish verified '+name+' [skip ci]',
                        'content':base64.b64encode(content).decode('ascii')}
               Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
           print('SHA256',digest)
           PY
-          for name in EbookViewer_v1.41-debug.apk EbookViewer_v1.41-debug.apk.sha256; do
+          for name in EbookViewer_v1.42-debug.apk EbookViewer_v1.42-debug.apk.sha256 EbookViewer_latest-debug.apk EbookViewer_latest-debug.apk.sha256; do
             current_sha=$(gh api "repos/narpheus-cpu/viewer/contents/downloads/$name" --jq '.sha' 2>/dev/null || true)
             if [[ -n "$current_sha" ]]; then
               jq --arg sha "$current_sha" '.sha=$sha' "/tmp/$name.json" > "/tmp/$name.updated.json"
