@@ -65,6 +65,7 @@ function indexVisible(){
   else{chosen=null;recordId='';mode='home';stack=[];page=0;}
  }
  if(recordId&&!byId.has(recordId)){recordId='';chosen=null;mode='home';stack=[];page=0;}
+ if(mode==='plot'&&!latestPlot()){mode='home';stack=[];page=0;}
  return s;
 }
 function forEntity(entity){
@@ -270,7 +271,7 @@ function renderList(s){
 }
 function cardHtml(r,content,part,total){
  return '<div class="insights-type">'+esc(labels[r.category])+(r.category==='plot'?' · 항목별 사실·해석 구분':' · '+esc(confidence[r.confidence]))+'</div>'+
-  '<h3 class="insights-title">'+esc(r.title)+(total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
+  '<h3 class="insights-title">'+esc(r.title)+(total==='…'||total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
   '<div class="insights-body">'+esc(content)+'</div>'+
   '<div class="insights-proof">원문 근거와 추론 수준을 구별해 표시</div>';
 }
@@ -282,14 +283,28 @@ function fits(r,portion){
  const usable=Math.max(55,surface.clientHeight-parseFloat(css.paddingTop||0)-parseFloat(css.paddingBottom||0)-7);
  const okay=probe.scrollHeight<=usable;probe.remove();return okay;
 }
-function splitDetail(r){
+/* Keep long cumulative plots responsive: compute only the requested detail page.
+   Earlier versions eagerly DOM-measured every page, which could freeze WebView
+   for thousands of bullets and silently truncate after 20,000 iterations. */
+function splitDetail(r,requestedPage=0){
  const surface=$('insightsPaper');
- const key='ev4|'+r.id+'|'+recordText(r).length+'|'+recordEvidence(r).length+'|'+surface.clientWidth+'x'+surface.clientHeight;
- if(detailCache.has(key))return detailCache.get(key);
- const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):recordText(r)+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
- let offset=0,pieces=[],guard=0;
- while(offset<text.length&&guard++<20000){
-  const possible=Math.min(12000,text.length-offset);
+ const key='ev5|'+r.id+'|'+recordText(r).length+'|'+recordEvidence(r).length+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ let state=detailCache.get(key);
+ if(!state){
+  const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):
+   recordText(r)+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
+  state={text,pages:[],offset:0,complete:false};
+  detailCache.set(key,state);
+ }
+ const text=state.text;
+ // Preserve the familiar exact page count for short records while computing
+ // large plot snapshots one page at a time.
+ const target=text.length<=14000?Infinity:Math.max(0,requestedPage);
+ while(!state.complete&&state.pages.length<=target){
+  if(state.offset>=text.length){
+   state.complete=true;break;
+  }
+  const offset=state.offset,possible=Math.min(12000,text.length-offset);
   let low=1,high=possible,best=1;
   while(low<=high){
    const mid=(low+high)>>1;
@@ -303,23 +318,28 @@ function splitDetail(r){
    }
   }
   let end=offset+Math.max(1,best);
-  if(end<text.length&&/[\uD800-\uDBFF]/.test(text[end-1])&&/[\uDC00-\uDFFF]/.test(text[end]))end--;
-  end=Math.max(end,offset+1);
-  pieces.push(text.slice(offset,end));offset=end;
-  while(offset<text.length&&/\s/.test(text[offset]))offset++;
+  // A high/low surrogate pair must remain together at the page boundary.
+  if(end<text.length&&/[\uD800-\uDBFF]/.test(text[end-1])&&/[\uDC00-\uDFFF]/.test(text[end])){
+   if(end-1>offset)end--;else end++;
+  }
+  state.pages.push(text.slice(offset,end));
+  state.offset=end;
+  if(end>=text.length)state.complete=true;
  }
- const result=pieces.length?pieces:[''];detailCache.set(key,result);return result;
+ if(!state.pages.length){state.pages=[''];state.complete=true;}
+ return state;
 }
+
 function renderRecord(){
  const r=mode==='plot'?latestPlot():byId.get(recordId);
  if(!r)return {html:'',labels:'0 / 0',prev:false,next:false};
- const portions=splitDetail(r),total=portions.length;
- page=Math.max(0,Math.min(page,total-1));
+ const state=splitDetail(r,page),portions=state.pages,total=state.complete?portions.length:null;
+ page=Math.max(0,Math.min(page,portions.length-1));
  const linked=(r.related_ids||[]).filter(id=>byId.has(id));
  $('insightsNavRelated').hidden=!linked.length;
  $('insightsNavPlotHistory').hidden=r.category!=='plot'||plotVersions().length<2;
- return {html:'<article class="insights-card">'+cardHtml(r,portions[page],page+1,total)+'</article>',
-   labels:(page+1)+' / '+total,prev:page>0,next:page<total-1};
+ return {html:'<article class="insights-card">'+cardHtml(r,portions[page],page+1,total??'…')+'</article>',
+   labels:(page+1)+' / '+(total??'…'),prev:page>0,next:!state.complete||page<portions.length-1};
 }
 function renderIfActive(){
  if(!active||!nav)return false;
@@ -346,9 +366,15 @@ function renderIfActive(){
 function paint(){if(active)requestRender();}
 function turn(delta){
  if(!active)return false;
- const s=snapshot(),count=(mode==='record'||mode==='plot')?
-  Math.max(1,splitDetail(mode==='plot'?latestPlot():(byId.get(recordId)||{text:'',evidence:'',title:''})).length):
-  Math.max(1,Math.ceil(itemsFor(s).length/listSize()));
+ if(mode==='record'||mode==='plot'){
+  const r=mode==='plot'?latestPlot():byId.get(recordId);
+  if(!r)return true;
+  const target=Math.max(0,page+delta),state=splitDetail(r,target);
+  const next=Math.min(target,state.pages.length-1);
+  if(next!==page){page=next;paint();}
+  return true;
+ }
+ const s=snapshot(),count=Math.max(1,Math.ceil(itemsFor(s).length/listSize()));
  const next=Math.max(0,Math.min(count-1,page+delta));
  if(next!==page){page=next;paint();}
  return true;
@@ -386,7 +412,7 @@ function init(){
  home.onclick=enterHome;
  $('insightsNavBack').onclick=goBack;
  $('insightsNavFind').onclick=()=>openSearch('');
- $('insightsNavRelated').onclick=()=>push('related',{record:recordId});
+ $('insightsNavRelated').onclick=()=>push('related',{record:mode==='plot'?latestPlot()?.id:recordId});
  $('insightsNavPlotHistory').onclick=()=>push('plot-history');
  $('insightsNavSearch').addEventListener('input',e=>{query=e.target.value.slice(0,100);page=0;paint();});
  $('insightsPaper').addEventListener('click',handleClick);
