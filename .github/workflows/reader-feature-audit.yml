@@ -1,0 +1,49 @@
+name: Extended ebook reader feature audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/reader-feature-audit.yml'
+      - 'index.html'
+      - 'reader-insights*.js'
+      - 'timeline-core.js'
+      - 'tests/reader-structure-audit.cjs'
+      - 'tests/character-count.cjs'
+      - 'tests/timeline*.cjs'
+      - 'tests/chatgpt*.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  feature-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser and dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Stage Android assets
+        run: python3 android/tools/sync_web_assets.py
+      - name: Audit TXT chapter boundaries on Web and Android
+        env:
+          VERIFY_ANDROID_ASSETS: '1'
+        run: node tests/reader-structure-audit.cjs
+      - name: Audit character counting and bookmarks
+        run: |
+          node tests/character-count.cjs
+          node tests/character-count.cjs android/app/src/main/assets
+      - name: Audit timeline parsing and data integrity
+        run: node tests/timeline-core.cjs
+      - name: Audit timeline user interactions
+        run: node tests/timeline-ui.cjs
+      - name: Audit ChatGPT answer Markdown and safe links
+        run: node tests/chatgpt-markdown.cjs
+      - name: Audit selectable text and ChatGPT bridge
+        run: node tests/process-text.cjs
