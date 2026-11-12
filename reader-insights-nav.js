@@ -297,7 +297,11 @@ function splitDetail(r,requestedPage=0){
  const key='ev6|'+r.id+'|'+r.category+'|'+(r.category==='plot'?r.bullets.length:(recordText(r).length+'-'+recordEvidence(r).length))+'|'+surface.clientWidth+'x'+surface.clientHeight;
  let state=detailCache.get(key);
  if(!state){
-  const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):
+  const text=r.category==='plot'?
+   (r.bullets.some(b=>b.evidence_status==='not_provided')?
+    '※ 이 버전은 항목별 원문 근거가 첨부되지 않았습니다. 원문 공개 위치만 확인했습니다.\n\n':'')+
+   r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']'+
+    (b.evidence.length?'\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: '):'')).join('\n\n'):
    recordText(r)+'\n\n근거: '+evidenceDisplay(r);
   state={text,pages:[],offset:0,complete:false};
   detailCache.set(key,state);
