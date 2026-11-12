@@ -32,18 +32,24 @@ jobs:
       - name: Stage Android assets
         run: python3 android/tools/sync_web_assets.py
       - name: Audit TXT chapter boundaries on Web and Android
+        if: always()
         env:
           VERIFY_ANDROID_ASSETS: '1'
         run: node tests/reader-structure-audit.cjs
       - name: Audit character counting and bookmarks
+        if: always()
         run: |
           node tests/character-count.cjs
           node tests/character-count.cjs android/app/src/main/assets
       - name: Audit timeline parsing and data integrity
+        if: always()
         run: node tests/timeline-core.cjs
       - name: Audit timeline user interactions
+        if: always()
         run: node tests/timeline-ui.cjs
       - name: Audit ChatGPT answer Markdown and safe links
+        if: always()
         run: node tests/chatgpt-markdown.cjs
       - name: Audit selectable text and ChatGPT bridge
+        if: always()
         run: node tests/process-text.cjs
