@@ -57,6 +57,24 @@ const bad=structuredClone(meta);bad.records[2].reveal.quote='원문에 절대로
 assert.throws(()=>D.validate(bad,source),/원문 인용/,'Invented source position must fail');
 const future=structuredClone(meta);future.records[0].reveal=meta.records[3].reveal;
 assert.throws(()=>D.validate(future,source),/공개 위치|줄거리 공개 위치|기록이 공개 위치/,'Out of order disclosure must fail');
+// Reproduce both uploaded generators verbatim: one uses a single separating
+// newline, the other has two; their explicit no-evidence style labels differ.
+for(const [style,separator] of [
+ ['full_rewritten_compressed_reports_without_evidence','\n'],
+ ['independent_compressed_reports_without_evidence','\n\n']
+]){
+ const variant=structuredClone(meta);
+ delete variant.source_metadata;
+ variant.metadata={plot_style:style};
+ const text=source+separator+D.OLD_START+'\n'+JSON.stringify(variant)+'\n'+D.OLD_END+'\n';
+ const reopened=D.parse(text);
+ assert.equal(reopened.body,source,'The novel text cannot change at the marker boundary');
+ assert.equal(reopened.metadata.compatibility_mode,'legacy-v2-compressed-plot-no-evidence');
+ assert.equal(reopened.metadata.records.filter(r=>r.category==='plot').length,3);
+ assert.equal(reopened.metadata.records[0].bullets[0].evidence_status,'not_provided');
+}
+console.log('2 uploaded generator delimiter and metadata-style variants passed');
+
 console.log('9 compressed plot/source position/strict-v3 assertions passed');
 
 async function browserCheck(browser,android){
