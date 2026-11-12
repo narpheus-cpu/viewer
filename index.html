@@ -2198,8 +2198,12 @@ function readerUpdateChapterNav(){
 }
 function readerGoChapter(index){
   if(restoreInProgress||!Number.isInteger(index)||index<0||index>=bookChapters.length)return;
-  if(readerLazyActive()){void readerLazyNavigate(chapterCanonicalStarts[index]);return;}
+  // Chapter-list navigation can originate outside #viewerOverlay (floating
+  // picker). Resume an Android WebView left paused by native focus changes.
+  readerBrowserResumeOnInput();
   const anchor=chapterCanonicalStarts[index];
+  if(!Number.isFinite(anchor)){setStatus('선택한 챕터의 시작 위치를 찾을 수 없습니다.',true);return;}
+  if(readerLazyActive()){void readerLazyNavigate(anchor);return;}
   pageIndex=findPageIndexForAnchor(anchor);readerChooseAnchor(anchor);render();
 }
 let readerChapterLayer=null,readerChapterFocus=null,readerChapterOverflow=null;
@@ -2225,6 +2229,11 @@ function setupChapterNavigation(){
  readerChapterLayer.innerHTML='<section class="reader-chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="readerChapterTitle"><header class="reader-chapter-header"><h2 id="readerChapterTitle">차례 선택</h2><button id="closeReaderChapter" type="button">닫기</button></header><div class="reader-chapter-list" id="readerChapterList"></div></section>';
  document.body.appendChild(readerChapterLayer);document.getElementById('openReaderChapter').onclick=readerChapterOpen;document.getElementById('closeReaderChapter').onclick=readerChapterClose;
  readerChapterLayer.addEventListener('click',e=>{e.stopPropagation();if(e.target===readerChapterLayer)readerChapterClose();});
+ // The chapter picker is attached to document.body, not #viewerOverlay.
+ // Its pointer/touch/keyboard events must also unpause background pagination
+ // when Android does not emit a corresponding window focus event.
+ for(const type of ['pointerdown','touchstart','mousedown','keydown','click'])
+  readerChapterLayer.addEventListener(type,readerBrowserResumeOnInput,{capture:true,passive:type!=='keydown'});
  document.addEventListener('keydown',e=>{if(!readerChapterIsOpen())return;e.stopImmediatePropagation();if(e.key==='Escape'){e.preventDefault();readerChapterClose();}else if(e.key==='Tab'){const items=[...readerChapterLayer.querySelectorAll('button')],first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
  addEventListener('resize',readerChapterViewport);window.visualViewport?.addEventListener('resize',readerChapterViewport);window.visualViewport?.addEventListener('scroll',readerChapterViewport);
 
