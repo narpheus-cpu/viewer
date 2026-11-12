@@ -44,12 +44,14 @@ async function runCase(browser,c,kind){
  await page.locator('#txtFileInput').setInputFiles({name:'megabook-'+c.min+'.txt',mimeType:'text/plain',buffer:Buffer.from(source)});
  await page.waitForFunction(expected=>!openViewerBtn.disabled&&inputText.value.length===expected,source.length,{timeout:240000});
  const importMs=Date.now()-uploadStart;
+ console.log(JSON.stringify({stage:'imported',kind,characters:source.length,chapters:c.chapters,importMs}));
  const bookLength=await page.evaluate(()=>inputText.value.length);
  assert.equal(bookLength,source.length,'TXT bytes and characters survive import');
  await page.evaluate(()=>{if(typeof hideRecentHistory==='function')hideRecentHistory();});
  const firstStart=Date.now();await page.locator('#openViewerBtn').click();
  await page.waitForFunction(()=>readerLazySession?.opened&&!restoreInProgress&&!readerState.initializing,null,{timeout:240000});
  const firstMs=Date.now()-firstStart;
+ console.log(JSON.stringify({stage:'first-visible',kind,characters:source.length,chapters:c.chapters,firstMs}));
  const state=await page.evaluate(()=>({
   chapters:bookChapters.length,done:readerLazySession.done,visible:pageInnerLeft.textContent,
   active:readerLazyActive(),canonical:readerCanonical().length,
@@ -63,8 +65,9 @@ async function runCase(browser,c,kind){
  const farChapter=c.chapters-2,farMarker='고유장면_'+String(farChapter).padStart(3,'0');
  const navStart=Date.now();
  await page.evaluate(c=>readerGoChapter(c),farChapter);
- await page.waitForFunction(target=>!restoreInProgress&&readerCurrentChapter()===target,null,{timeout:180000},farChapter);
+ await page.waitForFunction(target=>!restoreInProgress&&readerCurrentChapter()===target,farChapter,{timeout:180000});
  const farMs=Date.now()-navStart;
+ console.log(JSON.stringify({stage:'far-jump',kind,characters:source.length,chapter:farChapter,farMs}));
  assert.ok((await page.locator('#pageInnerLeft').innerText()).includes(farMarker),'Far chapter shows its exact marker');
  const farAnchor=await page.evaluate(()=>readerAnchor());
  assert.ok(farAnchor>source.length*.70,'Far chapter anchor is near book end');
