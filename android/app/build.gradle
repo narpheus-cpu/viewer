@@ -7,14 +7,14 @@ android {
         applicationId 'com.seosol.ebookviewer.recent'
         minSdk 23
         targetSdk 36
-        versionCode 37
-        versionName '1.36'
+        versionCode 38
+        versionName '1.37'
     }
     buildTypes {
         debug {
             debuggable true
             // Preview signature differs from the private release key: install side by side.
-            applicationIdSuffix '.preview136'
+            applicationIdSuffix '.preview137'
             versionNameSuffix '-preview'
         }
         release { minifyEnabled false }
