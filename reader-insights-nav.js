@@ -10,7 +10,13 @@ let nav=null,active=false,mode='home',query='',pendingQuery='',chosen=null,recor
 let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),detailCache=new Map(),cacheKey='';
 function api(){return window.readerInsights;}
 function recordText(r){return r.category==='plot'?(r.bullets||[]).map(b=>b.text).join(' '):String(r.body??r.text??'');}
-function recordEvidence(r){return r.category==='plot'?(r.bullets||[]).flatMap(b=>(b.evidence||[]).map(e=>e.quote)).join(' '):String(r.evidence||'');}
+function recordEvidence(r){return r.category==='plot'?(r.bullets||[]).flatMap(b=>(b.evidence||[]).map(e=>e.quote)).join(' '):
+ (Array.isArray(r.evidence_passages)&&r.evidence_passages.length?r.evidence_passages.map(e=>e.quote).join(' '):String(r.evidence||''));}
+function evidenceDisplay(r){
+ const quotes=Array.isArray(r.evidence_passages)&&r.evidence_passages.length?
+  r.evidence_passages.map(e=>e.quote):[r.evidence];
+ return quotes.map(q=>window.ReaderInsightsData.formatEvidence(q)).join('\n근거: ');
+}
 function plotVersions(){return records.filter(r=>r.category==='plot').sort((a,b)=>a.revealOffset-b.revealOffset);}
 function latestPlot(){return plotVersions().slice(-1)[0]||null;}
 function snapshot(){return api()?.navigationSnapshot?.()||{records:[],readEnd:0,bookLength:0,currentAnchor:0,pageText:'',bookKey:''};}
@@ -292,7 +298,7 @@ function splitDetail(r,requestedPage=0){
  let state=detailCache.get(key);
  if(!state){
   const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):
-   recordText(r)+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
+   recordText(r)+'\n\n근거: '+evidenceDisplay(r);
   state={text,pages:[],offset:0,complete:false};
   detailCache.set(key,state);
  }
