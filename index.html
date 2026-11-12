@@ -2068,7 +2068,10 @@ function normalizeBookChapters(chapters,text){
   return result;
 }
 function detectTextChapters(text){
-  const matches=[...text.matchAll(/\[([^\[\]\r\n]+)\]/g)].filter(m=>m[1].trim()&&!readerNoteContainsOffset(text,m.index));
+  // Treat [chapter title] as a heading only at the start of a line. Inline
+  // citations such as [1], [참고], or characters mentioning [이름] are not TOC.
+  // Continue supporting headings with text on the same line: "[제1장] 본문".
+  const matches=[...text.matchAll(/^[ \t]*\[([^\[\]\r\n]+)\]/gm)].filter(m=>m[1].trim()&&!readerNoteContainsOffset(text,m.index));
   if(matches.length<3)return [];
   const chapters=matches.map(m=>({title:m[1].trim(),start:m.index}));
   if(text.slice(0,chapters[0].start).trim())chapters.unshift({title:'앞부분',start:0});
