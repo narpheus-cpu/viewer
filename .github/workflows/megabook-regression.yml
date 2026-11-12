@@ -40,3 +40,13 @@ jobs:
           MEGABOOK_SIZES: '1200000,3200000,6200000'
           MEGABOOK_ANDROID: '1'
         run: npm run test:megabooks
+      - name: Validate 1.2M-character chapters with paragraphs exceeding 20K each
+        env:
+          MEGABOOK_SIZES: '1200000'
+          MEGABOOK_LONG_PARAGRAPHS: '1'
+        run: npm run test:megabooks
+      - name: Simulate slow reader CPU at 6x throttling
+        env:
+          MEGABOOK_SIZES: '1200000'
+          MEGABOOK_CPU_THROTTLE: '6'
+        run: npm run test:megabooks
