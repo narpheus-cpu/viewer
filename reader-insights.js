@@ -358,7 +358,7 @@ function init(){
 
  overlay=document.createElement('section');overlay.id='insightsPanel';overlay.className='insights-shell';
  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','독서 정보');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-hidden','true');
- overlay.innerHTML='<header class="insights-head"><h2>독서 정보</h2><button id="insightsClose" type="button">닫기</button></header>'+
+ overlay.innerHTML='<header class="insights-head"><h2>독서 정보</h2><button id="insightsClose" type="button" aria-label="독서정보 닫기">독서정보 닫기</button></header>'+
  '<nav class="insights-tabs" aria-label="독서정보 종류">'+tabs.map(([k,v])=>'<button type="button" data-insight-tab="'+k+'" aria-pressed="false">'+v+'</button>').join('')+'</nav>'+
  '<div class="insights-toolbar"><span id="insightsSeen"></span><span id="insightsStatus"></span><button type="button" id="insightsGoMark">읽은 지점 수정</button><button type="button" id="insightsImportBtn">정보 불러오기</button><input type="file" id="insightsImportInput" accept=".json,application/json" hidden></div>'+
  '<main id="insightsPaper" class="insights-paper" tabindex="0" aria-label="독서정보 페이지"></main>'+
