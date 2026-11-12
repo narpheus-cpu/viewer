@@ -1,8 +1,11 @@
-/* ReaderInsightsData v2 — source-only unified TXT parser and local book metadata. */
+/* ReaderInsightsData v3: cumulative plot records, source validation and legacy v2 support. */
 (function(){
 'use strict';
-const BEGIN='<<<READER_INSIGHTS_V2_BEGIN>>>';
-const END='<<<READER_INSIGHTS_V2_END>>>';
+const BEGIN='<<<READER_INSIGHTS_V3_BEGIN>>>';
+const END='<<<READER_INSIGHTS_V3_END>>>';
+const OLD_BEGIN='<<<READER_INSIGHTS_V2_BEGIN>>>';
+const OLD_END='<<<READER_INSIGHTS_V2_END>>>';
+const CATEGORIES_V3=new Set(['plot','relation','character','clue']);
 const CATEGORIES=new Set(['event','relation','character','clue']);
 const CONFIDENCE=new Set(['fact','strong_inference','tentative']);
 const MAX_RECORDS=3000, MAX_JSON_BYTES=2*1024*1024, MAX_TEXT=12000;
@@ -72,7 +75,91 @@ function occurrenceEnd(text,phrase,occurrence){
  }
  return start;
 }
+
+/* Every plot is a fully independent, source-verified cumulative snapshot.
+   All refs resolve against the unmodified book body, not against displayed excerpts. */
+function validateV3(meta,body){
+ if(!Array.isArray(meta.records))validError('schema_version=3의 records 배열이 필요합니다.');
+ const out=[],seen=new Map();let lastPlot=null,lastOffset=-1;
+ const str=(value,label,max)=>{if(typeof value!=='string'||!value.trim()||(max&&value.length>max))validError(label+' 문자열을 확인하세요.');return value;};
+ const array=(value,label)=>{if(!Array.isArray(value))validError(label+' 배열이 필요합니다.');return value;};
+ const aliases=(value,label)=>array(value,label).map((v,j)=>str(v,label+'['+j+']',160));
+ const quote=(ref,label,min=1,max=0)=>{
+  if(!ref||typeof ref!=='object'||Array.isArray(ref))validError(label+' 객체가 아닙니다.');
+  str(ref.quote,label+'.quote',max);
+  if(ref.quote.length<min)validError(label+'.quote의 길이가 맞지 않습니다.');
+  if(!Number.isSafeInteger(ref.occurrence)||ref.occurrence<1)validError(label+'.occurrence가 잘못되었습니다.');
+  const at=occurrenceEnd(body,ref.quote,ref.occurrence);
+  if(at<0)validError(label+'의 원문 위치를 확인할 수 없습니다.');
+  return {quote:ref.quote,occurrence:ref.occurrence,end:at};
+ };
+ for(const [i,r] of meta.records.entries()){
+  if(!r||typeof r!=='object'||Array.isArray(r))validError((i+1)+'번 레코드가 객체가 아닙니다.');
+  const id=str(r.id,(i+1)+'번 id',100);
+  if(seen.has(id))validError(id+'가 중복되었습니다.');
+  if(!CATEGORIES_V3.has(r.category))validError(id+'의 category가 허용되지 않습니다.');
+  str(r.title,id+'.title',160);str(r.subject,id+'.subject',160);str(r.scene_id,id+'.scene_id',120);
+  if(!Number.isInteger(r.importance)||r.importance<1||r.importance>5)validError(id+'.importance는 1~5 정수여야 합니다.');
+  const reveal=quote(r.reveal,id+'.reveal',20,500);
+  if(reveal.end<lastOffset)validError(id+'의 기록이 공개 위치 순서로 정렬되지 않았습니다.');
+  lastOffset=reveal.end;
+  const entities=array(r.entities,id+'.entities').map((e,j)=>{
+   const label=id+'.entities['+j+']';
+   if(!e||typeof e!=='object'||Array.isArray(e))validError(label+' 객체를 확인하세요.');
+   if(!['person','place','object','concept','other'].includes(e.type))validError(label+'.type가 잘못되었습니다.');
+   return {id:str(e.id,label+'.id',160),name:str(e.name,label+'.name',160),type:e.type,aliases:aliases(e.aliases,label+'.aliases')};
+  });
+  const base={id,category:r.category,subject:r.subject,title:r.title,scene_id:r.scene_id,
+   reveal:{quote:reveal.quote,occurrence:reveal.occurrence},rawOffset:reveal.end,
+   entities,aliases:aliases(r.aliases,id+'.aliases'),
+   related_ids:aliases(r.related_ids,id+'.related_ids'),importance:r.importance};
+  if(r.category==='plot'){
+   if(r.subject!=='현재까지 줄거리')validError(id+'의 subject는 현재까지 줄거리여야 합니다.');
+   if(r.previous_plot_id!==(lastPlot?.id??null))validError(id+'.previous_plot_id는 직전 줄거리 버전이어야 합니다.');
+   if(lastPlot&&reveal.end<=lastPlot.rawOffset)validError(id+'의 공개 위치는 직전 줄거리보다 뒤여야 합니다.');
+   if(r.replaces!=null)validError(id+'의 plot에 replaces를 지정할 수 없습니다.');
+   const bullets=array(r.bullets,id+'.bullets');
+   if(!bullets.length)validError(id+'의 줄거리 항목이 없습니다.');
+   const checked=bullets.map((b,j)=>{
+    const label=id+'.bullets['+j+']';
+    if(!b||typeof b!=='object'||Array.isArray(b))validError(label+' 객체를 확인하세요.');
+    const value=str(b.text,label+'.text');
+    if(/^\s*\d+[.)]\s/.test(value))validError(label+'에는 번호를 직접 넣지 마세요.');
+    if(!CONFIDENCE.has(b.confidence))validError(label+'.confidence가 잘못되었습니다.');
+    const ev=array(b.evidence,label+'.evidence');
+    if(!ev.length)validError(label+'의 원문 근거가 없습니다.');
+    return {text:value,confidence:b.confidence,evidence:ev.map((e,k)=>{
+     const q=quote(e,label+'.evidence['+k+']');
+     if(q.end>reveal.end)validError(label+'의 근거가 줄거리 공개 시점보다 뒤입니다.');
+     return {quote:q.quote,occurrence:q.occurrence};
+    })};
+   });
+   const row={...base,previous_plot_id:r.previous_plot_id,bullets:checked};
+   out.push(row);seen.set(id,row);lastPlot=row;
+  }else{
+   if(!('replaces' in r))validError(id+'.replaces 필드가 없습니다.');
+   const evidence=str(r.evidence,id+'.evidence'),text=str(r.body,id+'.body');
+   if(body.lastIndexOf(evidence,reveal.end-evidence.length)<0)validError(id+'의 근거가 공개 위치 이전 원문과 다릅니다.');
+   if(!CONFIDENCE.has(r.confidence))validError(id+'.confidence가 잘못되었습니다.');
+   if(r.replaces!==null){
+    if(typeof r.replaces!=='string'||!seen.has(r.replaces))validError(id+'.replaces가 존재하는 이전 레코드를 가리키지 않습니다.');
+    const prev=seen.get(r.replaces);
+    if(prev.category!==r.category||prev.rawOffset>reveal.end)validError(id+'.replaces의 범주나 위치가 다릅니다.');
+   }
+   const row={...base,body:text,text,confidence:r.confidence,evidence,replaces:r.replaces,
+    story_order:Number.isInteger(r.story_order)?r.story_order:null};
+   out.push(row);seen.set(id,row);
+  }
+ }
+ for(const row of out)for(const id of row.related_ids){
+  const target=seen.get(id);
+  if(!target||target.id===row.id||target.rawOffset>row.rawOffset)validError(row.id+'.related_ids가 잘못되었거나 아직 공개되지 않았습니다.');
+ }
+ return {schema_version:3,records:out};
+}
+
 function validate(meta,body){
+ if(meta?.schema_version===3)return validateV3(meta,body);
  if(!meta||meta.schema_version!==2||!Array.isArray(meta.records))validError('schema_version=2 및 records 배열이 필요합니다.');
  if(meta.records.length>MAX_RECORDS)validError('레코드는 최대 '+MAX_RECORDS+'건입니다.');
  const ids=new Map(),out=[];
@@ -120,15 +207,20 @@ function validate(meta,body){
 }
 function parse(raw){
  const text=String(raw||'');
- const hasBegin=text.includes(BEGIN);
- if(!hasBegin)return {body:text,hasInsights:false,metadata:null};
- // Strict tail and separate newline only; never leave a malformed metadata block in the book.
- const regex=/(?:\r?\n){2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
+ const v3=text.includes(BEGIN),v2=text.includes(OLD_BEGIN);
+ if(!v3&&!v2){
+  if(text.includes(END)||text.includes(OLD_END))validError('독서정보 종료 표식만 존재합니다.');
+  return {body:text,hasInsights:false,metadata:null};
+ }
+ if(v3&&v2)validError('v2와 v3 독서정보 표식을 혼합할 수 없습니다.');
+ const regex=v3?/(?:\r?\n){2}<<<READER_INSIGHTS_V3_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V3_END>>>\s*$/:
+  /(?:\r?\n){2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
  const m=regex.exec(text);
  if(!m)validError('통합 TXT 끝의 시작·종료 표식 및 빈 줄을 확인하세요.');
  const body=text.slice(0,m.index);
- if(m[1].length>MAX_JSON_BYTES)validError('JSON 정보 영역은 2MB 이하여야 합니다.');
+ if(m[1].length>(v3?32*1024*1024:MAX_JSON_BYTES))validError('독서정보 JSON이 허용 용량을 넘었습니다.');
  let meta;try{meta=JSON.parse(m[1]);}catch(e){validError('JSON 파싱 오류: '+e.message);}
+ if(meta?.schema_version!==(v3?3:2))validError('독서정보 표식과 schema_version이 일치하지 않습니다.');
  return {body,hasInsights:true,metadata:validate(meta,body)};
 }
 function openDb(){
@@ -148,7 +240,7 @@ async function save(body,metadata){
  const db=await openDb();
  await new Promise((resolve,reject)=>{
   const tx=db.transaction(STORE,'readwrite');
-  tx.objectStore(STORE).put({schema_version:2,records:validated.records,updatedAt:Date.now()},id);
+  tx.objectStore(STORE).put({schema_version:validated.schema_version,records:validated.records,updatedAt:Date.now()},id);
   tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('독서정보 저장 취소'));
   tx.onerror=()=>reject(tx.error||Error('독서정보 저장 오류'));
  });
@@ -162,7 +254,7 @@ async function load(body){
    const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get(id);
    q.onsuccess=()=>resolve(q.result||null);q.onerror=()=>reject(q.error);
   });
-  const parsed=found?.schema_version===2&&Array.isArray(found.records)?found:null;
+  const parsed=(found?.schema_version===2||found?.schema_version===3)&&Array.isArray(found.records)?found:null;
   memory.set(id,parsed);return parsed;
  }catch(e){return null;}
 }
@@ -195,5 +287,5 @@ function markSeen(body,at){
 function setSeen(body,at){return writeSeen(body,at,'manual');}
 function resetSeen(body){return setSeen(body,0);}
 function clearCache(body){memory.delete(key(body));}
-window.ReaderInsightsData={BEGIN,END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd,evidenceSentences,formatEvidence};
+window.ReaderInsightsData={BEGIN,END,OLD_BEGIN,OLD_END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd,evidenceSentences,formatEvidence};
 })();
