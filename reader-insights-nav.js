@@ -10,7 +10,7 @@ let nav=null,active=false,mode='home',query='',pendingQuery='',chosen=null,recor
 let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),detailCache=new Map(),cacheKey='';
 function api(){return window.readerInsights;}
 function recordText(r){return r.category==='plot'?(r.bullets||[]).map(b=>b.text).join(' '):String(r.body??r.text??'');}
-function recordEvidence(r){return r.category==='plot'?(r.bullets||[]).flatMap(b=>(b.evidence||[]).map(e=>e.quote)).join(' '):
+function recordEvidence(r){return r.category==='plot'?'':
  (Array.isArray(r.evidence_passages)&&r.evidence_passages.length?r.evidence_passages.map(e=>e.quote).join(' '):String(r.evidence||''));}
 function evidenceDisplay(r){
  const quotes=Array.isArray(r.evidence_passages)&&r.evidence_passages.length?
@@ -279,7 +279,7 @@ function cardHtml(r,content,part,total){
  return '<div class="insights-type">'+esc(labels[r.category])+(r.category==='plot'?' · 항목별 사실·해석 구분':' · '+esc(confidence[r.confidence]))+'</div>'+
   '<h3 class="insights-title">'+esc(r.title)+(total==='…'||total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
   '<div class="insights-body">'+esc(content)+'</div>'+
-  '<div class="insights-proof">'+(r.category==='plot'&&r.bullets?.some(b=>b.evidence_status==='not_provided')?'항목별 근거 미첨부 · 공개 위치만 확인':'원문 근거와 추론 수준을 구별해 표시')+'</div>';
+  '<div class="insights-proof">'+(r.category==='plot'?'읽은 위치까지의 압축형 줄거리':'원문 근거와 추론 수준을 구별해 표시')+'</div>';
 }
 function fits(r,portion){
  const surface=$('insightsPaper');
@@ -294,14 +294,11 @@ function fits(r,portion){
    for thousands of bullets and silently truncate after 20,000 iterations. */
 function splitDetail(r,requestedPage=0){
  const surface=$('insightsPaper');
- const key='ev6|'+r.id+'|'+r.category+'|'+(r.category==='plot'?r.bullets.length:(recordText(r).length+'-'+recordEvidence(r).length))+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ const key='report-v7|'+r.id+'|'+r.category+'|'+(r.category==='plot'?r.bullets.length:(recordText(r).length+'-'+recordEvidence(r).length))+'|'+surface.clientWidth+'x'+surface.clientHeight;
  let state=detailCache.get(key);
  if(!state){
   const text=r.category==='plot'?
-   (r.bullets.some(b=>b.evidence_status==='not_provided')?
-    '※ 이 버전은 항목별 원문 근거가 첨부되지 않았습니다. 원문 공개 위치만 확인했습니다.\n\n':'')+
-   r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']'+
-    (b.evidence.length?'\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: '):'')).join('\n\n'):
+   r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']').join('\n\n'):
    recordText(r)+'\n\n근거: '+evidenceDisplay(r);
   state={text,pages:[],offset:0,complete:false};
   detailCache.set(key,state);
