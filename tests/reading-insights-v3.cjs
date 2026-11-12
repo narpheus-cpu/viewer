@@ -17,13 +17,13 @@ const props=(id,category,title,scene,quote)=>({
  reveal:{quote,occurrence:1},entities:[],aliases:[],related_ids:[],importance:5
 });
 const firstPlot={...props('R00001','plot','첫 발견까지','S1',first),previous_plot_id:null,
- bullets:[{text:'첫 장면에서 중요한 물건이 발견된다.',confidence:'fact',evidence:[{quote:first,occurrence:1}]}]};
+ bullets:[{text:'첫 장면에서 중요한 물건이 발견된다.',confidence:'fact'}]};
 const relationship={...props('R00002','relation','관계 확인','S2',middle),body:'두 인물이 직접 대화를 나누었다.',
  confidence:'fact',evidence:middle,replaces:null};
 const secondPlot={...props('R00003','plot','열쇠의 출처까지','S3',final),previous_plot_id:'R00001',
  bullets:[
-  {text:'첫 장면에서 중요한 물건이 발견된다.',confidence:'fact',evidence:[{quote:first,occurrence:1}]},
-  {text:'대화 이후 열쇠의 출처가 밝혀진다.',confidence:'strong_inference',evidence:[{quote:middle,occurrence:1},{quote:final,occurrence:1}]}
+  {text:'첫 장면에서 중요한 물건이 발견된다.',confidence:'fact'},
+  {text:'대화 이후 열쇠의 출처가 밝혀진다.',confidence:'strong_inference'}
  ]};
 const meta={schema_version:3,records:[firstPlot,relationship,secondPlot]};
 const embedded=body+'\n\n'+D.BEGIN+'\n'+JSON.stringify(meta)+'\n'+D.END;
@@ -31,11 +31,18 @@ const parsed=D.parse(embedded);
 eq(parsed.body,body,'Integrated TXT preserves source exactly');
 eq(parsed.metadata.schema_version,3,'Schema v3 accepted');
 eq(parsed.metadata.records[2].bullets.length,2,'Independent latest plot');
+ok(!('evidence' in parsed.metadata.records[0].bullets[0]),'Official v3 plot has no evidence field');
+ok(!('evidence_status' in parsed.metadata.records[0].bullets[0]),'Official v3 plot has no evidence_status');
+const older=JSON.parse(JSON.stringify(meta));
+older.records[0].bullets[0].evidence=[{quote:first,occurrence:1}];
+const normalizedLegacy=D.validate(older,body);
+ok(!('evidence' in normalizedLegacy.records[0].bullets[0]),'Old v3 plot proof not copied into normalized report');
 eq(D.formatEvidence(first).includes('(중략)'),true,'Seven or more evidence sentences abbreviated');
 eq(D.formatEvidence(middle),middle,'Short evidence unchanged');
 for(const [name,transform] of [
  ['event rejected',m=>m.records[0].category='event'],
- ['missing bullet evidence',m=>m.records[0].bullets[0].evidence=[]],
+ ['missing bullet confidence',m=>delete m.records[0].bullets[0].confidence],
+ ['malformed legacy plot proof',m=>m.records[0].bullets[0].evidence='not a list'],
  ['future spoiler evidence',m=>m.records[0].bullets[0].evidence=[{quote:final,occurrence:1}]],
  ['broken plot pointer',m=>m.records[2].previous_plot_id=null],
  ['duplicate ID',m=>m.records[2].id='R00001'],
@@ -88,7 +95,7 @@ async function checkViewer(browser,android){
  ok(early.includes('첫 발견까지'),'Early snapshot displayed');
  ok(!early.includes('열쇠의 출처까지'),'Future snapshot hidden');
  ok(!early.includes('대화 이후 열쇠의 출처'),'Later bullet hidden');
- ok(early.includes('(중략)'),'Long original evidence abbreviated in plot detail');
+ ok(!early.includes('근거:')&&!early.includes('(중략)'),'Plot detail never displays source proof');
  await page.locator('#insightsClose').click();
  await page.evaluate(()=>window.readerInsights.correctTo(readerCanonical().length));
  await page.locator('#insightsOpen').click();
