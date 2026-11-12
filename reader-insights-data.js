@@ -190,8 +190,85 @@ function validateV3(meta,body){
  return {schema_version:3,records:out};
 }
 
+
+/* Upgrade only the known mixed v2/plot generator format. All quotes must be
+   exact source substrings within their respective spoiler reveal limits. */
+function upgradeMixedV2(meta,body){
+ const seen=new Map();
+ function matches(s,label){
+  if(typeof s!=='string'||!s.trim())validError(label+'의 원문 인용이 비어 있습니다.');
+  if(seen.has(s))return seen.get(s);
+  const result=[];
+  for(let at=0;(at=body.indexOf(s,at))>=0;at+=s.length)
+   result.push({start:at,end:at+s.length,occurrence:result.length+1});
+  if(!result.length)validError(label+' 원문 인용을 찾지 못했습니다.');
+  seen.set(s,result);return result;
+ }
+ function exact(r,label){
+  if(!r||!Number.isSafeInteger(r.occurrence)||r.occurrence<1)
+   validError(label+'의 occurrence가 잘못되었습니다.');
+  const seq=matches(r.quote,label);
+  if(r.occurrence>seq.length)validError(label+'의 출현 횟수가 잘못되었습니다.');
+  return {...seq[r.occurrence-1],quote:r.quote};
+ }
+ function reveal(r,label){
+  const original=exact(r,label);
+  if(r.quote.length>=20)return {...r,end:original.end};
+  const quote=body.slice(Math.max(0,original.end-64),original.end);
+  if(quote.length<20)validError(label+'의 공개 문장을 원문에서 확장할 수 없습니다.');
+  const occurrence=matches(quote,label).find(x=>x.end===original.end)?.occurrence;
+  if(!occurrence)validError(label+'의 공개 문장을 찾지 못했습니다.');
+  return {quote,occurrence,end:original.end};
+ }
+ function evidence(e,label,end,hint){
+  let found;
+  if(e&&typeof e==='object'&&!Array.isArray(e))found=exact(e,label);
+  else{
+   const options=matches(e,label).filter(x=>x.end<=end);
+   if(!options.length)validError(label+' 원문 근거가 공개 위치 이전에 없습니다.');
+   const near=Number.isFinite(hint)?options.filter(x=>x.end<=hint):[];
+   const chosen=near.length?near[near.length-1]:options[0];
+   found={...chosen,quote:e};
+  }
+  if(found.end>end)validError(label+' 근거가 공개 위치 이후에 있습니다.');
+  return found;
+ }
+ const records=meta.records.map((r,i)=>{
+  const id=r?.id||String(i+1);
+  if(!r||!CATEGORIES_V3.has(r.category))validError(id+'의 중간형 범주가 잘못되었습니다.');
+  const v=reveal(r.reveal,id+'.reveal');
+  const base={id:r.id,category:r.category,subject:r.subject,title:r.title,scene_id:r.scene_id,
+   reveal:{quote:v.quote,occurrence:v.occurrence},entities:r.entities,aliases:r.aliases,
+   related_ids:r.related_ids,importance:r.importance};
+  if(r.category==='plot'){
+   if(!Array.isArray(r.bullets)||!r.bullets.length)validError(id+'에 누적 줄거리가 없습니다.');
+   const bullets=r.bullets.map((b,j)=>{
+    const label=id+'.bullets['+j+']';
+    if(!Array.isArray(b.evidence)||!b.evidence.length)validError(label+' 원문 근거 배열이 없습니다.');
+    const at=b.reveal?Math.min(v.end,exact(b.reveal,label+'.reveal').end):v.end;
+    return {text:b.text,confidence:b.confidence,evidence:b.evidence.map((item,k)=>{
+     const ref=evidence(item,label+'.evidence['+k+']',v.end,at);
+     return {quote:ref.quote,occurrence:ref.occurrence};
+    })};
+   });
+   return {...base,bullets,previous_plot_id:r.previous_plot_id};
+  }
+  const pieces=Array.isArray(r.evidence)?r.evidence:[r.evidence];
+  if(!pieces.length)validError(id+'의 근거가 없습니다.');
+  const refs=pieces.map((item,j)=>evidence(item,id+'.evidence['+j+']',v.end));
+  const start=Math.min(...refs.map(x=>x.start)),stop=Math.max(...refs.map(x=>x.end));
+  const original=body.slice(start,stop);
+  if(!original||!refs.every(ref=>original.includes(ref.quote)))validError(id+' 근거 원문 보존에 실패했습니다.');
+  return {...base,body:r.body??r.text,confidence:r.confidence,evidence:original,replaces:r.replaces,
+   ...(refs.length>1?{evidence_passages:refs.map(({quote,occurrence})=>({quote,occurrence}))}:{})};
+ });
+ return {schema_version:3,records};
+}
+
 function validate(meta,body){
  if(meta?.schema_version===3)return validateV3(meta,body);
+ if(meta?.schema_version===2&&Array.isArray(meta.records)&&meta.records.some(r=>r?.category==='plot'))
+  return validateV3(upgradeMixedV2(meta,body),body);
  if(!meta||meta.schema_version!==2||!Array.isArray(meta.records))validError('schema_version=2 및 records 배열이 필요합니다.');
  if(meta.records.length>MAX_RECORDS)validError('레코드는 최대 '+MAX_RECORDS+'건입니다.');
  const ids=new Map(),out=[];
