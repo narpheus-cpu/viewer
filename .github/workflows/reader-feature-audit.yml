@@ -50,6 +50,11 @@ jobs:
       - name: Audit ChatGPT answer Markdown and safe links
         if: always()
         run: node tests/chatgpt-markdown.cjs
+      - name: Audit ChatGPT answer pagination and gestures
+        if: always()
+        run: |
+          mkdir -p work/gpt-markdown-v122
+          node tests/chatgpt-pages.cjs
       - name: Audit selectable text and ChatGPT bridge
         if: always()
         run: node tests/process-text.cjs
