@@ -18,7 +18,7 @@ async function check(browser,android){
  const origin=android?'https://appassets.androidplatform.net/assets/':'https://reader.test/';
  await page.route(android?'https://appassets.androidplatform.net/**':'https://reader.test/**',async route=>{
   const u=new URL(route.request().url()),rel=android?u.pathname.replace(/^\/assets\//,''):u.pathname.slice(1)||'index.html';
-  const f=path.join(base,rel);
+  const f=path.join(base,rel||'index.html');
   await route.fulfill(fs.existsSync(f)?{body:fs.readFileSync(f),contentType:rel.endsWith('.js')?'application/javascript':rel.endsWith('.json')?'application/json':'text/html; charset=utf-8'}:{status:404,body:'missing'});
  });
  await page.goto(origin);await page.evaluate(()=>readerReady);
