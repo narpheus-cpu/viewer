@@ -8,7 +8,8 @@
     "test:insights": "node tests/reading-insights-cursor.cjs && node tests/reading-insights-selection-unit.cjs && node tests/reading-insights-nav.cjs && node tests/reading-insights-v2.cjs && node tests/reading-insights-selection.cjs && node tests/reading-insights-navigator-web.cjs && node tests/reading-insights-audit.cjs && node tests/reading-insights-storage.cjs",
     "test:apk-open": "node tests/android-apk-file-open.cjs",
     "test:evidence": "node tests/reading-insights-evidence.cjs",
-    "test:v3": "node tests/reading-insights-v3.cjs"
+    "test:v3": "node tests/reading-insights-v3.cjs",
+    "test:hybrid": "node tests/reading-insights-hybrid.cjs"
   },
   "devDependencies": {
     "jszip": "3.10.2",
