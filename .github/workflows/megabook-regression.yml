@@ -1,0 +1,42 @@
+name: Multi-million character ebook loading regression
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/megabook-regression.yml'
+      - 'tests/web-megabooks.cjs'
+      - 'index.html'
+      - 'reader-insights*.js'
+      - 'android/tools/sync_web_assets.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reader-megabooks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stress:
+    name: Web and Android layout, jump, resume stress
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Stage current HTML into Android WebView assets
+        run: python3 android/tools/sync_web_assets.py
+      - name: Verify Android WebView source parity
+        run: python3 android/tests/insights_assets.py
+      - name: Test 1.2M, 3.2M and 6.2M characters, 48–96 chapters, and Android 3.2M
+        env:
+          MEGABOOK_SIZES: '1200000,3200000,6200000'
+          MEGABOOK_ANDROID: '1'
+        run: npm run test:megabooks
