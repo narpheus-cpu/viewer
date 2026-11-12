@@ -1,0 +1,36 @@
+name: Hybrid V2_START and schema v3 import regression
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/hybrid-import-regression.yml'
+      - 'reader-insights*.js'
+      - 'index.html'
+      - 'tests/reading-insights-hybrid.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-uploads:
+    name: Original TXT preservation, exact evidence, Web and Android render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies and Chromium
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Sync Web assets to Android
+        run: python3 android/tools/sync_web_assets.py
+      - name: Run legacy hybrid TXT and v3 tests on Web and Android
+        env:
+          VERIFY_ANDROID_ASSETS: '1'
+        run: |
+          npm run test:hybrid
+          npm run test:v3
