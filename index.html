@@ -395,7 +395,13 @@ async function readerDisplayFull(record={pageAnchor:0},generation=++readerState.
     readerState.layout=signature;
     record=readerMigrateNotePosition(record,cached);
     const hasAnchor=record.pageAnchor!==null&&record.pageAnchor!==undefined&&Number.isFinite(Number(record.pageAnchor));
-    const target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
+    let target=hasAnchor?readerResolveAnchor(record):Number(pageAnchors[Math.min(pages.length-1,Math.max(0,Number(record.pageIndex)||0))])||0;
+    if(record._lazyLastPage){
+      const nextChapter=chapterCanonicalStarts.find(start=>start>target);
+      let last=nextChapter===undefined?pages.length-1:findPageIndexForAnchor(nextChapter)-1;
+      while(last>0&&pages[last].includes('class="chapter-spacer"'))last--;
+      target=pageAnchors[last]??target;
+    }
     readerChooseAnchor(target,readerContext(target));pageIndex=findPageIndexForAnchor(target);
     restoreInProgress=false;render();readerSetLoading(false);
     if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();
@@ -507,9 +513,12 @@ async function readerLazyPump(s){
  try{while(readerLazyAlive(s)&&s.queue.length){
   if(readerBrowserLayoutPaused()||settingsPanelIsOpen()||pageJumpLayoutLocked()||pageGesture||readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen()||readerChapterIsOpen()){await new Promise(resolve=>setTimeout(resolve,180));continue;}
   if(s.signature!==getLayoutSignature()){
-   const anchor=readerAnchor(),context=readerState.context;s.cancelled=true;for(const job of s.jobs.values())job.reject(Error('화면 크기 변경'));readerLazySession=null;
+    const pending=s.pendingNavigation;
+    const anchor=pending?.anchor??readerAnchor(),context=pending?readerContext(anchor):readerState.context;
+    s.cancelled=true;for(const job of s.jobs.values())job.reject(Error('화면 크기 변경'));readerLazySession=null;
    if(s.reflows>=3){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');setStatus('화면 크기가 계속 바뀌어 계산을 중단했습니다. 다시 열어 주세요.',true);break;}
-   await new Promise(resolve=>setTimeout(resolve,120));if(s.generation===readerState.generation&&viewerOverlay.classList.contains('active'))void readerDisplay({pageAnchor:anchor,pageContext:context,_lazyReflows:s.reflows+1});break;
+    restoreInProgress=true;readerSetLoading(true,'바뀐 화면 크기에 맞춰 페이지를 계산하는 중…');
+    await new Promise(resolve=>setTimeout(resolve,120));if(s.generation===readerState.generation&&viewerOverlay.classList.contains('active'))void readerDisplay({pageAnchor:anchor,pageContext:context,_lazyReflows:s.reflows+1,_lazyLastPage:pending?.lastPage});break;
   }
   const job=s.queue.shift();if(s.results[job.c])continue;
   try{
@@ -524,11 +533,12 @@ async function readerLazyPump(s){
 }
 async function readerLazyNavigate(anchor,lastPage=false){
  const s=readerLazySession;if(!readerLazyAlive(s))return;const c=readerLazyChapter(anchor),ticket=++s.navigation;
+ s.pendingNavigation={anchor,lastPage};
  restoreInProgress=true;readerSetLoading(true,'구간 '+(c+1)+' / '+s.results.length+' 페이지를 계산하는 중…');
- try{const result=await readerLazyEnsure(s,c,true);if(!readerLazyAlive(s)||ticket!==s.navigation)return;if(lastPage)anchor=result.anchors[result.anchors.length-1];readerLazyAssemble(s,anchor);restoreInProgress=false;readerSetLoading(false);render();readerLazyUpdateUI();
+ try{const result=await readerLazyEnsure(s,c,true);if(!readerLazyAlive(s)||ticket!==s.navigation)return;s.pendingNavigation=null;if(lastPage)anchor=result.anchors[result.anchors.length-1];readerLazyAssemble(s,anchor);restoreInProgress=false;readerSetLoading(false);render();readerLazyUpdateUI();
   if(!s.opened){s.opened=true;readerLazyStats.firstVisibleMs=performance.now()-s.started;if(typeof readerPrepareSearchBook==='function')readerPrepareSearchBook();}
   if(!s.backgroundQueued){s.backgroundQueued=true;const order=[];for(let n=1;n<s.results.length;n++){if(c+n<s.results.length)order.push(c+n);if(c-n>=0)order.push(c-n);}for(const index of order)void readerLazyEnsure(s,index).catch(()=>{});}
- }catch(error){if(readerLazyAlive(s)&&ticket===s.navigation){restoreInProgress=false;readerSetLoading(false);if(!s.opened){viewerOverlay.classList.remove('active');readerLazyCancel();}setStatus(error.message,true);}}
+ }catch(error){if(readerLazyAlive(s)&&ticket===s.navigation){s.pendingNavigation=null;restoreInProgress=false;readerSetLoading(false);if(!s.opened){viewerOverlay.classList.remove('active');readerLazyCancel();}setStatus(error.message,true);}}
 }
 function readerLazyPendingPage(){const html=pages[pageIndex]||'';if(!html.includes('data-reader-pending='))return false;void readerLazyNavigate(readerAnchor());return true;}
 async function readerLazyTurn(direction){if(restoreInProgress)return;const target=pageIndex+direction*readerVisiblePageCount();if(target<0||target>=pages.length)return;const html=pages[target],anchor=pageAnchors[target];if(html.includes('data-reader-pending=')){await readerLazyNavigate(anchor,direction<0);return;}pageIndex=target;readerChooseAnchor(anchor);render();}
@@ -546,7 +556,7 @@ async function readerDisplay(record={pageAnchor:0},generation=++readerState.gene
   readerLazyPreparing=true;try{getPaginationBlocks(fullText);readerCanonical();}finally{readerLazyPreparing=false;}
   readerStats.lastCacheReason='chapter-first';readerState.layout=signature;const bounds=bookChapters.length?[...chapterBlockBoundaries].sort((a,b)=>a-b):[0],starts=bookChapters.length?chapterCanonicalStarts.slice():[0];
   const s=readerLazySession={generation,source:fullText,id:activeRecentId,signature,previous:cached,bounds,starts,results:Array(bounds.length).fill(null),queue:[],jobs:new Map(),formatted:new Map(),done:0,complete:false,cancelled:false,running:false,priority:null,navigation:0,started,reflows:record._lazyReflows||0};readerLazyStats.sessions++;
-  record=readerMigrateNotePosition(record,cached);const anchor=readerResolveAnchor(record);readerLazyAssemble(s,anchor);await readerLazyNavigate(anchor);
+  record=readerMigrateNotePosition(record,cached);const anchor=readerResolveAnchor(record);readerLazyAssemble(s,anchor);await readerLazyNavigate(anchor,record._lazyLastPage);
  }catch(error){if(generation===readerState.generation){restoreInProgress=false;readerSetLoading(false);viewerOverlay.classList.remove('active');readerLazyCancel();setStatus(error.message,true);}}
 }
 
@@ -2245,6 +2255,7 @@ function readerChapterClose(){
  if(readerChapterOverflow.aria===null)viewerOverlay.removeAttribute('aria-hidden');else viewerOverlay.setAttribute('aria-hidden',readerChapterOverflow.aria);
  resetPageGesture();pageGestureSuppressUntil=performance.now()+800;
  if(readerChapterFocus?.isConnected)readerChapterFocus.focus({preventScroll:true});
+ scheduleRepaginate();
 }
 function readerChapterOpen(){
  if(restoreInProgress||!bookChapters.length||readerChapterIsOpen())return;
@@ -4086,7 +4097,7 @@ function render(){
 
 async function repaginate(){
   if(readerBrowserLayoutPaused())return;
-  if(readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen())return;
+  if(readerNoteIsOpen()||readerTimelineIsOpen()||readerGPTIsOpen()||readerChapterIsOpen())return;
   if(pageGesture){pageGestureLayoutDeferred=true;return;}
   if(pageJumpLayoutLocked())return;
   if(!fullText||restoreInProgress||!viewerOverlay.classList.contains('active'))return;
@@ -4276,6 +4287,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  readerChapterClose();
   window.readerInsights?.close();
   window.readerInsights?.cancelCorrection();
   readerLazyCancel();
