@@ -2342,7 +2342,12 @@ async function loadReaderFile(file){
     text=unpacked.body.replace(/\r\n?/g,'\n');
     if(unpacked.hasInsights){
       const normalized={...unpacked.metadata,records:unpacked.metadata.records.map(r=>({
-        ...r,evidence:r.evidence.replace(/\r\n?/g,'\n'),
+        ...r,
+        ...(r.category==='plot'?{
+          bullets:r.bullets.map(b=>({
+            ...b,evidence:b.evidence.map(e=>({...e,quote:e.quote.replace(/\r\n?/g,'\n')}))
+          }))
+        }:{evidence:r.evidence.replace(/\r\n?/g,'\n')}),
         reveal:{...r.reveal,quote:r.reveal.quote.replace(/\r\n?/g,'\n')}
       }))};
       await window.ReaderInsightsData.save(text,normalized);
