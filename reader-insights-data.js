@@ -316,18 +316,20 @@ function validate(meta,body){
 }
 function parse(raw){
  const text=String(raw||'');
- const v3=text.includes(BEGIN),v2=text.includes(OLD_BEGIN);
- if(!v3&&!v2){
-  if(text.includes(END)||text.includes(OLD_END))validError('독서정보 종료 표식만 존재합니다.');
+ const v3=text.includes(BEGIN),v2=text.includes(OLD_BEGIN),mixed=text.includes(OLD_START);
+ if(!v3&&!v2&&!mixed){
+  if(text.includes(END)||text.includes(OLD_END))validError('통합 TXT의 시작 표식이 없습니다. V3_BEGIN/V3_END 또는 V2_BEGIN/V2_END 쌍을 확인하세요.');
   return {body:text,hasInsights:false,metadata:null};
  }
- if(v3&&v2)validError('v2와 v3 독서정보 표식을 혼합할 수 없습니다.');
+ if(Number(v3)+Number(v2)+Number(mixed)!==1)validError('서로 다른 독서정보 시작 표식을 함께 사용할 수 없습니다.');
+ if(text.split(v3?BEGIN:v2?OLD_BEGIN:OLD_START).length!==2)validError('독서정보 시작 표식이 중복되었습니다.');
  const regex=v3?/(?:\r?\n){2}<<<READER_INSIGHTS_V3_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V3_END>>>\s*$/:
-  /(?:\r?\n){2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
+  v2?/(?:\r?\n){2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/:
+  /(?:\r?\n){2}<<<READER_INSIGHTS_V2_START>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
  const m=regex.exec(text);
- if(!m)validError('통합 TXT 끝의 시작·종료 표식 및 빈 줄을 확인하세요.');
+ if(!m)validError('통합 TXT 끝의 시작·종료 표식, 빈 줄 또는 JSON 경계를 확인하세요.');
  const body=text.slice(0,m.index);
- if(m[1].length>(v3?32*1024*1024:MAX_JSON_BYTES))validError('독서정보 JSON이 허용 용량을 넘었습니다.');
+ if(m[1].length>(v3||mixed?32*1024*1024:MAX_JSON_BYTES))validError('독서정보 JSON이 허용 용량을 넘었습니다.');
  let meta;try{meta=JSON.parse(m[1]);}catch(e){validError('JSON 파싱 오류: '+e.message);}
  if(meta?.schema_version!==(v3?3:2))validError('독서정보 표식과 schema_version이 일치하지 않습니다.');
  return {body,hasInsights:true,metadata:validate(meta,body)};
@@ -398,5 +400,5 @@ function markSeen(body,at){
 function setSeen(body,at){return writeSeen(body,at,'manual');}
 function resetSeen(body){return setSeen(body,0);}
 function clearCache(body){memory.delete(key(body));}
-window.ReaderInsightsData={BEGIN,END,OLD_BEGIN,OLD_END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd,evidenceSentences,formatEvidence};
+window.ReaderInsightsData={BEGIN,END,OLD_BEGIN,OLD_START,OLD_END,key,parse,validate,save,load,getReadState,getSeen,markSeen,setSeen,resetSeen,clearCache,occurrenceEnd,evidenceSentences,formatEvidence};
 })();
