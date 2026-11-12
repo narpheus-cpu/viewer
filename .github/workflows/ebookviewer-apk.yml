@@ -75,6 +75,8 @@ jobs:
         run: npm run test:apk-open
       - name: Run all insights and navigation browser regressions (Web + Android assets)
         run: VERIFY_ANDROID_ASSETS=1 npm run test:insights
+      - name: Prevent V2_START mixed-format upload failures on Web and Android
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:hybrid
       - name: Verify schema v3 plots, version history and Web/Android rendering
         run: VERIFY_ANDROID_ASSETS=1 npm run test:v3
       - name: Verify evidence excerpts on Web and staged Android reader
