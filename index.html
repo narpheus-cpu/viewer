@@ -537,9 +537,12 @@ async function readerDisplay(record={pageAnchor:0},generation=++readerState.gene
  const started=performance.now();restoreInProgress=true;readerSetLoading(true,'책 구조와 읽던 구간을 준비하는 중…');await new Promise(resolve=>setTimeout(resolve,0));
  try{
   const cached=activeRecentId?await readerBounded(readerReadCache(activeRecentId),2000,'페이지 캐시').catch(()=>null):null;if(generation!==readerState.generation)return;
-  readerLazyPreparing=true;try{readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();if(readerCacheBodyValid(cached,fullText)){readerState.canonical=cached.canonical;readerState.canonicalSource=fullText;}else readerCanonical();}finally{readerLazyPreparing=false;}
+  readerLazyPreparing=true;try{readerConfigureChapters(record,cached);readerRestoreCountCache(cached);updateViewerCharacterCount();if(readerCacheBodyValid(cached,fullText)){readerState.canonical=cached.canonical;readerState.canonicalSource=fullText;}else if(!(fullText.length>=1000000&&bookChapters.length>=12))readerCanonical();}finally{readerLazyPreparing=false;}
   await readerWaitForLayout();if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;const signature=getLayoutSignature();
   if(readerFindCachedLayout(cached,signature,fullText))return readerDisplayFull(record,generation);
+  if(fullText.length>=1000000&&bookChapters.length>=12&&cachedMarkdownSource!==fullText)
+   await readerPrepareLongBook(fullText,generation);
+  if(generation!==readerState.generation||!viewerOverlay.classList.contains('active'))return;
   readerLazyPreparing=true;try{getPaginationBlocks(fullText);readerCanonical();}finally{readerLazyPreparing=false;}
   readerStats.lastCacheReason='chapter-first';readerState.layout=signature;const bounds=bookChapters.length?[...chapterBlockBoundaries].sort((a,b)=>a-b):[0],starts=bookChapters.length?chapterCanonicalStarts.slice():[0];
   const s=readerLazySession={generation,source:fullText,id:activeRecentId,signature,previous:cached,bounds,starts,results:Array(bounds.length).fill(null),queue:[],jobs:new Map(),formatted:new Map(),done:0,complete:false,cancelled:false,running:false,priority:null,navigation:0,started,reflows:record._lazyReflows||0};readerLazyStats.sessions++;
@@ -2072,6 +2075,39 @@ function detectTextChapters(text){
   else chapters[0].start=0;
   return chapters;
 }
+/* Cooperative first-pass chapter analysis for 1M+ TXT files.
+   Never publish partial block or offset state while yielding. */
+async function readerPrepareLongBook(source,generation){
+ if(cachedMarkdownSource===source)return;
+ if(source!==fullText||bookChapters.length<12)return;
+ const blocks=[],texts=[],starts=[],bounds=new Set();let anchor=0;
+ for(let index=0;index<bookChapters.length;index++){
+  if(generation!==readerState.generation||source!==fullText||
+     !viewerOverlay.classList.contains('active'))throw Error('책 분석이 취소되었습니다.');
+  const chapter=bookChapters[index],end=bookChapters[index+1]?.start??source.length;
+  bounds.add(blocks.length);starts.push(anchor);
+  const part=chapter.blocks?
+    chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):
+    readerMarkdownNoteBlocks(source.slice(chapter.start,end));
+  const content=part.length?part:['<p></p>'];
+  blocks.push(...content);
+  for(const html of content){
+   const plain=htmlToStableText(html);texts.push(plain);anchor+=plain.length+1;
+  }
+  if(index%2===1||index===bookChapters.length-1){
+   readerSetLoading(true,'책 구조 분석 '+(index+1)+' / '+bookChapters.length+'개 챕터…');
+   await new Promise(resolve=>setTimeout(resolve,0));
+  }
+ }
+ if(generation!==readerState.generation||source!==fullText||
+    !viewerOverlay.classList.contains('active'))throw Error('책 분석이 취소되었습니다.');
+ const offsets=[];let current=0;
+ for(const value of texts){offsets.push(current);current+=value.length+1;}
+ cachedOriginalBlocks=blocks;cachedBlockTexts=texts;cachedBlockStarts=offsets;
+ cachedQuoteRoles=readerQuoteRoles(texts.join('\n'));
+ cachedMarkdownBlocks=blocks;cachedBreakKey=readerBreakKey();cachedMarkdownSource=source;
+ readerPreparedBlockTexts=null;chapterBlockBoundaries=bounds;chapterCanonicalStarts=starts;
+}
 function readerConfigureChapters(record={},cache=null){
   const explicit=record.chapters||activeRecentMeta?.chapters||inputBookChapters;
   const chapters=normalizeBookChapters(explicit,fullText);
@@ -2090,7 +2126,7 @@ function readerConfigureChapters(record={},cache=null){
   });
   document.getElementById('chapterNav').hidden=!bookChapters.length;
   if(readerCacheStructureValid(cache))chapterCanonicalStarts=cache.chapterStarts.slice();
-  else getPaginationBlocks(fullText);
+  else if(!(readerLazyPreparing&&fullText.length>=1000000&&bookChapters.length>=12))getPaginationBlocks(fullText);
 }
 let chapterImageSource=null;
 function readerPrepareChapterImages(){
