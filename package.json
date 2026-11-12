@@ -11,7 +11,7 @@
     "test:v3": "node tests/reading-insights-v3.cjs",
     "test:hybrid": "node tests/reading-insights-hybrid.cjs",
     "test:compressed": "node tests/reading-insights-compressed.cjs",
-    "test:feature-audit": "node tests/reader-structure-audit.cjs && node tests/character-count.cjs && node tests/character-count.cjs android/app/src/main/assets && node tests/timeline-core.cjs && node tests/timeline-ui.cjs && node tests/chatgpt-markdown.cjs && node tests/process-text.cjs"
+    "test:feature-audit": "node tests/reader-structure-audit.cjs && node tests/character-count.cjs && node tests/character-count.cjs android/app/src/main/assets && node tests/timeline-core.cjs && node tests/timeline-ui.cjs && node tests/chatgpt-markdown.cjs && node tests/process-text.cjs && node -e \"require('fs').mkdirSync('work/gpt-markdown-v122',{recursive:true})\" && node tests/chatgpt-pages.cjs"
   },
   "devDependencies": {
     "jszip": "3.10.2",
