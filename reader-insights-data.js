@@ -207,7 +207,8 @@ function upgradeMixedV2(meta,body){
  const seen=new Map();
  const declaredUnverified=
   meta?.source_metadata?.plot_style==='compressed_reconstructed_full_report_no_evidence'||
-  meta?.metadata?.plot_style==='full_rewritten_compressed_reports_without_evidence';
+  meta?.metadata?.plot_style==='full_rewritten_compressed_reports_without_evidence'||
+  meta?.metadata?.plot_style==='independent_compressed_reports_without_evidence';
  let missingBulletEvidence=0;
  function matches(s,label){
   if(typeof s!=='string'||!s.trim())validError(label+'의 원문 인용이 비어 있습니다.');
