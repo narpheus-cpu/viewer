@@ -3,7 +3,7 @@ const root=path.resolve(process.argv[2]||path.join(__dirname,'..'));
 (async()=>{const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});let checks=0;try{
  for(const width of (root.includes('assets')?[390]:[390,1280])){const context=await browser.newContext({viewport:{width,height:800}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.route('https://reader.test/**',async route=>{const p=new URL(route.request().url()).pathname,file=path.join(root,p==='/'?'index.html':p.slice(1));await route.fulfill(fs.existsSync(file)?{contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.json')?'application/json':'text/html; charset=utf-8',body:fs.readFileSync(file)}:{status:404,body:'missing'});});
- await page.goto('https://reader.test/');await page.evaluate(()=>readerReady);
+ await page.goto('https://reader.test/');await page.evaluate(()=>readerReady);await page.evaluate(()=>{if(typeof hideRecentHistory==='function')hideRecentHistory();});
  const whitespace=' \t\r\n\v\f\u00a0\u0085\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff\u200b';
  assert.deepEqual(await page.evaluate(w=>[formatCharacterCount(''),formatCharacterCount(w),formatCharacterCount('한 A\t😀\n글'),formatCharacterCount('A'.repeat(1234))],whitespace),['0자','0자','4자','1,234자']);checks+=4;
  const source='[가]\nA B\tC\n😀'+whitespace+'\n\n[나]\n한 글\n\n[다]\nX\tY\n';
