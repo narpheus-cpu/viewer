@@ -12,6 +12,8 @@ const MAX_RECORDS=3000, MAX_JSON_BYTES=2*1024*1024, MAX_TEXT=12000;
 const DB_NAME='ebookViewerInsightsDBV2', STORE='books', PROGRESS='ebookViewerInsightsReadCursorV3:';
 let dbPromise=null, lastText=null,lastKey=null;
 const memory=new Map();
+// Storage failures must never erase spoiler boundaries during the current session.
+const volatileReadState=new Map();
 
 function key(body){
  if(body===lastText&&lastKey!==null)return lastKey;
@@ -262,6 +264,8 @@ async function load(body){
    It could be 100% after an accidental end-of-book jump. */
 function getReadState(body){
  const id=key(body);
+ const volatile=volatileReadState.get(id);
+ if(volatile)return {...volatile,hasRecord:true};
  try{
   const raw=localStorage.getItem(PROGRESS+id);
   if(raw===null)return {seen:0,hasRecord:false,mode:'none'};
@@ -274,8 +278,8 @@ function getSeen(body){return getReadState(body).seen;}
 function writeSeen(body,at,mode){
  const n=Math.max(0,Math.floor(Number(at)||0));
  const id=key(body);
- try{localStorage.setItem(PROGRESS+id,JSON.stringify({seen:n,mode,updatedAt:Date.now()}));}
- catch{/* Keep in-memory accuracy if storage is unavailable. */}
+ try{localStorage.setItem(PROGRESS+id,JSON.stringify({seen:n,mode,updatedAt:Date.now()}));volatileReadState.delete(id);}
+ catch{volatileReadState.set(id,{seen:n,mode,updatedAt:Date.now()});}
  return n;
 }
 function markSeen(body,at){
