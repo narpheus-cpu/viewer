@@ -9,6 +9,11 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>
 let overlay=null,paper=null,category='plot',entries=[],shown=[],insightPages=[],pageNumber=0;
 let currentKey='',latestToken=0,focused=null,gesture=null,layoutKey='',offsetCache=new Map(),unmatched=0;
 function bookText(){try{return fullText||'';}catch{return '';}}
+function evidenceDisplay(r){
+ const quotes=Array.isArray(r.evidence_passages)&&r.evidence_passages.length?
+  r.evidence_passages.map(e=>e.quote):[r.evidence];
+ return quotes.map(q=>D().formatEvidence(q)).join('\n근거: ');
+}
 function bookCanonical(){try{return readerCanonical();}catch{return bookText();}}
 function panelOpen(){return !!overlay?.classList.contains('is-open');}
 function readerOpen(){return !!el('viewerOverlay')?.classList.contains('active');}
@@ -123,7 +128,7 @@ function currentEntries(){
   a.story_order-b.story_order:a.revealOffset-b.revealOffset);
  shown=shown.map(r=>{
   const prev=r.replaces?known.get(r.replaces):null;
-  return {...r,display:r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confLabels[b.confidence]+']\n근거: '+b.evidence.map(e=>D().formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):(r.body??r.text)+(prev?'\n\n이전 판단: '+(prev.body??prev.text):'')+'\n\n근거: '+D().formatEvidence(r.evidence)};
+  return {...r,display:r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confLabels[b.confidence]+']\n근거: '+b.evidence.map(e=>D().formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):(r.body??r.text)+(prev?'\n\n이전 판단: '+(prev.body??prev.text):'')+'\n\n근거: '+evidenceDisplay(r)};
  });
  const pct=text.length?Math.floor(limit/text.length*100):0;
  el('insightsSeen').textContent='읽은 범위 '+pct+'%';
