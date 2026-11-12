@@ -1,0 +1,143 @@
+name: Publish EbookViewer 1.37 compatibility APK (independent)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ebookviewer-137-compat.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - name: Install SDK 36 and Build Tools
+        run: |
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Configure Gradle 8.13 for Android Gradle Plugin 8.13.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Stage current Web reader into offline APK
+        run: python3 android/tools/sync_web_assets.py
+      - name: Check offline assets and native bridge
+        run: python3 android/tests/insights_assets.py
+      - name: Validate embedded HTML and reader JS syntax
+        run: |
+          node --check reader-insights-data.js
+          node --check reader-insights.js
+          node --check reader-insights-nav.js
+          node --check android/app/src/main/assets/android.js
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=fs.readFileSync('android/app/src/main/assets/index.html','utf8');
+          const matches=[...s.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+          for(const [i,x] of matches.entries())try{new Function(x[1]);}catch(e){throw Error('Embedded script '+i+': '+e.message);}
+          console.log('Verified '+matches.length+' embedded script blocks');
+          NODE
+      - name: Install Node tests
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium for Android asset UI regression
+        run: npx playwright install --with-deps chromium
+      - name: Run complete reader and EPUB/TXT regressions
+        run: npm test
+      - name: Run chapter pagination, reopen and responsive layout regressions
+        run: npm run test:chapters
+      - name: Reproduce and prevent frozen TXT import in packaged APK browser
+        run: npm run test:apk-open
+      - name: Run all insights and navigation browser regressions (Web + Android assets)
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:insights
+      - name: Prevent V2_START mixed-format upload failures on Web and Android
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:hybrid
+      - name: Verify schema v3 plots, version history and Web/Android rendering
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:v3
+      - name: Verify evidence excerpts on Web and staged Android reader
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:evidence
+      - name: Run native selection menu Java test
+        run: python3 android/tests/selection_menu.py
+      - name: Run native bridge and timeline regression tests
+        run: |
+          python3 android/tests/chatgpt_entry.py
+          python3 android/tests/timeline_assets.py
+      - name: Build debug APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Validate resulting APK archive and bundled assets
+        run: |
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          assert apk.is_file() and apk.stat().st_size>100000, 'APK was not created'
+          with ZipFile(apk) as z:
+              names=set(z.namelist())
+              required={
+                'AndroidManifest.xml','classes.dex',
+                'assets/index.html','assets/android.js','assets/reader-core.js',
+                'assets/reader-insights-data.js','assets/reader-insights.js',
+                'assets/reader-insights-nav.js','assets/reader-insights.css'
+              }
+              missing=required-names
+              assert not missing, f'Missing APK assets: {sorted(missing)}'
+              html=z.read('assets/index.html').decode('utf-8')
+              assert 'reader-insights-nav.js' in html
+              assert 'reader-insights-data.js' in html
+              assert 'reader-insights.js' in html
+              assert 'reader-insights.css' in html
+          assert '<script src="./reader-core.js"' not in html, 'Duplicate reader-core script will freeze TXT loader'
+          assert html.count('const readerReady=new Promise') == 1
+          print('Validated APK size:',apk.stat().st_size,'bytes; all required assets present')
+          PY
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as downloadable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EbookViewer_v1.37_debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish verified APK and SHA256 with atomic GitHub Contents requests
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: narpheus-cpu/viewer
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,base64,json
+          from pathlib import Path
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          filename='EbookViewer_v1.37-debug.apk'
+          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+          files={filename:apk.read_bytes(),filename+'.sha256':(digest+'  '+filename+'\\n').encode()}
+          for name,content in files.items():
+              payload={'branch':'main','message':'Publish verified '+name+' [skip ci]',
+                       'content':base64.b64encode(content).decode('ascii')}
+              Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
+          print('SHA256',digest)
+          PY
+          for name in EbookViewer_v1.37-debug.apk EbookViewer_v1.37-debug.apk.sha256; do
+            current_sha=$(gh api "repos/narpheus-cpu/viewer/contents/downloads/$name" --jq '.sha' 2>/dev/null || true)
+            if [[ -n "$current_sha" ]]; then
+              jq --arg sha "$current_sha" '.sha=$sha' "/tmp/$name.json" > "/tmp/$name.updated.json"
+              mv "/tmp/$name.updated.json" "/tmp/$name.json"
+            fi
+            gh api -X PUT "repos/narpheus-cpu/viewer/contents/downloads/$name" --input "/tmp/$name.json" --jq '.content.download_url'
+          done
