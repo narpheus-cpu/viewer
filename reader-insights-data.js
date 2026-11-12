@@ -7,6 +7,7 @@ const OLD_BEGIN='<<<READER_INSIGHTS_V2_BEGIN>>>';
 const OLD_START='<<<READER_INSIGHTS_V2_START>>>'; // legacy generator typo
 const OLD_END='<<<READER_INSIGHTS_V2_END>>>';
 const CATEGORIES_V3=new Set(['plot','relation','character','clue']);
+const LEGACY_PLOT_NO_EVIDENCE='legacy-v2-compressed-plot-no-evidence';
 const CATEGORIES=new Set(['event','relation','character','clue']);
 const CONFIDENCE=new Set(['fact','strong_inference','tentative']);
 const MAX_RECORDS=3000, MAX_JSON_BYTES=2*1024*1024, MAX_TEXT=12000;
@@ -87,6 +88,9 @@ function occurrenceEnd(text,phrase,occurrence){
 /* Every plot is a fully independent, source-verified cumulative snapshot.
    All refs resolve against the unmodified book body, not against displayed excerpts. */
 function validateV3(meta,body){
+ // Tagged transitional TXT may be displayed without per-bullet proof.
+ // Native v3 remains strict; none of the missing evidence is synthesized.
+ const allowUnverifiedPlot=meta?.compatibility_mode===LEGACY_PLOT_NO_EVIDENCE;
  if(!Array.isArray(meta.records))validError('schema_version=3의 records 배열이 필요합니다.');
  const out=[],seen=new Map(),occurrenceCache=new Map();let lastPlot=null,lastOffset=-1;
  // Cumulative plot snapshots cite many of the same source passages. A single
@@ -149,7 +153,12 @@ function validateV3(meta,body){
     if(/^\s*\d+[.)]\s/.test(value))validError(label+'에는 번호를 직접 넣지 마세요.');
     if(!CONFIDENCE.has(b.confidence))validError(label+'.confidence가 잘못되었습니다.');
     const ev=array(b.evidence,label+'.evidence');
-    if(!ev.length)validError(label+'의 원문 근거가 없습니다.');
+    if(!ev.length){
+     if(!allowUnverifiedPlot||b.evidence_status!=='not_provided')
+      validError(label+'의 원문 근거가 없습니다.');
+     return {text:value,confidence:b.confidence,evidence:[],
+      evidence_status:'not_provided'};
+    }
     return {text:value,confidence:b.confidence,evidence:ev.map((e,k)=>{
      const q=quote(e,label+'.evidence['+k+']');
      if(q.end>reveal.end)validError(label+'의 근거가 줄거리 공개 시점보다 뒤입니다.');
@@ -187,7 +196,8 @@ function validateV3(meta,body){
   const target=seen.get(id);
   if(!target||target.id===row.id||target.rawOffset>row.rawOffset)validError(row.id+'.related_ids가 잘못되었거나 아직 공개되지 않았습니다.');
  }
- return {schema_version:3,records:out};
+ return {schema_version:3,records:out,
+  ...(allowUnverifiedPlot?{compatibility_mode:LEGACY_PLOT_NO_EVIDENCE}:{})};
 }
 
 
@@ -195,6 +205,8 @@ function validateV3(meta,body){
    exact source substrings within their respective spoiler reveal limits. */
 function upgradeMixedV2(meta,body){
  const seen=new Map();
+ const declaredUnverified=meta?.source_metadata?.plot_style==='compressed_reconstructed_full_report_no_evidence';
+ let missingBulletEvidence=0;
  function matches(s,label){
   if(typeof s!=='string'||!s.trim())validError(label+'의 원문 인용이 비어 있습니다.');
   if(seen.has(s))return seen.get(s);
@@ -244,7 +256,12 @@ function upgradeMixedV2(meta,body){
    if(!Array.isArray(r.bullets)||!r.bullets.length)validError(id+'에 누적 줄거리가 없습니다.');
    const bullets=r.bullets.map((b,j)=>{
     const label=id+'.bullets['+j+']';
-    if(!Array.isArray(b.evidence)||!b.evidence.length)validError(label+' 원문 근거 배열이 없습니다.');
+    if(!Array.isArray(b.evidence)||!b.evidence.length){
+     if(!declaredUnverified)validError(label+' 원문 근거 배열이 없습니다.');
+     missingBulletEvidence++;
+     return {text:b.text,confidence:b.confidence,evidence:[],
+      evidence_status:'not_provided'};
+    }
     const at=b.reveal?Math.min(v.end,exact(b.reveal,label+'.reveal').end):v.end;
     return {text:b.text,confidence:b.confidence,evidence:b.evidence.map((item,k)=>{
      const ref=evidence(item,label+'.evidence['+k+']',v.end,at);
@@ -262,7 +279,8 @@ function upgradeMixedV2(meta,body){
   return {...base,body:r.body??r.text,confidence:r.confidence,evidence:original,replaces:r.replaces,
    ...(refs.length>1?{evidence_passages:refs.map(({quote,occurrence})=>({quote,occurrence}))}:{})};
  });
- return {schema_version:3,records};
+ return {schema_version:3,records,
+  ...(missingBulletEvidence?{compatibility_mode:LEGACY_PLOT_NO_EVIDENCE}:{})};
 }
 
 function validate(meta,body){
@@ -351,7 +369,9 @@ async function save(body,metadata){
  const db=await openDb();
  await new Promise((resolve,reject)=>{
   const tx=db.transaction(STORE,'readwrite');
-  tx.objectStore(STORE).put({schema_version:validated.schema_version,records:validated.records,updatedAt:Date.now()},id);
+  tx.objectStore(STORE).put({schema_version:validated.schema_version,
+   ...(validated.compatibility_mode?{compatibility_mode:validated.compatibility_mode}:{}),
+   records:validated.records,updatedAt:Date.now()},id);
   tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('독서정보 저장 취소'));
   tx.onerror=()=>reject(tx.error||Error('독서정보 저장 오류'));
  });
