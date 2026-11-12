@@ -131,3 +131,9 @@ body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
 /* v3: expose plot history without collapsing the primary reading surface. */
 #insightsNavPlotHistory{white-space:nowrap;font-size:12px!important;padding:4px 6px!important}
 @media(max-width:390px){#insightsNavPlotHistory{font-size:11px!important;padding:3px!important}}
+
+/* Primary exit action: high contrast, explicitly labelled for accessibility. */
+.insights-shell #insightsClose{background:#000;color:#fff;border-color:#000;font-weight:700;white-space:nowrap}
+.insights-shell #insightsClose:hover,.insights-shell #insightsClose:active{background:#111;color:#fff}
+.insights-shell #insightsClose:focus-visible{outline:2px solid #000;outline-offset:3px}
+@media(max-width:360px){.insights-shell #insightsClose{font-size:13px;padding:5px 8px}}
