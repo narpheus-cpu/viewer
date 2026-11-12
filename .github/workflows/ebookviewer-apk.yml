@@ -1,4 +1,4 @@
-name: Build and verify EbookViewer 1.40 APK
+name: Build and verify EbookViewer 1.41 APK
 
 on:
   workflow_dispatch:
@@ -11,6 +11,7 @@ on:
       - 'android/**'
       - 'tests/reading-insights*.cjs'
       - 'tests/android-apk-file-open.cjs'
+      - 'tests/chapter-modal-focus-regression.cjs'
       - 'package.json'
 
 permissions:
@@ -83,6 +84,8 @@ jobs:
         run: VERIFY_ANDROID_ASSETS=1 npm run test:v3
       - name: Verify evidence excerpts on Web and staged Android reader
         run: VERIFY_ANDROID_ASSETS=1 npm run test:evidence
+      - name: Verify chapter-picker focus recovery and previous/next/select on Web/Android
+        run: VERIFY_ANDROID_ASSETS=1 node tests/chapter-modal-focus-regression.cjs
       - name: Run native selection menu Java test
         run: python3 android/tests/selection_menu.py
       - name: Run native bridge and timeline regression tests
@@ -122,7 +125,7 @@ jobs:
       - name: Publish APK as downloadable workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EbookViewer_v1.40_debug
+          name: EbookViewer_v1.41_debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -137,7 +140,7 @@ jobs:
           import hashlib,base64,json
           from pathlib import Path
           apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
-          filename='EbookViewer_v1.40-debug.apk'
+          filename='EbookViewer_v1.41-debug.apk'
           digest=hashlib.sha256(apk.read_bytes()).hexdigest()
           files={filename:apk.read_bytes(),filename+'.sha256':(digest+'  '+filename+'\\n').encode()}
           for name,content in files.items():
@@ -146,7 +149,7 @@ jobs:
               Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
           print('SHA256',digest)
           PY
-          for name in EbookViewer_v1.40-debug.apk EbookViewer_v1.40-debug.apk.sha256; do
+          for name in EbookViewer_v1.41-debug.apk EbookViewer_v1.41-debug.apk.sha256; do
             current_sha=$(gh api "repos/narpheus-cpu/viewer/contents/downloads/$name" --jq '.sha' 2>/dev/null || true)
             if [[ -n "$current_sha" ]]; then
               jq --arg sha "$current_sha" '.sha=$sha' "/tmp/$name.json" > "/tmp/$name.updated.json"
