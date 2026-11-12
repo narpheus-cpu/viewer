@@ -2382,9 +2382,9 @@ async function loadReaderFile(file){
       const normalized={...unpacked.metadata,records:unpacked.metadata.records.map(r=>({
         ...r,
         ...(r.category==='plot'?{
-          bullets:r.bullets.map(b=>({
-            ...b,evidence:b.evidence.map(e=>({...e,quote:e.quote.replace(/\r\n?/g,'\n')}))
-          }))
+          // v3 plot reports do not require (or display) bullet-level evidence.
+          // The parser has already validated and normalized legacy evidence.
+          bullets:r.bullets.map(b=>({...b}))
         }:{evidence:r.evidence.replace(/\r\n?/g,'\n'),
           ...(Array.isArray(r.evidence_passages)?{evidence_passages:r.evidence_passages.map(e=>({
             ...e,quote:e.quote.replace(/\r\n?/g,'\n')
