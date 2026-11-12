@@ -43,6 +43,8 @@ for(const [name,transform] of [
  ['event rejected',m=>m.records[0].category='event'],
  ['missing bullet confidence',m=>delete m.records[0].bullets[0].confidence],
  ['malformed legacy plot proof',m=>m.records[0].bullets[0].evidence='not a list'],
+ ['missing relation evidence',m=>delete m.records[1].evidence],
+ ['invented relation evidence',m=>m.records[1].evidence='원문에 나타나지 않은 가상의 설명'],
  ['future spoiler evidence',m=>m.records[0].bullets[0].evidence=[{quote:final,occurrence:1}]],
  ['broken plot pointer',m=>m.records[2].previous_plot_id=null],
  ['duplicate ID',m=>m.records[2].id='R00001'],
