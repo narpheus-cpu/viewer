@@ -15,7 +15,7 @@ function recordEvidence(r){return r.category==='plot'?'':
 function evidenceDisplay(r){
  const quotes=Array.isArray(r.evidence_passages)&&r.evidence_passages.length?
   r.evidence_passages.map(e=>e.quote):[r.evidence];
- return quotes.map(q=>window.ReaderInsightsData.formatEvidence(q)).join('\n근거: ');
+ return window.ReaderInsightsData.formatEvidence(quotes);
 }
 function plotVersions(){return records.filter(r=>r.category==='plot').sort((a,b)=>a.revealOffset-b.revealOffset);}
 function latestPlot(){return plotVersions().slice(-1)[0]||null;}

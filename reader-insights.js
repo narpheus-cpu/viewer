@@ -1,4 +1,4 @@
-/* Reading insights panel v3: cumulative plot first, individual bullet evidence and legacy v2 support. */
+/* Reading insights panel v3: plot first, with evidence for other categories and legacy v2 support. */
 (function(){
 'use strict';
 const D=()=>window.ReaderInsightsData;
@@ -12,7 +12,7 @@ function bookText(){try{return fullText||'';}catch{return '';}}
 function evidenceDisplay(r){
  const quotes=Array.isArray(r.evidence_passages)&&r.evidence_passages.length?
   r.evidence_passages.map(e=>e.quote):[r.evidence];
- return quotes.map(q=>D().formatEvidence(q)).join('\n근거: ');
+ return D().formatEvidence(quotes);
 }
 function bookCanonical(){try{return readerCanonical();}catch{return bookText();}}
 function panelOpen(){return !!overlay?.classList.contains('is-open');}

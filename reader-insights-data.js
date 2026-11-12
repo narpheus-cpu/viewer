@@ -68,9 +68,9 @@ function evidenceSentences(source){
  return parts;
 }
 function formatEvidence(source){
- const text=String(source??'');
- const sentences=evidenceSentences(text);
- if(sentences.length<=6)return text;
+ const passages=Array.isArray(source)?source:[String(source??'')];
+ const sentences=passages.flatMap(evidenceSentences);
+ if(sentences.length<=6)return passages.join('\n근거: ');
  return sentences.slice(0,3).join(' ')+' (중략) '+sentences.slice(-3).join(' ');
 }
 
