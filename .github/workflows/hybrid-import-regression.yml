@@ -9,6 +9,7 @@ on:
       - 'index.html'
       - 'tests/reading-insights-hybrid.cjs'
       - 'tests/reading-insights-compressed.cjs'
+      - 'tests/chapter-modal-focus-regression.cjs'
 
 permissions:
   contents: read
@@ -36,3 +37,4 @@ jobs:
           npm run test:hybrid
           npm run test:compressed
           npm run test:v3
+          node tests/chapter-modal-focus-regression.cjs
