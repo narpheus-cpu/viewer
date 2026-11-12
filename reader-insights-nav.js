@@ -269,7 +269,7 @@ function renderList(s){
   selected.map(rowHtml).join('')+'</div>',count:list.length,labels:(page+1)+' / '+total,prev:page>0,next:page+1<total};
 }
 function cardHtml(r,content,part,total){
- return '<div class="insights-type">'+esc(labels[r.category])+' · '+esc(confidence[r.confidence])+'</div>'+
+ return '<div class="insights-type">'+esc(labels[r.category])+(r.category==='plot'?' · 항목별 사실·해석 구분':' · '+esc(confidence[r.confidence]))+'</div>'+
   '<h3 class="insights-title">'+esc(r.title)+(total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
   '<div class="insights-body">'+esc(content)+'</div>'+
   '<div class="insights-proof">원문 근거와 추론 수준을 구별해 표시</div>';
@@ -284,11 +284,11 @@ function fits(r,portion){
 }
 function splitDetail(r){
  const surface=$('insightsPaper');
- const key='ev3|'+r.id+'|'+r.text.length+'|'+r.evidence.length+'|'+surface.clientWidth+'x'+surface.clientHeight;
+ const key='ev4|'+r.id+'|'+recordText(r).length+'|'+recordEvidence(r).length+'|'+surface.clientWidth+'x'+surface.clientHeight;
  if(detailCache.has(key))return detailCache.get(key);
- const text=String(r.text||'')+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
+ const text=r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confidence[b.confidence]+']\n근거: '+b.evidence.map(e=>window.ReaderInsightsData.formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):recordText(r)+'\n\n근거: '+window.ReaderInsightsData.formatEvidence(r.evidence);
  let offset=0,pieces=[],guard=0;
- while(offset<text.length&&guard++<300){
+ while(offset<text.length&&guard++<20000){
   const possible=Math.min(12000,text.length-offset);
   let low=1,high=possible,best=1;
   while(low<=high){
@@ -311,12 +311,13 @@ function splitDetail(r){
  const result=pieces.length?pieces:[''];detailCache.set(key,result);return result;
 }
 function renderRecord(){
- const r=byId.get(recordId);
+ const r=mode==='plot'?latestPlot():byId.get(recordId);
  if(!r)return {html:'',labels:'0 / 0',prev:false,next:false};
  const portions=splitDetail(r),total=portions.length;
  page=Math.max(0,Math.min(page,total-1));
  const linked=(r.related_ids||[]).filter(id=>byId.has(id));
  $('insightsNavRelated').hidden=!linked.length;
+ $('insightsNavPlotHistory').hidden=r.category!=='plot'||plotVersions().length<2;
  return {html:'<article class="insights-card">'+cardHtml(r,portions[page],page+1,total)+'</article>',
    labels:(page+1)+' / '+total,prev:page>0,next:page<total-1};
 }
@@ -330,11 +331,12 @@ function renderIfActive(){
  $('insightsNavBack').disabled=mode==='home'&&!stack.length;
  $('insightsNavQueryWrap').hidden=mode!=='search';
  $('insightsNavRelated').hidden=true;
+ $('insightsNavPlotHistory').hidden=true;
  if(mode==='search'){
   const input=$('insightsNavSearch');
   if(input.value!==query)input.value=query;
  }
- const result=mode==='record'?renderRecord():renderList(s);
+ const result=(mode==='record'||mode==='plot')?renderRecord():renderList(s);
  $('insightsPaper').innerHTML=result.html;
  $('insightsPageCount').textContent=result.labels||'0 / 0';
  $('insightsPrev').disabled=!result.prev;
@@ -344,8 +346,8 @@ function renderIfActive(){
 function paint(){if(active)requestRender();}
 function turn(delta){
  if(!active)return false;
- const s=snapshot(),count=mode==='record'?
-  Math.max(1,splitDetail(byId.get(recordId)||{text:'',title:''}).length):
+ const s=snapshot(),count=(mode==='record'||mode==='plot')?
+  Math.max(1,splitDetail(mode==='plot'?latestPlot():(byId.get(recordId)||{text:'',evidence:'',title:''})).length):
   Math.max(1,Math.ceil(itemsFor(s).length/listSize()));
  const next=Math.max(0,Math.min(count-1,page+delta));
  if(next!==page){page=next;paint();}
@@ -374,6 +376,7 @@ function init(){
  nav=document.createElement('div');nav.id='insightsNavigatorBar';nav.className='insights-nav-bar';nav.hidden=true;
  nav.innerHTML='<button type="button" id="insightsNavBack" aria-label="이전 탐색 화면">〈</button>'+
   '<strong id="insightsNavTitle">독서정보 탐색</strong>'+
+  '<button type="button" id="insightsNavPlotHistory" hidden>이전 줄거리</button>'+
   '<button type="button" id="insightsNavRelated" hidden>관련</button>'+
   '<button type="button" id="insightsNavFind">검색</button>'+
   '<div id="insightsNavQueryWrap" hidden><input id="insightsNavSearch" type="search" placeholder="인물 · 사건 · 단서 검색" aria-label="독서정보 검색어" autocomplete="off"></div>';
@@ -384,6 +387,7 @@ function init(){
  $('insightsNavBack').onclick=goBack;
  $('insightsNavFind').onclick=()=>openSearch('');
  $('insightsNavRelated').onclick=()=>push('related',{record:recordId});
+ $('insightsNavPlotHistory').onclick=()=>push('plot-history');
  $('insightsNavSearch').addEventListener('input',e=>{query=e.target.value.slice(0,100);page=0;paint();});
  $('insightsPaper').addEventListener('click',handleClick);
  nav.addEventListener('click',handleClick);
