@@ -14,15 +14,16 @@ const root=path.resolve(process.argv[2]||path.join(__dirname,'..'));
  for(const chapter of [1,2]){await page.evaluate(c=>readerGoChapter(c),chapter);await page.waitForFunction(()=>!restoreInProgress);assert.equal(await page.locator('#viewerCharCount').textContent(),'5/17자');checks++;}
  assert.match(await page.locator('#inputCharCount').getAttribute('title'),/제외/);assert.match(await page.locator('#viewerCharCount').getAttribute('title'),/제외/);checks+=2;
  // Upgrade existing valid page layouts while rejecting old count metadata alone.
+ const bookId=await page.evaluate(()=>activeRecentId);
  const before=await page.evaluate(()=>({anchor:readerAnchor(),pages:pages.slice(),anchors:pageAnchors.slice(),canonical:readerCanonical()}));
  for(const version of [null,'space-including-v0']){
   await page.evaluate(async version=>{const cache=await readerReadCache(activeRecentId);cache.chapterCounts=[99,99,99];cache.totalCount=297;if(version===null)delete cache.countVersion;else cache.countVersion=version;await readerStoreCache(cache);flushReadingSessionSave(true);await readingDatabaseWrite;},version);
-  await page.reload();await page.evaluate(()=>readerReady);await page.evaluate(()=>readerState.pendingCache);
+  await page.reload();await page.evaluate(()=>readerReady);if(root.includes('assets')){await page.evaluate(id=>openRecentBook(id),bookId);await page.waitForFunction(()=>pages.length>0&&!restoreInProgress,null,{timeout:30000});}await page.evaluate(()=>readerState.pendingCache);
   assert.equal(await page.evaluate(()=>readerStats.splits),0);assert.equal(await page.locator('#viewerCharCount').textContent(),'5/17자');assert.deepEqual(await page.evaluate(()=>({anchor:readerAnchor(),pages:pages.slice(),anchors:pageAnchors.slice(),canonical:readerCanonical()})),before);checks+=3;
   const updated=await page.evaluate(async()=>{const c=await readerReadCache(activeRecentId);return{valid:readerCountCacheValid(c),total:c.totalCount,counts:c.chapterCounts};});assert.deepEqual(updated,{valid:true,total:17,counts:[7,5,5]});checks++;
  }
  // Matching count metadata is reused without recounting or paginating on reopen.
- await page.reload();await page.evaluate(()=>readerReady);assert.equal(await page.evaluate(async()=>readerCountCacheValid(await readerReadCache(activeRecentId))),true);assert.equal(await page.evaluate(()=>readerStats.splits),0);assert.equal(await page.locator('#viewerCharCount').textContent(),'5/17자');checks+=3;
+ await page.reload();await page.evaluate(()=>readerReady);if(root.includes('assets')){await page.evaluate(id=>openRecentBook(id),bookId);await page.waitForFunction(()=>pages.length>0&&!restoreInProgress,null,{timeout:30000});}assert.equal(await page.evaluate(async()=>readerCountCacheValid(await readerReadCache(activeRecentId))),true);assert.equal(await page.evaluate(()=>readerStats.splits),0);assert.equal(await page.locator('#viewerCharCount').textContent(),'5/17자');checks+=3;
  assert.deepEqual(errors,[]);checks++;await context.close();
  }console.log(checks+' whitespace-excluded input/chapter/total counts, Unicode, unchanged text/anchors, count-only cache migration and cache reuse checks passed: '+root);
 }finally{await browser.close()}})().catch(e=>{console.error(String(e.stack||e).slice(0,2000));process.exitCode=1;});
