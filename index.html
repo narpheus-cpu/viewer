@@ -1231,8 +1231,15 @@ function readerGPTLayoutPages(){
     const style=getComputedStyle(flow),rect=viewport.getBoundingClientRect();
     const signature=[rect.width,rect.height,style.font,style.lineHeight,style.letterSpacing].join('|');
     const total=Math.max(1,Math.ceil((flow.scrollWidth+24-1)/(rect.width+24)));
+    const atEnd=state.total>1&&state.index>=state.total-1;
+    const changed=state.signature!==signature||state.total!==total;
     if(state.signature!==signature)state.starts.clear();
-    if(state.signature&&state.signature!==signature)state.index=readerGPTAnswerColumn(state.anchor);
+    if(state.signature&&changed){
+      // When a dialog resize creates extra columns, the reader already on
+      // the last page should stay at the actual last page. Otherwise reanchor
+      // by the visible text offset rather than preserving a stale page index.
+      state.index=atEnd?total-1:readerGPTAnswerColumn(state.anchor);
+    }
     state.total=total;state.index=Math.max(0,Math.min(total-1,state.index));state.signature=signature;
     readerGPTRenderAnswerPage();
     const actual=viewport.getBoundingClientRect();
