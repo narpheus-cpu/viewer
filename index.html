@@ -2246,7 +2246,7 @@ function readerGoChapter(index){
   if(readerLazyActive()){void readerLazyNavigate(anchor);return;}
   pageIndex=findPageIndexForAnchor(anchor);readerChooseAnchor(anchor);render();
 }
-let readerChapterLayer=null,readerChapterFocus=null,readerChapterOverflow=null;
+let readerChapterLayer=null,readerChapterFocus=null,readerChapterOverflow=null,readerChapterOpenPending=false;
 function readerChapterIsOpen(){return !!readerChapterLayer&&!readerChapterLayer.hidden;}
 function readerChapterViewport(){if(!readerChapterLayer)return;const v=window.visualViewport;Object.assign(readerChapterLayer.style,{left:(v?.offsetLeft||0)+'px',top:(v?.offsetTop||0)+'px',width:(v?.width||innerWidth)+'px',height:(v?.height||innerHeight)+'px'});}
 function readerChapterClose(){
@@ -2258,7 +2258,9 @@ function readerChapterClose(){
  scheduleRepaginate();
 }
 function readerChapterOpen(){
- if(restoreInProgress||!bookChapters.length||readerChapterIsOpen())return;
+ if(!bookChapters.length||readerChapterIsOpen())return;
+ if(restoreInProgress){readerChapterOpenPending=true;return;}
+ readerChapterOpenPending=false;
  readerChapterFocus=document.activeElement;readerChapterOverflow={body:document.body.style.overflow,root:document.documentElement.style.overflow,aria:viewerOverlay.getAttribute('aria-hidden')};
  const list=document.getElementById('readerChapterList');list.replaceChildren();const current=readerCurrentChapter();
  bookChapters.forEach((chapter,index)=>{const button=document.createElement('button');button.type='button';button.textContent=(index+1)+'. '+chapter.title;button.dataset.chapter=String(index);if(index===current)button.setAttribute('aria-current','page');button.onclick=()=>{readerChapterClose();readerGoChapter(index);};list.appendChild(button);});
@@ -4092,6 +4094,7 @@ function render(){
     scheduleReadingSessionSave(true);
     scheduleActiveRecentPositionSave();
     window.readerInsights?.observe();
+    if(readerChapterOpenPending)readerChapterOpen();
   }
 }
 
@@ -4287,6 +4290,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  readerChapterOpenPending=false;
   readerChapterClose();
   window.readerInsights?.close();
   window.readerInsights?.cancelCorrection();
