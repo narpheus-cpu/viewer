@@ -138,5 +138,11 @@ jobs:
               Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
           print('SHA256',digest)
           PY
-          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.34-debug.apk --input /tmp/EbookViewer_v1.34-debug.apk.json --jq '.content.download_url'
-          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.34-debug.apk.sha256 --input /tmp/EbookViewer_v1.34-debug.apk.sha256.json --jq '.content.download_url'
+          for name in EbookViewer_v1.34-debug.apk EbookViewer_v1.34-debug.apk.sha256; do
+            current_sha=$(gh api "repos/narpheus-cpu/viewer/contents/downloads/$name" --jq '.sha' 2>/dev/null || true)
+            if [[ -n "$current_sha" ]]; then
+              jq --arg sha "$current_sha" '.sha=$sha' "/tmp/$name.json" > "/tmp/$name.updated.json"
+              mv "/tmp/$name.updated.json" "/tmp/$name.json"
+            fi
+            gh api -X PUT "repos/narpheus-cpu/viewer/contents/downloads/$name" --input "/tmp/$name.json" --jq '.content.download_url'
+          done
