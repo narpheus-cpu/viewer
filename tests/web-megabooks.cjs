@@ -9,14 +9,16 @@ const sizes=(process.env.MEGABOOK_SIZES||'1200000,3200000,6200000').split(',').m
 const cases=sizes.map((min,i)=>({min,chapters:[48,68,96][i]||80}));
 const sentence='등장인물은 과거의 말을 떠올리고 현재의 선택을 조심스럽게 검토했다. 어떤 이유인지 이 시점에서는 알 수 없었다.';
 const para=sentence+'\n\n'+sentence+'\n\n';
+const giantParagraph=process.env.MEGABOOK_LONG_PARAGRAPHS==='1';
 function generate(min,chapters){
  const per=Math.ceil(min/chapters);
  let all=[];
  for(let n=0;n<chapters;n++){
   const marker='고유장면_'+String(n).padStart(3,'0');
   const chapter='['+String(n+1).padStart(3,'0')+'장]\n\n'+marker+'\n\n';
-  const count=Math.ceil((per-chapter.length)/para.length);
-  all.push(chapter+para.repeat(Math.max(1,count)));
+  const filler=giantParagraph?sentence:para;
+  const count=Math.ceil((per-chapter.length)/filler.length);
+  all.push(chapter+filler.repeat(Math.max(1,count)));
  }
  return all.join('\n\n');
 }
@@ -27,6 +29,7 @@ async function runCase(browser,c,kind){
  const context=await browser.newContext({viewport:{width:390,height:720},
   ...(isAndroid?{userAgent:'Mozilla/5.0 (Linux; Android 11; eInk) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'}:{})});
  const page=await context.newPage(),errors=[];
+ if(process.env.MEGABOOK_CPU_THROTTLE){const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.MEGABOOK_CPU_THROTTLE)});}
  page.on('pageerror',e=>errors.push(e.message));
  const prefix=isAndroid?'https://appassets.androidplatform.net/assets/':'https://reader.test/';
  await page.route(isAndroid?'https://appassets.androidplatform.net/**':'https://reader.test/**',async route=>{
@@ -62,6 +65,8 @@ async function runCase(browser,c,kind){
  assert.ok(state.visible.includes('고유장면_000'),'First chapter is visible');
  assert.ok(state.active,'Large book remains lazily paginated');
  assert.ok(state.canonical>0,'Canonical source computed');
+ const integrity=await page.evaluate(n=>({blockTextParity:cachedOriginalBlocks.length===cachedBlockTexts.length,chapterStartsStrict:chapterCanonicalStarts.every((v,i)=>!i||v>chapterCanonicalStarts[i-1]),markers:Array.from({length:n},(_,i)=>readerCanonical().includes('고유장면_'+String(i).padStart(3,'0'))).every(Boolean)}),c.chapters);
+ assert.ok(integrity.blockTextParity&&integrity.chapterStartsStrict&&integrity.markers,'All chapter markers, canonical offsets, and stable text blocks are preserved');
  const farChapter=c.chapters-2,farMarker='고유장면_'+String(farChapter).padStart(3,'0');
  const navStart=Date.now();
  await page.evaluate(c=>readerGoChapter(c),farChapter);
