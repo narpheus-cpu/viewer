@@ -1249,7 +1249,12 @@ function readerGPTLayoutPages(){
 }
 function readerGPTTurnAnswerPage(delta){
   const state=readerGPTAnswerPager;if(state.frame){cancelAnimationFrame(state.frame);state.frame=0;}
-  readerGPTLayoutPages();state.index=Math.max(0,Math.min(state.total-1,state.index+delta));readerGPTRenderAnswerPage();
+  readerGPTLayoutPages();
+  state.index=Math.max(0,Math.min(state.total-1,state.index+delta));readerGPTRenderAnswerPage();
+  // A page-counter update can change the flex height and therefore the number
+  // of CSS columns. Recalculate after rendering the new counter, not only
+  // before navigating, or the visible page can point to a stale column.
+  readerGPTLayoutPages();
 }
 function readerGPTStopAnswerGesture(){readerGPTAnswerPager.gesture=null;readerGPTAnswerPager.pointers.clear();}
 function setupReaderGPTAnswerPages(){
