@@ -9,7 +9,8 @@
     "test:apk-open": "node tests/android-apk-file-open.cjs",
     "test:evidence": "node tests/reading-insights-evidence.cjs",
     "test:v3": "node tests/reading-insights-v3.cjs",
-    "test:hybrid": "node tests/reading-insights-hybrid.cjs"
+    "test:hybrid": "node tests/reading-insights-hybrid.cjs",
+    "test:compressed": "node tests/reading-insights-compressed.cjs"
   },
   "devDependencies": {
     "jszip": "3.10.2",
