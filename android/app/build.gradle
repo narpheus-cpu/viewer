@@ -14,7 +14,7 @@ android {
         debug {
             debuggable true
             // Preview signature differs from the private release key: install side by side.
-            applicationIdSuffix '.preview133'
+            applicationIdSuffix '.preview134'
             versionNameSuffix '-preview'
         }
         release { minifyEnabled false }
