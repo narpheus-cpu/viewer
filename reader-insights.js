@@ -128,11 +128,18 @@ function currentEntries(){
   a.story_order-b.story_order:a.revealOffset-b.revealOffset);
  shown=shown.map(r=>{
   const prev=r.replaces?known.get(r.replaces):null;
-  return {...r,display:r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confLabels[b.confidence]+']\n근거: '+b.evidence.map(e=>D().formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):(r.body??r.text)+(prev?'\n\n이전 판단: '+(prev.body??prev.text):'')+'\n\n근거: '+evidenceDisplay(r)};
+  return {...r,display:r.category==='plot'?
+   (r.bullets.some(b=>b.evidence_status==='not_provided')?
+    '※ 이 버전은 항목별 원문 근거가 첨부되지 않았습니다. 원문 공개 위치만 확인했습니다.\n\n':'')+
+   r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confLabels[b.confidence]+']'+
+    (b.evidence.length?'\n근거: '+b.evidence.map(e=>D().formatEvidence(e.quote)).join('\n근거: '):'')).join('\n\n'):
+   (r.body??r.text)+(prev?'\n\n이전 판단: '+(prev.body??prev.text):'')+'\n\n근거: '+evidenceDisplay(r)};
  });
  const pct=text.length?Math.floor(limit/text.length*100):0;
  el('insightsSeen').textContent='읽은 범위 '+pct+'%';
- el('insightsStatus').textContent=unmatched?'위치 검증 실패 '+unmatched+'건':'';
+ el('insightsStatus').textContent=unmatched?'위치 검증 실패 '+unmatched+'건':
+  shown.some(r=>r.category==='plot'&&r.bullets.some(b=>b.evidence_status==='not_provided'))?
+  '줄거리 항목별 근거 미첨부':'';
 }
 function cardHtml(entry,portion,part=1,total=1){
  return '<div class="insights-type">'+escape(tabNames[entry.category])+(entry.subject?' · '+escape(entry.subject):'')+'</div>'+
