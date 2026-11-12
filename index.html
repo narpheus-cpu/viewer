@@ -1148,7 +1148,12 @@ function readerGPTAnswerPoint(offset){
 }
 function readerGPTSetAnswer(value,reset=false){
   const text=String(value||''),state=readerGPTAnswerPager;
-  if(!reset&&text===state.text)return;
+  if(!reset&&text===state.text){
+    // A no-op streamed update should not leave a stale frame queued after a
+    // font, viewport or dialog resize. Reconcile layout without touching DOM.
+    if(state.frame){cancelAnimationFrame(state.frame);state.frame=0;readerGPTLayoutPages();}
+    return;
+  }
   if(reset||!text.startsWith(state.text)){state.index=0;state.anchor=0;state.signature='';}
   state.text=text;state.dirty=true;readerGPTSchedulePages();
 }
@@ -1215,15 +1220,25 @@ function readerGPTRenderAnswerPage(){
 }
 function readerGPTLayoutPages(){
   if(!readerGPTIsOpen())return;
-  readerGPTCommitAnswer();readerGPTFitAnswerSettings();
+  readerGPTCommitAnswer();
   const state=readerGPTAnswerPager,viewport=document.getElementById('readerGPTAnswerViewport'),flow=document.getElementById('readerGPTAnswerFlow');
   if(!viewport?.clientWidth||viewport.clientHeight<1)return;
-  const style=getComputedStyle(flow),rect=viewport.getBoundingClientRect(),signature=[rect.width,rect.height,style.font,style.lineHeight,style.letterSpacing].join('|');
-  state.total=Math.max(1,Math.ceil((flow.scrollWidth+24-1)/(viewport.getBoundingClientRect().width+24)));
-  if(state.signature!==signature)state.starts.clear();
-  if(state.signature&&state.signature!==signature)state.index=readerGPTAnswerColumn(state.anchor);
-  state.index=Math.max(0,Math.min(state.total-1,state.index));state.signature=signature;
-  readerGPTRenderAnswerPage();
+  // Page-counter labels and settings caps can change flex layout at fractional
+  // widths, including AFTER the first width measurement. Converge synchronously
+  // rather than rendering a stale final column and clipping the answer.
+  for(let attempt=0;attempt<5;attempt++){
+    readerGPTFitAnswerSettings();
+    const style=getComputedStyle(flow),rect=viewport.getBoundingClientRect();
+    const signature=[rect.width,rect.height,style.font,style.lineHeight,style.letterSpacing].join('|');
+    const total=Math.max(1,Math.ceil((flow.scrollWidth+24-1)/(rect.width+24)));
+    if(state.signature!==signature)state.starts.clear();
+    if(state.signature&&state.signature!==signature)state.index=readerGPTAnswerColumn(state.anchor);
+    state.total=total;state.index=Math.max(0,Math.min(total-1,state.index));state.signature=signature;
+    readerGPTRenderAnswerPage();
+    const actual=viewport.getBoundingClientRect();
+    const recomputed=Math.max(1,Math.ceil((flow.scrollWidth+24-1)/(actual.width+24)));
+    if(actual.width===rect.width&&actual.height===rect.height&&recomputed===total)break;
+  }
 }
 function readerGPTTurnAnswerPage(delta){
   const state=readerGPTAnswerPager;if(state.frame){cancelAnimationFrame(state.frame);state.frame=0;}
