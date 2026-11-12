@@ -42,7 +42,7 @@ async function runCase(browser,c,kind){
  const startupMs=Date.now()-t;
  const uploadStart=Date.now();
  await page.locator('#txtFileInput').setInputFiles({name:'megabook-'+c.min+'.txt',mimeType:'text/plain',buffer:Buffer.from(source)});
- await page.waitForFunction(expected=>!openViewerBtn.disabled&&inputText.value.length===expected,null,{timeout:240000},source.length);
+ await page.waitForFunction(expected=>!openViewerBtn.disabled&&inputText.value.length===expected,source.length,{timeout:240000});
  const importMs=Date.now()-uploadStart;
  const bookLength=await page.evaluate(()=>inputText.value.length);
  assert.equal(bookLength,source.length,'TXT bytes and characters survive import');
