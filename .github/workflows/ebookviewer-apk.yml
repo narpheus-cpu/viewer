@@ -1,4 +1,4 @@
-name: Build and verify EbookViewer 1.33 APK
+name: Build and verify EbookViewer 1.34 APK
 
 on:
   workflow_dispatch:
@@ -71,6 +71,8 @@ jobs:
         run: npm run test:apk-open
       - name: Run all insights and navigation browser regressions
         run: npm run test:insights
+      - name: Verify schema v3 plots, version history and Web/Android rendering
+        run: VERIFY_ANDROID_ASSETS=1 npm run test:v3
       - name: Verify evidence excerpts on Web and staged Android reader
         run: VERIFY_ANDROID_ASSETS=1 npm run test:evidence
       - name: Run native selection menu Java test
@@ -112,7 +114,7 @@ jobs:
       - name: Publish APK as downloadable workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EbookViewer_v1.33_debug
+          name: EbookViewer_v1.34_debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -127,7 +129,7 @@ jobs:
           import hashlib,base64,json
           from pathlib import Path
           apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
-          filename='EbookViewer_v1.33-debug.apk'
+          filename='EbookViewer_v1.34-debug.apk'
           digest=hashlib.sha256(apk.read_bytes()).hexdigest()
           files={filename:apk.read_bytes(),filename+'.sha256':(digest+'  '+filename+'\\n').encode()}
           for name,content in files.items():
@@ -136,5 +138,5 @@ jobs:
               Path('/tmp/'+name+'.json').write_text(json.dumps(payload))
           print('SHA256',digest)
           PY
-          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.33-debug.apk --input /tmp/EbookViewer_v1.33-debug.apk.json --jq '.content.download_url'
-          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.33-debug.apk.sha256 --input /tmp/EbookViewer_v1.33-debug.apk.sha256.json --jq '.content.download_url'
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.34-debug.apk --input /tmp/EbookViewer_v1.34-debug.apk.json --jq '.content.download_url'
+          gh api -X PUT repos/narpheus-cpu/viewer/contents/downloads/EbookViewer_v1.34-debug.apk.sha256 --input /tmp/EbookViewer_v1.34-debug.apk.sha256.json --jq '.content.download_url'
