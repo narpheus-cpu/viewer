@@ -5,14 +5,14 @@ const quote='그녀는 열쇠를 발견하고 그것이 어디서 왔는지 아�
 const source='[1장]\n\n'+quote+'\n\n'+('그날의 일들은 아직 완전히 밝혀지지 않았다.\n\n'.repeat(70));
 const bullets=Array.from({length:240},(_,i)=>({
  text:'기록 '+String(i+1)+'번: 주인공은 앞선 선택을 돌아보면서도 사건의 원인을 단정하지 않는다. '+(i%9===0?'📚 뒤따르는 소식은 아직 확인되지 않았다.':'관련 사실과 추론을 구분한다.'),
- confidence:'fact',evidence:[{quote,occurrence:1}]
+ confidence:'fact'
 }));
 const metadata={schema_version:3,records:[{
  id:'R00001',category:'plot',subject:'현재까지 줄거리',title:'처음부터 여기까지의 누적 줄거리',
  scene_id:'S001',bullets,reveal:{quote,occurrence:1},previous_plot_id:null,
  entities:[],aliases:[],related_ids:[],importance:5
 }]};
-const expected=bullets.map((b,i)=>(i+1)+'. '+b.text+'\n[확인된 사실]\n근거: '+quote).join('\n\n');
+const expected=bullets.map((b,i)=>(i+1)+'. '+b.text+'\n[확인된 사실]').join('\n\n');
 async function browserCheck(browser,kind,width){
  const assets=kind==='android'?path.join(root,'android/app/src/main/assets'):root;
  const url=kind==='android'?'https://appassets.androidplatform.net/assets/index.html':'https://reader.test/';
@@ -64,6 +64,7 @@ async function browserCheck(browser,kind,width){
  });
  assert.equal(result.unfinished,false,'Every bullet can be reached without a fixed page cap');
  assert.equal(result.joined,expected,'Incremental page split preserves EVERY displayed character including whitespace/emoji');
+ assert.ok(!result.joined.includes('근거:'),'Plot report must never display source excerpts');
  assert.ok(result.pages>10&&result.pages<2000);
  assert.ok(result.overflow<=1,'No horizontal overflow on mobile');
  await page.locator('#insightsClose').click();
