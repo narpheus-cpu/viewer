@@ -12,6 +12,11 @@ const MAX_RECORDS=3000, MAX_JSON_BYTES=2*1024*1024, MAX_TEXT=12000;
 const DB_NAME='ebookViewerInsightsDBV2', STORE='books', PROGRESS='ebookViewerInsightsReadCursorV3:';
 let dbPromise=null, lastText=null,lastKey=null;
 const memory=new Map();
+const MAX_CACHED_INSIGHT_BOOKS=12;
+function rememberBook(id,metadata){
+ memory.delete(id);memory.set(id,metadata);
+ while(memory.size>MAX_CACHED_INSIGHT_BOOKS)memory.delete(memory.keys().next().value);
+}
 // Storage failures must never erase spoiler boundaries during the current session.
 const volatileReadState=new Map();
 
@@ -82,7 +87,21 @@ function occurrenceEnd(text,phrase,occurrence){
    All refs resolve against the unmodified book body, not against displayed excerpts. */
 function validateV3(meta,body){
  if(!Array.isArray(meta.records))validError('schema_version=3의 records 배열이 필요합니다.');
- const out=[],seen=new Map();let lastPlot=null,lastOffset=-1;
+ const out=[],seen=new Map(),occurrenceCache=new Map();let lastPlot=null,lastOffset=-1;
+ // Cumulative plot snapshots cite many of the same source passages. A single
+ // occurrence index avoids re-scanning 6M-character books for each bullet.
+ function sourceEnd(phrase,occurrence){
+  let ends=occurrenceCache.get(phrase);
+  if(!ends){ends=[];occurrenceCache.set(phrase,ends);}
+  let start=ends.length?ends[ends.length-1]:0;
+  while(ends.length<occurrence){
+   const at=body.indexOf(phrase,start);
+   if(at<0)return -1;
+   start=at+phrase.length;
+   ends.push(start);
+  }
+  return ends[occurrence-1];
+ }
  const str=(value,label,max)=>{if(typeof value!=='string'||!value.trim()||(max&&value.length>max))validError(label+' 문자열을 확인하세요.');return value;};
  const array=(value,label)=>{if(!Array.isArray(value))validError(label+' 배열이 필요합니다.');return value;};
  const aliases=(value,label)=>array(value,label).map((v,j)=>str(v,label+'['+j+']',160));
@@ -91,7 +110,7 @@ function validateV3(meta,body){
   str(ref.quote,label+'.quote',max);
   if(ref.quote.length<min)validError(label+'.quote의 길이가 맞지 않습니다.');
   if(!Number.isSafeInteger(ref.occurrence)||ref.occurrence<1)validError(label+'.occurrence가 잘못되었습니다.');
-  const at=occurrenceEnd(body,ref.quote,ref.occurrence);
+  const at=sourceEnd(ref.quote,ref.occurrence);
   if(at<0)validError(label+'의 원문 위치를 확인할 수 없습니다.');
   return {quote:ref.quote,occurrence:ref.occurrence,end:at};
  };
@@ -246,7 +265,7 @@ async function save(body,metadata){
   tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('독서정보 저장 취소'));
   tx.onerror=()=>reject(tx.error||Error('독서정보 저장 오류'));
  });
- memory.set(id,validated);return validated;
+ rememberBook(id,validated);return validated;
 }
 async function load(body){
  const id=key(body);if(memory.has(id))return memory.get(id);
@@ -257,7 +276,7 @@ async function load(body){
    q.onsuccess=()=>resolve(q.result||null);q.onerror=()=>reject(q.error);
   });
   const parsed=(found?.schema_version===2||found?.schema_version===3)&&Array.isArray(found.records)?found:null;
-  memory.set(id,parsed);return parsed;
+  rememberBook(id,parsed);return parsed;
  }catch(e){return null;}
 }
 /* v3: the old v2 "furthest displayed anywhere" key is intentionally not migrated.
