@@ -80,10 +80,10 @@ body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
 
 /* Reading navigator. All lists/cards occupy one e-ink page; nothing scrolls. */
 #insightsNavReturn[hidden],#insightsNavigatorBar[hidden],#insightsNavQueryWrap[hidden],
-#insightsNavRelated[hidden]{display:none!important}
+#insightsNavRelated[hidden],#insightsNavPlotHistory[hidden]{display:none!important}
 #insightsNavReturn{margin-left:auto;margin-right:7px}
 .insights-nav-active .insights-tabs{display:none!important}
-.insights-nav-bar{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;
+.insights-nav-bar{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto auto;
  align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #555;flex:0 0 auto}
 .insights-nav-bar strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .insights-nav-bar button{min-height:37px;padding:4px 8px;font-size:13px}
@@ -127,3 +127,7 @@ body.insights-correcting #insightsMarkRead:focus-visible{outline:3px solid #222}
 @media(max-width:370px){
  #readerInsightsLookupAction{font-size:12px;padding:6px 8px;min-height:36px}
 }
+
+/* v3: expose plot history without collapsing the primary reading surface. */
+#insightsNavPlotHistory{white-space:nowrap;font-size:12px!important;padding:4px 6px!important}
+@media(max-width:390px){#insightsNavPlotHistory{font-size:11px!important;padding:3px!important}}
