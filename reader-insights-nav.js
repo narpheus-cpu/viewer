@@ -279,7 +279,7 @@ function cardHtml(r,content,part,total){
  return '<div class="insights-type">'+esc(labels[r.category])+(r.category==='plot'?' · 항목별 사실·해석 구분':' · '+esc(confidence[r.confidence]))+'</div>'+
   '<h3 class="insights-title">'+esc(r.title)+(total==='…'||total>1?' <small>'+part+'/'+total+'</small>':'')+'</h3>'+
   '<div class="insights-body">'+esc(content)+'</div>'+
-  '<div class="insights-proof">원문 근거와 추론 수준을 구별해 표시</div>';
+  '<div class="insights-proof">'+(r.category==='plot'&&r.bullets?.some(b=>b.evidence_status==='not_provided')?'항목별 근거 미첨부 · 공개 위치만 확인':'원문 근거와 추론 수준을 구별해 표시')+'</div>';
 }
 function fits(r,portion){
  const surface=$('insightsPaper');
