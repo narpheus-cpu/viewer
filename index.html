@@ -477,7 +477,7 @@ function readerSyncBreakButtons(){
 }
 
 /* Paginate the requested section first; keep background work and cached layouts independent of the visible spread. */
-let readerLazySession=null,readerLazyPreparing=false,readerLazyDatabase=null;
+let readerLazySession=null,readerLazyPreparing=false,readerLazyDatabase=null,readerLazySaves=0;
 const readerLazyStats={sessions:0,chapterBuilds:0,chapterCacheHits:0,firstVisibleMs:0,yields:0};
 function readerLazyActive(){const s=readerLazySession;return !!s&&!s.cancelled&&!s.complete&&s.generation===readerState.generation&&s.source===fullText;}
 function readerLazyAlive(s){return s===readerLazySession&&!s.cancelled&&s.generation===readerState.generation&&s.source===fullText&&viewerOverlay.classList.contains('active');}
@@ -487,7 +487,7 @@ function readerLazyDB(){if(readerLazyDatabase)return readerLazyDatabase;readerLa
 async function readerLazyDeleteCache(id){try{const db=await readerBounded(readerLazyDB(),1500,'구간 캐시 삭제'),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');if(!id)store.clear();else{const q=store.openKeyCursor(IDBKeyRange.bound(id+':',id+':\uffff'));q.onsuccess=()=>{const e=q.result;if(e){store.delete(e.primaryKey);e.continue();}};}await transactionDone(tx);}catch{}}
 function readerLazyKey(s,c){return s.id+':'+readerLazyHash(s.signature)+':'+c;}
 async function readerLazyRead(s,c){try{const db=await readerBounded(readerLazyDB(),1500,'구간 캐시');return await readerBounded(new Promise((resolve,reject)=>{const q=db.transaction('chapters').objectStore('chapters').get(readerLazyKey(s,c));q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);}),1500,'구간 캐시');}catch{return null;}}
-async function readerLazySave(s,c,result){if(!s.id)return;try{const db=await readerLazyDB(),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');store.put({...result,signature:s.signature,length:s.source.length,version:READER_CACHE_VERSION,updatedAt:Date.now()},readerLazyKey(s,c));let n=0;const q=store.index('updatedAt').openKeyCursor(null,'prev');q.onsuccess=()=>{const e=q.result;if(e){if(++n>512)store.delete(e.primaryKey);e.continue();}};await transactionDone(tx);}catch{}}
+async function readerLazySave(s,c,result){if(!s.id)return;try{const db=await readerLazyDB(),tx=db.transaction('chapters','readwrite'),store=tx.objectStore('chapters');store.put({...result,signature:s.signature,length:s.source.length,version:READER_CACHE_VERSION,updatedAt:Date.now()},readerLazyKey(s,c));if(++readerLazySaves%12===0){let n=0;const q=store.index('updatedAt').openKeyCursor(null,'prev');q.onsuccess=()=>{const e=q.result;if(e){if(++n>512)store.delete(e.primaryKey);e.continue();}};}await transactionDone(tx);}catch{}}
 async function readerLazyImages(chapter){const sources=new Set();for(const html of bookChapters[chapter]?.blocks||[]){if(!html.includes('<img'))continue;const root=document.createElement('div');root.innerHTML=html;root.querySelectorAll('img').forEach(image=>sources.add(image.src));}if(!sources.size)return;await readerBounded(Promise.all([...sources].map(src=>new Promise(resolve=>{const image=new Image();image.onload=resolve;image.onerror=resolve;image.src=src;if(image.complete)resolve();}))),12000,'구간 이미지 준비');}
 function readerLazyBlock(s,index){if(!s.formatted.has(index))s.formatted.set(index,readerApplyBreaks(cachedOriginalBlocks[index],cachedQuoteRoles,cachedBlockStarts[index]));return s.formatted.get(index);}
 function readerLazyChapter(anchor){const starts=readerLazySession?.starts||chapterCanonicalStarts;let c=0;for(let i=1;i<starts.length;i++){if(starts[i]>anchor)break;c=i;}return c;}
@@ -514,12 +514,12 @@ async function readerLazyPump(s){
   const job=s.queue.shift();if(s.results[job.c])continue;
   try{
    let result=null;if(!job.checked){job.checked=true;await readerLazyImages(job.c);if(!readerLazyAlive(s))break;const saved=await readerLazyRead(s,job.c);if(!readerLazyAlive(s))break;if(saved&&saved.signature===s.signature&&saved.version===READER_CACHE_VERSION&&saved.length===s.source.length&&Array.isArray(saved.pages)&&saved.pages.length&&saved.pages.length===saved.anchors?.length&&saved.anchors[0]===s.starts[job.c]&&saved.pages.every(x=>typeof x==='string')&&saved.anchors.every((a,i)=>Number.isFinite(a)&&(!i||a>saved.anchors[i-1]))){result=saved;readerLazyStats.chapterCacheHits++;}else{job.generator=readerPaginateChapter(s.source,job.c,s);readerLazyStats.chapterBuilds++;}}
-   if(!result){const until=performance.now()+12;let step;do{step=job.generator.next();if(step.done){result=step.value;break;}}while(performance.now()<until);}
+   if(!result){const foreground=!s.opened||s.priority===job.c;const budget=foreground?12:(s.source.length>=1000000?4:8);const until=performance.now()+budget;let step;do{step=job.generator.next();if(step.done){result=step.value;break;}}while(performance.now()<until);}
    if(result){if(!readerLazyAlive(s))break;s.results[job.c]=result;s.done++;if(s.priority===job.c)s.priority=null;s.jobs.delete(job.c);for(let i=s.bounds[job.c];i<(s.bounds[job.c+1]??cachedOriginalBlocks.length);i++)s.formatted.delete(i);readerLazyAssemble(s);readerLazyUpdateUI();job.resolve(result);void readerLazySave(s,job.c,result);
     if(s.done===s.results.length){s.complete=true;cachedBreakKey='';readerLazyUpdateUI();s.cacheWrite=readerState.pendingCache=readerStoreCache(readerCreatePageCache(s.id,s.signature,s.previous,null));flushReadingSessionSave(true);flushActiveRecentPositionSave();}
    }else{s.queue=s.queue.filter(j=>j!==job);if(s.priority!==null&&s.priority!==job.c)s.queue.push(job);else s.queue.unshift(job);}
   }catch(error){job.reject(error);s.jobs.delete(job.c);s.error=error;setStatus('구간 '+(job.c+1)+' 계산 실패: '+error.message,true);}
-  readerLazyStats.yields++;await new Promise(resolve=>setTimeout(resolve,0));
+  readerLazyStats.yields++;const pause=s.opened&&s.priority!==job.c&&s.source.length>=1000000?48:0;await new Promise(resolve=>setTimeout(resolve,pause));
  }}finally{s.running=false;}
 }
 async function readerLazyNavigate(anchor,lastPage=false){
@@ -2107,17 +2107,19 @@ function readerPrepareChapterImages(){
   })));
   return chapterImagesReady;
 }
+let readerPreparedBlockTexts=null;
 function readerChapterBlocks(text){
-  chapterBlockBoundaries=new Set();chapterCanonicalStarts=[];
+  chapterBlockBoundaries=new Set();chapterCanonicalStarts=[];readerPreparedBlockTexts=null;
   if(!bookChapters.length||text!==fullText)return readerMarkdownNoteBlocks(text);
-  const blocks=[];let anchor=0;
+  const blocks=[],plainTexts=[];let anchor=0;
   bookChapters.forEach((chapter,index)=>{
     chapterBlockBoundaries.add(blocks.length);chapterCanonicalStarts.push(anchor);
     const part=chapter.blocks?chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
     const content=part.length?part:['<p></p>'];
     blocks.push(...content);
-    for(const html of content)anchor+=htmlToStableText(html).length+1;
+    for(const html of content){const plain=htmlToStableText(html);plainTexts.push(plain);anchor+=plain.length+1;}
   });
+  readerPreparedBlockTexts=plainTexts;
   return blocks;
 }
 // Rebuild chapter page ordinals only when pagination or chapter boundaries change.
@@ -3910,7 +3912,8 @@ function getPaginationBlocks(text){
   if(text!==cachedMarkdownSource){
     cachedMarkdownSource=text;
     cachedOriginalBlocks=readerChapterBlocks(text);
-    cachedBlockTexts=cachedOriginalBlocks.map(htmlToStableText);
+    cachedBlockTexts=readerPreparedBlockTexts&&readerPreparedBlockTexts.length===cachedOriginalBlocks.length?readerPreparedBlockTexts:cachedOriginalBlocks.map(htmlToStableText);
+    readerPreparedBlockTexts=null;
     cachedQuoteRoles=readerQuoteRoles(cachedBlockTexts.join('\n'));
     let offset=0;cachedBlockStarts=cachedBlockTexts.map(text=>{const start=offset;offset+=text.length+1;return start;});
     cachedBreakKey='';
