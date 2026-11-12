@@ -5,7 +5,7 @@
     "test": "node tests/reader.cjs && node tests/reader-tools.cjs && node tests/chapter-pages.cjs && node tests/sentence-periods.cjs && node tests/reopen.cjs && node tests/footnotes.cjs && node tests/note-gestures.cjs && node tests/chatgpt-connector.cjs && node tests/chatgpt-ui.cjs",
     "test:chapters": "node tests/web-large-book.cjs && node tests/web-chapter-controls.cjs && node tests/web-chapter-spread.cjs && node tests/browser-resume.cjs",
     "test:megabooks": "node tests/web-megabooks.cjs",
-    "test:insights": "node tests/reading-insights-cursor.cjs && node tests/reading-insights-selection-unit.cjs && node tests/reading-insights-nav.cjs && node tests/reading-insights-v2.cjs && node tests/reading-insights-selection.cjs && node tests/reading-insights-navigator-web.cjs",
+    "test:insights": "node tests/reading-insights-cursor.cjs && node tests/reading-insights-selection-unit.cjs && node tests/reading-insights-nav.cjs && node tests/reading-insights-v2.cjs && node tests/reading-insights-selection.cjs && node tests/reading-insights-navigator-web.cjs && node tests/reading-insights-audit.cjs",
     "test:apk-open": "node tests/android-apk-file-open.cjs",
     "test:evidence": "node tests/reading-insights-evidence.cjs",
     "test:v3": "node tests/reading-insights-v3.cjs"
