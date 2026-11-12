@@ -202,20 +202,26 @@ function asItemEntity(e){
  return {type:'entity',id:e.id,title:e.name,caption:e.recordIds.size+'건의 관련 기록',importance:e.recordIds.size};
 }
 function homeItems(s){
- const related=lens(s);
+ const plots=plotVersions(),legacy=records.filter(r=>r.category==='event');
  return [
-  {type:'route',id:'lens',title:'지금 읽는 장면',caption:'현재 위치에 연결된 기록 '+related.length+'건'},
+  ...(plots.length?[{type:'route',id:'plot',title:'현재까지 줄거리',caption:'지금까지의 누적 줄거리 · '+plots.length+'개 버전'}]:
+   legacy.length?[{type:'route',id:'timeline',title:'기존 사건 연표',caption:'v2 기존 기록 '+legacy.length+'건'}]:[]),
+  {type:'route',id:'lens',title:'지금 읽는 장면',caption:'현재 장면에 연결된 기록'},
   {type:'route',id:'people',title:'인물 찾아가기',caption:'주요 인물 '+filterPerson().length+'명'},
-  {type:'route',id:'timeline',title:'사건 지도',caption:'공개된 주요 사건 '+records.filter(r=>r.category==='event').length+'건'},
+  {type:'route',id:'relations',title:'인물 관계',caption:'확인된 관계와 변화'},
+  {type:'route',id:'characters',title:'인물별 분석',caption:'목표·욕망·두려움·동기'},
   {type:'route',id:'clues',title:'핵심 단서',caption:'등록된 단서 '+filterClue().length+'개'},
-  {type:'route',id:'recent',title:'최근 변화',caption:'최근에 드러난 정보와 수정된 해석'},
-  {type:'route',id:'search',title:'통합 검색',caption:'이름·별칭·사건·단서 검색'},
-  {type:'route',id:'all',title:'전체 정보 보기',caption:'기존 네 범주로 모든 기록 확인'}
+  {type:'route',id:'recent',title:'최근 변화',caption:'최근에 드러난 정보'},
+  {type:'route',id:'search',title:'통합 검색',caption:'인물·줄거리·관계·단서 검색'},
+  {type:'route',id:'all',title:'범주별 독서정보',caption:'읽은 범위의 네 범주 선택'}
  ];
 }
 function itemsFor(s){
  switch(mode){
   case 'home':return homeItems(s);
+  case 'plot-history':return plotVersions().slice().reverse().map(asItemRecord);
+  case 'relations':return records.filter(r=>r.category==='relation').slice().sort((a,b)=>b.revealOffset-a.revealOffset).map(asItemRecord);
+  case 'characters':return records.filter(r=>r.category==='character').slice().sort((a,b)=>b.revealOffset-a.revealOffset).map(asItemRecord);
   case 'lens':return lens(s).map(asItemRecord);
   case 'people':return filterPerson().map(asItemEntity);
   case 'clues':return filterClue().map(asItemEntity);
@@ -235,8 +241,8 @@ function itemsFor(s){
  }
 }
 function titleFor(){
- const map={home:'독서정보 탐색',lens:'지금 읽는 장면',people:'인물 찾아가기',clues:'핵심 단서',
-  timeline:'사건 지도',recent:'최근 변화',search:'정보 검색',
+ const map={home:'독서정보 탐색',plot:'현재까지 줄거리','plot-history':'줄거리 변화 이력',relations:'인물 관계',characters:'인물별 분석',lens:'지금 읽는 장면',people:'인물 찾아가기',clues:'핵심 단서',
+  timeline:'기존 사건 연표',recent:'최근 변화',search:'정보 검색',
   entity:chosen?.name||'인물 정보',history:(chosen?.name||'인물')+' · 변화 이력',
   related:'연관 기록',record:byId.get(recordId)?.title||'기록'};
  return map[mode]||'독서정보';
@@ -351,7 +357,7 @@ function navigateItem(kind,id){
   if(id==='all'){exitToCategory();$('insightsPanel').querySelector('.insights-tabs').hidden=false;api()?.refresh?.();return;}
   if(id==='search'){openSearch('');$('insightsNavSearch').focus({preventScroll:true});return;}
   if(id==='history'){push('history',{entity:chosen});return;}
-  if(['lens','people','timeline','clues','recent'].includes(id)){push(id);return;}
+  if(['plot','plot-history','relations','characters','lens','people','timeline','clues','recent'].includes(id)){push(id);return;}
  }else if(kind==='record')goRecord(id);
  else if(kind==='entity'){
   const entity=entityById.get(id);if(entity)push('entity',{entity});
