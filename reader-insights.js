@@ -1,12 +1,12 @@
-/* Reading insights panel v2: only supplied evidence-based data, always page turns. */
+/* Reading insights panel v3: cumulative plot first, individual bullet evidence and legacy v2 support. */
 (function(){
 'use strict';
 const D=()=>window.ReaderInsightsData;
 const el=id=>document.getElementById(id);
-const tabs=[['event','사건 연표'],['relation','인물 관계'],['character','인물별 분석'],['clue','핵심 단서']];
+const tabs=[['plot','현재까지 줄거리'],['relation','인물 관계'],['character','인물별 분석'],['clue','핵심 단서']];
 const tabNames=Object.fromEntries(tabs),confLabels={fact:'확인된 사실',strong_inference:'근거 있는 해석',tentative:'잠정적 해석'};
 const escape=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-let overlay=null,paper=null,category='event',entries=[],shown=[],insightPages=[],pageNumber=0;
+let overlay=null,paper=null,category='plot',entries=[],shown=[],insightPages=[],pageNumber=0;
 let currentKey='',latestToken=0,focused=null,gesture=null,layoutKey='',offsetCache=new Map(),unmatched=0;
 function bookText(){try{return fullText||'';}catch{return '';}}
 function bookCanonical(){try{return readerCanonical();}catch{return bookText();}}
@@ -118,11 +118,12 @@ function currentEntries(){
  unmatched=missing.length;
  const known=new Map(mapped.map(r=>[r.id,r]));
  shown=mapped.filter(r=>r.category===category);
+ if(category==='plot')shown=shown.slice().sort((a,b)=>a.revealOffset-b.revealOffset).slice(-1);
  shown.sort((a,b)=>category==='event'&&a.story_order!=null&&b.story_order!=null&&a.story_order!==b.story_order?
   a.story_order-b.story_order:a.revealOffset-b.revealOffset);
  shown=shown.map(r=>{
   const prev=r.replaces?known.get(r.replaces):null;
-  return {...r,display:r.text+(prev?'\n\n이전 판단: '+prev.text:'')+'\n\n근거: '+D().formatEvidence(r.evidence)};
+  return {...r,display:r.category==='plot'?r.bullets.map((b,i)=>(i+1)+'. '+b.text+'\n['+confLabels[b.confidence]+']\n근거: '+b.evidence.map(e=>D().formatEvidence(e.quote)).join('\n근거: ')).join('\n\n'):(r.body??r.text)+(prev?'\n\n이전 판단: '+(prev.body??prev.text):'')+'\n\n근거: '+D().formatEvidence(r.evidence)};
  });
  const pct=text.length?Math.floor(limit/text.length*100):0;
  el('insightsSeen').textContent='읽은 범위 '+pct+'%';
@@ -132,7 +133,7 @@ function cardHtml(entry,portion,part=1,total=1){
  return '<div class="insights-type">'+escape(tabNames[entry.category])+(entry.subject?' · '+escape(entry.subject):'')+'</div>'+
  '<h3 class="insights-title">'+escape(entry.title)+(total>1?' <small>('+part+'/'+total+')</small>':'')+'</h3>'+
  '<div class="insights-body">'+escape(portion)+'</div>'+
- '<div class="insights-proof">'+escape(confLabels[entry.confidence])+'</div>';
+ '<div class="insights-proof">'+escape(entry.category==='plot'?'항목별 근거·확실성 확인':confLabels[entry.confidence])+'</div>';
 }
 function fits(entry,string){
  const probe=document.createElement('article');probe.className='insights-card insights-measure';
@@ -144,7 +145,7 @@ function split(entry){
  const text=entry.display;
  if(!text)return [{...entry,portion:'',part:1,total:1}];
  const result=[];let offset=0,loop=0;
- while(offset<text.length&&loop++<500){
+ while(offset<text.length&&loop++<20000){
   let length=Math.min(text.length-offset,12000),best=1;
   if(fits(entry,text.slice(offset,offset+length)))best=length;
   else{
@@ -207,21 +208,31 @@ async function open(){
  observe();const token=++latestToken;
  currentKey=D().key(bookText());entries=[];offsetCache.clear();layoutKey='';pageNumber=0;
  focused=document.activeElement;overlay.classList.add('is-open');overlay.setAttribute('aria-hidden','false');
- setTab('event');paper.replaceChildren();el('insightsPageCount').textContent='0 / 0';
+ setTab('plot');paper.replaceChildren();el('insightsPageCount').textContent='0 / 0';
  el('insightsClose').focus({preventScroll:true});
  const loaded=await D().load(bookText());
  if(!panelOpen()||token!==latestToken||currentKey!==D().key(bookText()))return;
- entries=loaded?.records||[];layoutKey='';window.ReaderInsightsNavigator?.onLoaded?.();paint();
+ entries=loaded?.records||[];
+  const isLegacy=!entries.some(r=>r.category==='plot')&&entries.some(r=>r.category==='event');
+  const first=overlay.querySelector('[data-insight-tab=plot], [data-insight-tab=event]');
+  if(first){first.dataset.insightTab=isLegacy?'event':'plot';first.textContent=isLegacy?'기존 사건 연표':'현재까지 줄거리';}
+  if(isLegacy)setTab('event');
+  layoutKey='';window.ReaderInsightsNavigator?.onLoaded?.();paint();
 }
 async function importJson(file){
  if(!file||!bookText())return;
- if(file.size>2097152){alert('JSON 정보는 2MB 이하여야 합니다.');return;}
+ if(file.size>32*1024*1024){alert('독서정보 JSON은 32MB 이하여야 합니다.');return;}
  try{
   const obj=JSON.parse(await file.text());
   const checked=D().validate(obj,bookText());
   if(!confirm('현재 책의 독서정보를 '+checked.records.length+'건으로 교체할까요?'))return;
   await D().save(bookText(),checked);
-  entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;window.ReaderInsightsNavigator?.onLoaded?.();paint();
+  entries=checked.records;offsetCache.clear();layoutKey='';pageNumber=0;
+   const isLegacy=!entries.some(r=>r.category==='plot')&&entries.some(r=>r.category==='event');
+   const first=overlay.querySelector('[data-insight-tab=plot], [data-insight-tab=event]');
+   if(first){first.dataset.insightTab=isLegacy?'event':'plot';first.textContent=isLegacy?'기존 사건 연표':'현재까지 줄거리';}
+   setTab(isLegacy?'event':'plot');
+   window.ReaderInsightsNavigator?.onLoaded?.();paint();
  }catch(e){alert(e.message||String(e));}
 }
 
