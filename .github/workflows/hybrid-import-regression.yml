@@ -8,6 +8,7 @@ on:
       - 'reader-insights*.js'
       - 'index.html'
       - 'tests/reading-insights-hybrid.cjs'
+      - 'tests/reading-insights-compressed.cjs'
 
 permissions:
   contents: read
@@ -33,4 +34,5 @@ jobs:
           VERIFY_ANDROID_ASSETS: '1'
         run: |
           npm run test:hybrid
+          npm run test:compressed
           npm run test:v3
