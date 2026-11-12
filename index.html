@@ -4359,6 +4359,15 @@ function readerBrowserViewportChanged(){
 syncVisualViewport();
 addEventListener('blur',readerBrowserPauseLayout);
 addEventListener('focus',()=>{if(readerBrowserResume.away||readerBrowserResume.settling)readerBrowserScheduleResume();});
+/* Some Android WebViews return to foreground without dispatching focus after
+   native dialogs. A real touch in the visible reader must resume deferred
+   pagination rather than leaving a stale layout permanently locked. */
+function readerBrowserResumeOnInput(){
+ if(readerBrowserResume.away&&document.visibilityState==='visible'&&viewerOverlay.classList.contains('active'))
+  readerBrowserScheduleResume();
+}
+for(const type of ['pointerdown','touchstart','mousedown','keydown'])
+ viewerOverlay.addEventListener(type,readerBrowserResumeOnInput,{capture:true,passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')readerBrowserPauseLayout();else readerBrowserScheduleResume();});
 addEventListener('pageshow',event=>{if(event.persisted)readerBrowserScheduleResume();});
 addEventListener('resize',readerBrowserViewportChanged);
