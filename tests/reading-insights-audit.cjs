@@ -27,6 +27,9 @@ async function browserCheck(browser,kind,width){
  });
  await page.goto(url);await page.evaluate(()=>readerReady);
  await page.locator('#inputText').fill(source);
+ // Android's recent-file picker can remain open after boot; explicitly dismiss it
+ // before testing the normal book-open control (as in the shipped APK smoke test).
+ await page.evaluate(()=>{if(typeof hideRecentHistory==='function')hideRecentHistory();});
  await page.locator('#openViewerBtn').click();
  await page.waitForFunction(()=>pages.length>0&&!restoreInProgress,null,{timeout:45000});
  const begin=Date.now();
