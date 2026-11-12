@@ -205,7 +205,9 @@ function validateV3(meta,body){
    exact source substrings within their respective spoiler reveal limits. */
 function upgradeMixedV2(meta,body){
  const seen=new Map();
- const declaredUnverified=meta?.source_metadata?.plot_style==='compressed_reconstructed_full_report_no_evidence';
+ const declaredUnverified=
+  meta?.source_metadata?.plot_style==='compressed_reconstructed_full_report_no_evidence'||
+  meta?.metadata?.plot_style==='full_rewritten_compressed_reports_without_evidence';
  let missingBulletEvidence=0;
  function matches(s,label){
   if(typeof s!=='string'||!s.trim())validError(label+'의 원문 인용이 비어 있습니다.');
@@ -341,11 +343,11 @@ function parse(raw){
  }
  if(Number(v3)+Number(v2)+Number(mixed)!==1)validError('서로 다른 독서정보 시작 표식을 함께 사용할 수 없습니다.');
  if(text.split(v3?BEGIN:v2?OLD_BEGIN:OLD_START).length!==2)validError('독서정보 시작 표식이 중복되었습니다.');
- const regex=v3?/(?:\r?\n){2}<<<READER_INSIGHTS_V3_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V3_END>>>\s*$/:
-  v2?/(?:\r?\n){2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/:
-  /(?:\r?\n){2}<<<READER_INSIGHTS_V2_START>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
+ const regex=v3?/(?:\r?\n){1,2}<<<READER_INSIGHTS_V3_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V3_END>>>\s*$/:
+  v2?/(?:\r?\n){1,2}<<<READER_INSIGHTS_V2_BEGIN>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/:
+  /(?:\r?\n){1,2}<<<READER_INSIGHTS_V2_START>>>\r?\n([\s\S]*?)\r?\n<<<READER_INSIGHTS_V2_END>>>\s*$/;
  const m=regex.exec(text);
- if(!m)validError('통합 TXT 끝의 시작·종료 표식, 빈 줄 또는 JSON 경계를 확인하세요.');
+ if(!m)validError('통합 TXT 끝의 독서정보 표식이 행 단위로 정확히 닫혀 있는지 확인하세요.');
  const body=text.slice(0,m.index);
  if(m[1].length>(v3||mixed?32*1024*1024:MAX_JSON_BYTES))validError('독서정보 JSON이 허용 용량을 넘었습니다.');
  let meta;try{meta=JSON.parse(m[1]);}catch(e){validError('JSON 파싱 오류: '+e.message);}
