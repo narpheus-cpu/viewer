@@ -2,13 +2,17 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const labels={event:'사건 연표',relation:'인물 관계',character:'인물별 분석',clue:'핵심 단서'};
+const labels={plot:'현재까지 줄거리',event:'기존 사건 연표',relation:'인물 관계',character:'인물별 분석',clue:'핵심 단서'};
 const confidence={fact:'확인된 사실',strong_inference:'근거 있는 해석',tentative:'잠정적 해석'};
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const norm=value=>String(value??'').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/g,' ').trim();
 let nav=null,active=false,mode='home',query='',pendingQuery='',chosen=null,recordId='',page=0;
 let stack=[],records=[],byId=new Map(),entities=[],entityById=new Map(),recordNames=new Map(),detailCache=new Map(),cacheKey='';
 function api(){return window.readerInsights;}
+function recordText(r){return r.category==='plot'?(r.bullets||[]).map(b=>b.text).join(' '):String(r.body??r.text??'');}
+function recordEvidence(r){return r.category==='plot'?(r.bullets||[]).flatMap(b=>(b.evidence||[]).map(e=>e.quote)).join(' '):String(r.evidence||'');}
+function plotVersions(){return records.filter(r=>r.category==='plot').sort((a,b)=>a.revealOffset-b.revealOffset);}
+function latestPlot(){return plotVersions().slice(-1)[0]||null;}
 function snapshot(){return api()?.navigationSnapshot?.()||{records:[],readEnd:0,bookLength:0,currentAnchor:0,pageText:'',bookKey:''};}
 function hasData(){return records.length>0;}
 function setTitle(title){$('insightsNavTitle').textContent=title;}
@@ -23,6 +27,7 @@ function makeEntity(id,name,type,aliases=[]){
 }
 function linkEntity(entry,record){if(entry)entry.recordIds.add(record.id);}
 function fallbackEntities(record){
+  if(record.category==='plot')return [];
  const subject=String(record.subject||'').trim();if(!subject)return [];
  if(record.category==='character')return [{id:'person:'+subject,name:subject,type:'person',aliases:record.aliases||[]}];
  if(record.category==='relation'){
@@ -74,7 +79,7 @@ function onLoaded(){
   active=false;mode='home';pendingQuery='';setVisibility(false);
   return;
  }
- active=true;stack=[];page=0;mode='home';
+ active=true;stack=[];page=0;mode=latestPlot()?'plot':'home';
  if(pendingQuery){
   const word=pendingQuery;pendingQuery='';
   setSearch(word,true);
@@ -176,7 +181,7 @@ function rankSearch(queryText){
  const scored=[];
  for(const r of records){
   let score=0;
-  const subject=norm(r.subject),title=norm(r.title),description=norm(r.text),proof=norm(r.evidence);
+  const subject=norm(r.subject),title=norm(r.title),description=norm(recordText(r)),proof=norm(recordEvidence(r));
   if(subject===q)score+=130;else if(subject.includes(q))score+=75;
   if(title.includes(q))score+=65;
   if(description.includes(q))score+=25;
@@ -191,7 +196,7 @@ function rankSearch(queryText){
 function filterPerson(){return entities.filter(e=>e.type==='person');}
 function filterClue(){return entities.filter(e=>e.type==='object'||e.type==='place'||e.type==='concept');}
 function asItemRecord(r){
- return {type:'record',id:r.id,title:r.title,caption:labels[r.category]+' · '+(r.subject||r.evidence.slice(0,20)),importance:r.importance||3};
+ return {type:'record',id:r.id,title:r.title,caption:labels[r.category]+' · '+(r.subject||recordEvidence(r).slice(0,20)),importance:r.importance||3};
 }
 function asItemEntity(e){
  return {type:'entity',id:e.id,title:e.name,caption:e.recordIds.size+'건의 관련 기록',importance:e.recordIds.size};
