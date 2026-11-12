@@ -45,12 +45,12 @@ assert.equal(parsed.metadata.schema_version,3);
 assert.equal(parsed.metadata.compatibility_mode,'legacy-v2-compressed-plot-no-evidence');
 assert.deepEqual(parsed.metadata.records.filter(r=>r.category==='plot').map(r=>r.bullets.length),[3,2,4]);
 assert.deepEqual(parsed.metadata.records.filter(r=>r.category==='plot').map(r=>r.previous_plot_id),[null,'R00001','R00003']);
-assert.equal(parsed.metadata.records[0].bullets[0].evidence_status,'not_provided');
-assert.deepEqual(parsed.metadata.records[0].bullets[0].evidence,[]);
+assert.ok(!('evidence_status' in parsed.metadata.records[0].bullets[0]));
+assert.ok(!('evidence' in parsed.metadata.records[0].bullets[0]));
 assert.equal(parsed.metadata.records[1].evidence_passages.length,2);
 assert.equal(D.validate(parsed.metadata,source).compatibility_mode,parsed.metadata.compatibility_mode);
 const strict=structuredClone(parsed.metadata);delete strict.compatibility_mode;
-assert.throws(()=>D.validate(strict,source),/원문 근거/,'Strict v3 refuses unproved bullets');
+assert.equal(D.validate(strict,source).schema_version,3,'Official v3 accepts compressed bullets without evidence');
 const notDeclared=structuredClone(meta);delete notDeclared.source_metadata.plot_style;
 assert.throws(()=>D.validate(notDeclared,source),/근거 배열/,'Unknown hybrid does not bypass proof requirement');
 const bad=structuredClone(meta);bad.records[2].reveal.quote='원문에 절대로 등장하지 않는 가상의 문장이다.';
@@ -71,7 +71,7 @@ for(const [style,separator] of [
  assert.equal(reopened.body,source,'The novel text cannot change at the marker boundary');
  assert.equal(reopened.metadata.compatibility_mode,'legacy-v2-compressed-plot-no-evidence');
  assert.equal(reopened.metadata.records.filter(r=>r.category==='plot').length,3);
- assert.equal(reopened.metadata.records[0].bullets[0].evidence_status,'not_provided');
+ assert.ok(!('evidence' in reopened.metadata.records[0].bullets[0]));
 }
 console.log('2 uploaded generator delimiter and metadata-style variants passed');
 
@@ -114,7 +114,7 @@ async function browserCheck(browser,android){
  assert.ok(current.includes('현재의 갈등: 수첩을 찾았지만'),'Latest snapshot appears as compact report');
  assert.ok(current.includes('남은 의문: 주소의 의미'),'Latest snapshot includes its own conclusion');
  assert.ok(!current.includes('회수: 수첩을 집으로 가져감.'),'Old bullet not blindly appended');
- assert.ok(current.includes('항목별 원문 근거가 첨부되지 않았습니다'),'Missing evidence is clearly disclosed');
+ assert.ok(!current.includes('근거 미첨부')&&!current.includes('원문 근거'),'Plot is clean, without evidence warnings');
  assert.ok(!current.includes('근거: undefined')&&!current.includes('근거: \n'),'No fabricated or blank citations shown');
  assert.ok(await page.locator('#insightsNavPlotHistory').isVisible(),'Previous snapshots remain accessible');
  await page.locator('#insightsNavPlotHistory').click();
