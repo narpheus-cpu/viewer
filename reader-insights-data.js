@@ -4,6 +4,7 @@
 const BEGIN='<<<READER_INSIGHTS_V3_BEGIN>>>';
 const END='<<<READER_INSIGHTS_V3_END>>>';
 const OLD_BEGIN='<<<READER_INSIGHTS_V2_BEGIN>>>';
+const OLD_START='<<<READER_INSIGHTS_V2_START>>>'; // legacy generator typo
 const OLD_END='<<<READER_INSIGHTS_V2_END>>>';
 const CATEGORIES_V3=new Set(['plot','relation','character','clue']);
 const CATEGORIES=new Set(['event','relation','character','clue']);
@@ -167,7 +168,17 @@ function validateV3(meta,body){
     const prev=seen.get(r.replaces);
     if(prev.category!==r.category||prev.rawOffset>reveal.end)validError(id+'.replaces의 범주나 위치가 다릅니다.');
    }
-   const row={...base,body:text,text,confidence:r.confidence,evidence,replaces:r.replaces,
+   // Some source-only generators preserve multiple disconnected evidence quotes.
+   // Keep each original passage, and validate it independently against the read cutoff.
+   const evidence_passages=r.evidence_passages===undefined?[]:
+    array(r.evidence_passages,id+'.evidence_passages').map((e,k)=>{
+     const ref=quote(e,id+'.evidence_passages['+k+']');
+     if(ref.end>reveal.end||!evidence.includes(ref.quote))
+      validError(id+'.evidence_passages['+k+']가 근거 범위 또는 공개 시점을 벗어났습니다.');
+     return {quote:ref.quote,occurrence:ref.occurrence};
+    });
+   const row={...base,body:text,text,confidence:r.confidence,evidence,
+    evidence_passages,replaces:r.replaces,
     story_order:Number.isInteger(r.story_order)?r.story_order:null};
    out.push(row);seen.set(id,row);
   }
