@@ -88,9 +88,9 @@ function occurrenceEnd(text,phrase,occurrence){
 /* Every plot is a fully independent, source-verified cumulative snapshot.
    All refs resolve against the unmodified book body, not against displayed excerpts. */
 function validateV3(meta,body){
- // Tagged transitional TXT may be displayed without per-bullet proof.
- // Native v3 remains strict; none of the missing evidence is synthesized.
- const allowUnverifiedPlot=meta?.compatibility_mode===LEGACY_PLOT_NO_EVIDENCE;
+ // Plot snapshots are compact reports: native v3 doesn't require bullet proof.
+ // Disclosure (reveal.quote/occurrence) remains mandatory and is source-verified.
+ const legacyPlot=meta?.compatibility_mode===LEGACY_PLOT_NO_EVIDENCE;
  if(!Array.isArray(meta.records))validError('schema_version=3의 records 배열이 필요합니다.');
  const out=[],seen=new Map(),occurrenceCache=new Map();let lastPlot=null,lastOffset=-1;
  // Cumulative plot snapshots cite many of the same source passages. A single
@@ -152,18 +152,16 @@ function validateV3(meta,body){
     const value=str(b.text,label+'.text');
     if(/^\s*\d+[.)]\s/.test(value))validError(label+'에는 번호를 직접 넣지 마세요.');
     if(!CONFIDENCE.has(b.confidence))validError(label+'.confidence가 잘못되었습니다.');
+    // Missing or empty evidence is valid in plot. No proof/status fields are
+    // synthesized in normalized v3 records. Old evidenced files still load.
+    if(b.evidence===undefined||(Array.isArray(b.evidence)&&!b.evidence.length))
+     return {text:value,confidence:b.confidence};
     const ev=array(b.evidence,label+'.evidence');
-    if(!ev.length){
-     if(!allowUnverifiedPlot||b.evidence_status!=='not_provided')
-      validError(label+'의 원문 근거가 없습니다.');
-     return {text:value,confidence:b.confidence,evidence:[],
-      evidence_status:'not_provided'};
-    }
-    return {text:value,confidence:b.confidence,evidence:ev.map((e,k)=>{
+    for(const [k,e] of ev.entries()){
      const q=quote(e,label+'.evidence['+k+']');
      if(q.end>reveal.end)validError(label+'의 근거가 줄거리 공개 시점보다 뒤입니다.');
-     return {quote:q.quote,occurrence:q.occurrence};
-    })};
+    }
+    return {text:value,confidence:b.confidence};
    });
    const row={...base,previous_plot_id:r.previous_plot_id,bullets:checked};
    out.push(row);seen.set(id,row);lastPlot=row;
@@ -197,7 +195,7 @@ function validateV3(meta,body){
   if(!target||target.id===row.id||target.rawOffset>row.rawOffset)validError(row.id+'.related_ids가 잘못되었거나 아직 공개되지 않았습니다.');
  }
  return {schema_version:3,records:out,
-  ...(allowUnverifiedPlot?{compatibility_mode:LEGACY_PLOT_NO_EVIDENCE}:{})};
+  ...(legacyPlot?{compatibility_mode:LEGACY_PLOT_NO_EVIDENCE}:{})};
 }
 
 
