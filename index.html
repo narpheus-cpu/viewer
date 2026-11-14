@@ -3444,6 +3444,8 @@ const viewerDefaults={
   breakAdverbs:false,
   sentenceSpacing:false
 };
+let viewerSettingsUpdatedAt=0;
+let viewerSettingsSnapshot='';
 let viewerSettings=loadViewerSettings();
 
 const viewerControls={
@@ -3455,21 +3457,48 @@ const viewerControls={
   padRight:['#padRightRange','#padRightNumber']
 };
 
-function loadViewerSettings(){
-  /* Android SharedPreferences 설정 읽기는 아래 원본 localStorage 읽기로 대체. */
+function parseViewerSettings(raw){
   try{
-    const raw=localStorage.getItem(VIEWER_STORAGE);
-    if(raw){
-      const parsed=JSON.parse(raw);
-      return {...viewerDefaults,...parsed};
-    }
-  }catch(e){}
-  return {...viewerDefaults};
+    const value=JSON.parse(raw);
+    if(value&&['serif','sans','mono','custom'].includes(value.font)&&Number.isFinite(value.fontSize))return value;
+  }catch{}
+  return null;
+}
+
+function loadViewerSettings(){
+  let local=null;
+  let native=null;
+  try{local=parseViewerSettings(localStorage.getItem(VIEWER_STORAGE));}catch{}
+  try{native=parseViewerSettings(window.AndroidReader?.readSettings?.());}catch{}
+  const revision=value=>Number.isFinite(value?.updatedAt)?value.updatedAt:0;
+  const saved=native&&(!local||revision(native)>revision(local))?native:local;
+  if(!saved)return {...viewerDefaults};
+  const {updatedAt,...settings}=saved;
+  viewerSettingsUpdatedAt=revision(saved);
+  const raw=JSON.stringify(saved);
+  if(saved!==local)writeViewerSettings(raw);
+  if(saved!==native)saveNativeViewerSettings(raw);
+  const restored={...viewerDefaults,...settings};
+  viewerSettingsSnapshot=JSON.stringify(restored);
+  return restored;
+}
+
+function writeViewerSettings(raw){
+  try{localStorage.setItem(VIEWER_STORAGE,raw);}catch{}
+}
+
+function saveNativeViewerSettings(raw){
+  try{window.AndroidReader?.saveSettings?.(raw);}catch{}
 }
 
 function saveViewerSettings(){
-  /* Android SharedPreferences 설정 쓰기는 아래 원본 localStorage 쓰기로 대체. */
-  try{ localStorage.setItem(VIEWER_STORAGE,JSON.stringify(viewerSettings)); }catch(e){}
+  const snapshot=JSON.stringify(viewerSettings);
+  if(viewerSettingsSnapshot===snapshot)return;
+  viewerSettingsSnapshot=snapshot;
+  viewerSettingsUpdatedAt=Math.max(Date.now(),viewerSettingsUpdatedAt+1);
+  const raw=JSON.stringify({...viewerSettings,updatedAt:viewerSettingsUpdatedAt});
+  saveNativeViewerSettings(raw);
+  writeViewerSettings(raw);
 }
 
 /* ---------------- 업로드 글꼴 저장 ---------------- */
@@ -3517,15 +3546,15 @@ async function getSavedFont(){
 async function saveFontRecord(record){
   const db=await openFontDatabase();
   return new Promise((resolve,reject)=>{
-    const request=db.transaction(FONT_STORE_NAME,'readwrite')
-      .objectStore(FONT_STORE_NAME).put(record,'current');
-    request.onsuccess=()=>{
+    const transaction=db.transaction(FONT_STORE_NAME,'readwrite');
+    transaction.objectStore(FONT_STORE_NAME).put(record,'current');
+    transaction.oncomplete=()=>{
       db.close();
       resolve();
     };
-    request.onerror=()=>{
+    transaction.onabort=()=>{
       db.close();
-      reject(request.error||new Error('글꼴을 저장할 수 없습니다.'));
+      reject(transaction.error||new Error('글꼴을 저장할 수 없습니다.'));
     };
   });
 }
@@ -3546,13 +3575,12 @@ async function deleteSavedFont(){
   });
 }
 
-async function installCustomFont(record,{select=false,repaginateAfter=false}={}){
+async function installCustomFont(record){
   if(!record)return false;
   const fingerprint=await readerFingerprintFont(record);
   if(customFontReady&&readerState.fontId===fingerprint){
     customFontOption.disabled=false;
     customFontOption.textContent=`${record.name} (업로드)`;
-    if(select){viewerSettings.font='custom';applyViewerSettings(repaginateAfter);}
     return true;
   }
   const load=(async()=>{
@@ -3576,16 +3604,27 @@ async function installCustomFont(record,{select=false,repaginateAfter=false}={})
     }
     readerState.fontId=fingerprint;customFontReady=true;
     customFontOption.disabled=false;customFontOption.textContent=`${record.name} (업로드)`;
-    if(select)viewerSettings.font='custom';
-    applyViewerSettings(repaginateAfter);
     return true;
   })();
   readerState.fontPromise=load.catch(()=>{});
   return load;
 }
 
-async function applyCustomFont(record){
-  return installCustomFont(record,{select:true,repaginateAfter:true});
+async function restoreViewerPreferences(){
+  applyViewerSettingsVisuals();
+  try{
+    const savedFont=await readerBounded(getSavedFont(),5000,'저장된 글꼴 읽기');
+    if(viewerSettings.font!=='custom'){
+      void installCustomFont(savedFont).catch(error=>setFontUploadStatus(error.message,true));
+      return;
+    }
+    if(!savedFont)throw Error('저장된 글꼴 파일을 찾을 수 없습니다. 글꼴 파일을 다시 올려 주세요.');
+    await installCustomFont(savedFont);
+    setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
+  }catch(error){
+    setFontUploadStatus(error.message,true);
+  }
+  applyViewerSettingsVisuals();
 }
 
 
@@ -3607,9 +3646,10 @@ fontFile.addEventListener('change',async()=>{
   try{
     setFontUploadStatus('글꼴을 저장하고 적용하는 중입니다...');
     const saved={name:file.name,mime:file.type||'application/octet-stream',data:await file.arrayBuffer()};
-    await readerFingerprintFont(saved);
-    await applyCustomFont(saved);
+    await installCustomFont(saved);
     await saveFontRecord(saved);
+    viewerSettings.font='custom';
+    applyViewerSettings(true);
     setFontUploadStatus(`저장됨: ${file.name}`);
   }catch(error){
     setFontUploadStatus(error.message||'글꼴을 저장하지 못했습니다.',true);
@@ -3778,10 +3818,11 @@ function applyViewerSettings(repaginateAfter=true){
 function bindViewerPair(key,rangeSel,numSel){
   const range=$(rangeSel),num=$(numSel);
 
-  const live=value=>{
+  const live=(value,source)=>{
     viewerSettings[key]=clampValue(key,value);
-    range.value=viewerSettings[key];
-    num.value=viewerSettings[key];
+    if(source!==range)range.value=viewerSettings[key];
+    if(source!==num)num.value=viewerSettings[key];
+    if(key==='fontSize')saveViewerSettings();
     repaginateDeferredBySettings=true;
     queueLiveViewerSettings();
   };
@@ -3789,16 +3830,23 @@ function bindViewerPair(key,rangeSel,numSel){
   const commit=()=>commitViewerSettings();
 
   /* 드래그 중에는 전체 페이지 재분할 금지 */
-  range.addEventListener('input',()=>live(range.value));
+  range.addEventListener('input',()=>live(range.value,range));
   /* 모바일 Safari/Chrome 모두 손을 뗀 뒤 한 번 확정 */
   range.addEventListener('change',commit);
   range.addEventListener('pointerup',commit);
   range.addEventListener('touchend',commit,{passive:true});
 
   /* 숫자 입력 중에도 키 입력마다 재분할하지 않는다. */
-  num.addEventListener('input',()=>live(num.value));
-  num.addEventListener('change',commit);
-  num.addEventListener('blur',commit);
+  num.addEventListener('input',()=>{
+    if(num.value!==''&&num.validity.valid)live(num.value,num);
+  });
+  const commitNumber=()=>{
+    if(num.value!=='')viewerSettings[key]=clampValue(key,num.value);
+    range.value=num.value=viewerSettings[key];
+    commit();
+  };
+  num.addEventListener('change',commitNumber);
+  num.addEventListener('blur',commitNumber);
   num.addEventListener('keydown',e=>{
     if(e.key==='Enter'){
       e.preventDefault();
@@ -4482,25 +4530,11 @@ if(syncReading){
 }
 (async()=>{
   try{
-    const [dbReading,savedFont]=await Promise.all([loadReadingSessionDB(),getSavedFont().catch(()=>null)]);
+    const [dbReading]=await Promise.all([loadReadingSessionDB(),restoreViewerPreferences()]);
     let reading=newestReadingRecord([syncReading,dbReading]);
     reading=await readerHydrateReading(reading);
     reading=await window.__browserRecoverReading(reading);
     if(!userEditedAfterRestore&&reading)applyReadingRecordToInput(reading);
-    if(savedFont){
-      if(viewerSettings.font==='custom'){
-        try{
-          const oldFingerprint=savedFont.fingerprint;
-          await installCustomFont(savedFont,{select:false,repaginateAfter:false});
-          if(!oldFingerprint)void saveFontRecord(savedFont);
-          setFontUploadStatus(`저장된 글꼴을 불러왔습니다: ${savedFont.name}`);
-        }catch(error){viewerSettings.font='serif';saveViewerSettings();setFontUploadStatus(error.message,true);}
-      }else{
-        // Registration is deferred until initialization finishes, and cannot trigger a reflow.
-        void installCustomFont(savedFont,{select:false,repaginateAfter:false}).catch(error=>setFontUploadStatus(error.message,true));
-      }
-    }else if(viewerSettings.font==='custom'){viewerSettings.font='serif';saveViewerSettings();}
-    applyViewerSettings(false);
     readerState.initializing=false;
     if(reading&&!userEditedAfterRestore&&!readerState.cancelled)await restoreReadingSession(reading);
     else readerSetLoading(false);
