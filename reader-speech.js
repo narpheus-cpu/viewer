@@ -29,6 +29,11 @@ toolbar.innerHTML = `
  </div>
  <div id="speechStatus" role="status" aria-live="polite"></div>
  <div id="speechOptionsStatus" role="status"></div>`;
+const localLink=document.createElement('a');
+localLink.id='speechLocalOpen';localLink.href=ORIGIN;
+localLink.target='_blank';localLink.rel='noopener';
+localLink.textContent='로컬 실행 화면 열기';localLink.hidden=true;
+toolbar.append(localLink);
 $('chapterNav').before(toolbar);
 const noteLabel = document.createElement('label');
 noteLabel.className = 'reader-spacing-option';
@@ -108,15 +113,19 @@ function connect() {
     frame = document.createElement('iframe');
     frame.hidden = true;
     frame.title = 'Supertonic 3 로컬 도우미';
+    frame.allow = 'local-network-access; local-network; loopback-network';
     frame.src = ORIGIN + '/supertonic3/bridge.html';
     const timer = setTimeout(() => {
+      removeEventListener('message',ready);
       frame.remove();frame = null;connecting = null;
-      reject(Error('로컬 낭독 도우미를 실행해 주세요. SupertonicReader 폴더의 실행.bat를 여세요.'));
+      localLink.hidden=false;
+      reject(Error('실행.bat로 도우미를 켜 주세요. 공개 웹에서는 사이트 설정의 로컬 네트워크 접근을 허용하거나 로컬 실행 화면을 여세요.'));
     }, 8000);
     const ready = event => {
       if (event.origin !== ORIGIN || event.source !== frame?.contentWindow ||
           event.data?.type !== 'ebook-speech' || event.data.action !== 'ready') return;
       clearTimeout(timer);removeEventListener('message',ready);resolve(frame);
+      localLink.hidden=true;
     };
     addEventListener('message',ready);
     frame.onload = () => frame.contentWindow.postMessage({type:'ebook-speech',action:'connect'},ORIGIN);
@@ -127,7 +136,14 @@ function connect() {
 addEventListener('message', event => {
   if (event.origin !== ORIGIN || event.source !== frame?.contentWindow || event.data?.type !== 'ebook-speech') return;
   const message = event.data, request = requests.get(message.id);
-  if (!request) return;
+  if (!request) {
+    if(message.action==='error'){
+      for(const [id,item] of requests)if(item.action==='synthesize'){
+        clearTimeout(item.timer);item.reject(Error(message.message));requests.delete(id);
+      }
+    }
+    return;
+  }
   if (message.action === 'progress') {
     if (session && !session.paused) status(`모델 준비 중 ${message.loaded}/${message.total}`);
     return;
@@ -347,7 +363,7 @@ function cancelRequests() {
 function stop(clear = true) {
   const old = session;session = null;
   if (old) {
-    old.source?.stop();notify(old);old.queue.length = 0;
+    old.source?.stop();old.finishAudio?.();notify(old);old.queue.length = 0;
   }
   cancelRequests();
   if (clear) selected = null;
@@ -392,7 +408,12 @@ async function play(run,item) {
   await new Promise(resolve => {
     const source = audioContext.createBufferSource();
     source.buffer = buffer;source.connect(audioContext.destination);run.source = source;
-    source.onended = () => { if (run.source===source) run.source=null;source.disconnect();resolve(); };
+    const finish=()=>{
+      source.onended=null;
+      if(run.source===source)run.source=null;
+      run.finishAudio=null;source.disconnect();resolve();
+    };
+    run.finishAudio=finish;source.onended=finish;
     source.start();
   });
 }

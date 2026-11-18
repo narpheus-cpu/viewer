@@ -5,6 +5,7 @@
 #speechToolbar #speechEngine{max-width:260px}
 #speechStatus:empty,#speechOptionsStatus:empty{display:none}
 #speechStatus,#speechOptionsStatus{margin-top:3px;line-height:1.3}
+#speechLocalOpen{font-size:12px;color:inherit;text-decoration:underline}
 #speechSentenceDialog,#readerMp3Dialog{max-width:min(640px,94vw);max-height:85vh;box-sizing:border-box;border:1px solid #000;background:#fff;color:#000;padding:12px}
 #speechSentenceDialog::backdrop,#readerMp3Dialog::backdrop{background:#0006}
 #speechSentenceDialog header,#readerMp3Dialog header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
