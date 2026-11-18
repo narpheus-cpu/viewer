@@ -1,7 +1,7 @@
 /* App files only. User books remain in the reader's existing local database. */
-const CACHE = 'ebook-reader-app-mobile-2';
+const CACHE = 'ebook-reader-app-mobile-3';
 const CORE = [
-  './', './index.html', './reader-speech.js?v=4', './reader-speech.css?v=3',
+  './', './index.html', './reader-speech.js?v=5', './reader-speech.css?v=3',
   './reader-insights.css?v=9', './reader-insights-data.js?v=15',
   './reader-insights.js?v=15', './reader-insights-nav.js?v=11',
   './supertonic3/browser-worker.mjs', './supertonic3/asset-list.mjs', './supertonic3/upstream.mjs',
@@ -9,7 +9,7 @@ const CORE = [
 ];
 addEventListener('install', event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
-  await cache.addAll(CORE);
+  await cache.addAll(CORE.map(path => new Request(new URL(path,location.href),{cache:'reload'})));
   await skipWaiting();
 })()));
 addEventListener('activate', event => event.waitUntil((async () => {
@@ -26,7 +26,7 @@ addEventListener('fetch', event => {
     const hit = await cache.match(event.request);
     if (event.request.mode !== 'navigate' && hit) return hit;
     try {
-      const response = await fetch(event.request);
+      const response = await fetch(event.request,event.request.mode === 'navigate' ? {cache:'no-cache'} : undefined);
       if (response.ok && (event.request.mode === 'navigate' ||
           /\.(?:js|mjs|css|json)$/.test(url.pathname))) await cache.put(event.request,response.clone());
       return response;

@@ -7,7 +7,8 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,
+const WEB_ENGINE_SCOPE = 'direct-web-v2';
+const defaults = {engine:directBrowser||mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
   `<option value="${sex}${n}">${sex==='M'?'남성':'여성'} ${n}</option>`)).join('');
@@ -86,6 +87,8 @@ if (mobile) {
   $('readerMp3Open').textContent = 'MP3 만들기 (PC용)';
   $('readerMp3Open').disabled = true;
   $('readerMp3Open').title = 'PC의 오프라인 고속 도우미에서 사용할 수 있습니다.';
+} else if (directBrowser) {
+  $('speechEngine').querySelector('[value="native"]').textContent += ' (PC 도우미 필요)';
 }
 const appOfflineReady = directBrowser && 'serviceWorker' in navigator
   ? navigator.serviceWorker.register('./reader-sw.js').then(() => navigator.serviceWorker.ready)
@@ -181,7 +184,14 @@ function saveLocal() {
 }
 try { mergePreferences(JSON.parse(localStorage.getItem(STORAGE) || '{}')); }
 catch (error) { optionStatus('듣기 옵션 불러오기 실패 · ' + error.message); }
-if (mobile && preferences.engine?.value === 'native') delete preferences.engine;
+// Older web versions defaulted to native without an explicit choice. Migrate once,
+// retaining all unrelated preferences and any subsequent explicit native choice.
+if (directBrowser && (preferences.engine?.scope !== WEB_ENGINE_SCOPE ||
+    (mobile && preferences.engine?.value === 'native'))) {
+  revision = Math.max(revision,...Object.values(preferences).map(item => item.revision+1));
+  preferences.engine = {value:'browser',revision,scope:WEB_ENGINE_SCOPE};
+  saveLocal();
+} else if (mobile && preferences.engine?.value === 'native') delete preferences.engine;
 applyPreferences();
 if (directBrowser && settings().engine === 'browser') {
   $('speechAssetStatus').textContent = '처음에는 [낭독 파일 저장]을 눌러 주세요. 약 395 MB · 본문은 이 기기 안에서 처리됩니다.';
@@ -202,7 +212,9 @@ function connect() {
       removeEventListener('message',ready);
       frame.remove();frame = null;connecting = null;
       localLink.hidden=false;
-      reject(Error('실행.bat로 도우미를 켜 주세요. 공개 웹에서는 사이트 설정의 로컬 네트워크 접근을 허용하거나 로컬 실행 화면을 여세요.'));
+      reject(Error(directBrowser
+        ? '고속 방식에는 PC 도우미가 필요합니다. 오프라인 브라우저로 바꾸면 실행.bat 없이 들을 수 있습니다.'
+        : '실행.bat로 PC 고속 낭독 도우미를 켜 주세요.'));
     }, 8000);
     const ready = event => {
       if (event.origin !== ORIGIN || event.source !== frame?.contentWindow ||
@@ -249,16 +261,17 @@ async function request(action, data = {}) {
   });
 }
 const rpc = (path,body = {}) => request('rpc',{path,body});
-let preferenceReady = (mobile || (directBrowser && settings().engine === 'browser') ? Promise.resolve() : rpc('/preferences').then(async remote => {
+let preferenceReady = (mobile || directBrowser ? Promise.resolve() : rpc('/preferences').then(async remote => {
   mergePreferences(remote);applyPreferences();saveLocal();
   if (Object.keys(preferences).length) await rpc('/preferences',{patch:preferences});
 }).catch(error => optionStatus('듣기 옵션은 이 브라우저에 저장됩니다. ' + error.message)));
 function remember(key,value) {
   revision = Math.max(Date.now()*1000,revision+1,...Object.values(preferences).map(item => item.revision+1));
   const patch = {[key]:{value,revision}};
+  if (key === 'engine' && directBrowser) patch[key].scope = WEB_ENGINE_SCOPE;
   Object.assign(preferences,patch);
   const local = saveLocal();
-  if (mobile || (directBrowser && settings().engine === 'browser')) {
+  if (mobile || directBrowser) {
     if (local) optionStatus('');
     return;
   }
