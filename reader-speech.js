@@ -7,22 +7,27 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const WEB_ENGINE_SCOPE = 'direct-web-v2';
-const defaults = {engine:directBrowser||mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,
-  mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false};
+const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,
+  mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
+  panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
   `<option value="${sex}${n}">${sex==='M'?'남성':'여성'} ${n}</option>`)).join('');
 const toolbar = document.createElement('section');
 toolbar.id = 'speechToolbar';
 toolbar.setAttribute('aria-label','오프라인 낭독');
 toolbar.innerHTML = `
- <div class="speech-actions">
-  <button id="speechPickSentence" type="button">시작 문장 선택</button>
+ <div class="speech-main-actions">
   <button id="speechPrevious" type="button" aria-label="이전 문장">&lt;&lt;</button>
+  <button id="speechNext" type="button" aria-label="다음 문장">&gt;&gt;</button>
   <button id="speechListen" type="button">듣기</button>
   <button id="speechPause" type="button" disabled>일시중지</button>
+ </div>
+ <details id="speechSettings">
+ <summary id="speechSettingsToggle">듣기 설정<span id="speechCompactStatus" role="status" aria-live="polite"></span></summary>
+ <div class="speech-settings-body">
+ <div class="speech-actions">
+  <button id="speechPickSentence" type="button">시작 문장 선택</button>
   <button id="speechStop" type="button">중지</button>
-  <button id="speechNext" type="button" aria-label="다음 문장">&gt;&gt;</button>
   <button id="readerMp3Open" type="button">MP3 만들기</button>
   <button id="speechPrepare" type="button">낭독 파일 저장</button>
   <button id="speechPrepareCancel" type="button" hidden>파일 저장 취소</button>
@@ -36,12 +41,13 @@ toolbar.innerHTML = `
  <div id="speechStatus" role="status" aria-live="polite"></div>
  <div id="speechAssetStatus" role="status"></div>
  <progress id="speechAssetProgress" max="100" hidden></progress>
- <div id="speechOptionsStatus" role="status"></div>`;
+ <div id="speechOptionsStatus" role="status"></div>
+ </div></details>`;
 const localLink=document.createElement('a');
 localLink.id='speechLocalOpen';localLink.href=ORIGIN;
 localLink.target='_blank';localLink.rel='noopener';
 localLink.textContent='로컬 실행 화면 열기';localLink.hidden=true;
-toolbar.append(localLink);
+toolbar.querySelector('.speech-settings-body').append(localLink);
 $('chapterNav').before(toolbar);
 const noteLabel = document.createElement('label');
 noteLabel.className = 'reader-spacing-option';
@@ -76,11 +82,35 @@ let source = null, blockCache = new Map(), noteCache = new Map();
 let selected = null, session = null, audioContext = null, generation = 0, pendingListen = 0;
 const status = text => { $('speechStatus').textContent = text; };
 const optionStatus = text => { $('speechOptionsStatus').textContent = text; };
-const settings = () => Object.fromEntries(Object.entries(defaults).map(([key,value]) =>
-  [key, preferences[key]?.value ?? value]));
+const settings = () => {
+  const value=Object.fromEntries(Object.entries(defaults).map(([key,fallback]) =>
+    [key, preferences[key]?.value ?? fallback]));
+  if(mobile)value.engine='browser';
+  return value;
+};
 const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',
   showNotes:'viewerBracketNotes',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
-  mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split'};
+  mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
+  mp3From:'readerMp3From',mp3To:'readerMp3To'};
+const speechSettings=$('speechSettings');
+speechSettings.addEventListener('toggle',()=>{
+  if(speechSettings.open!==settings().panelOpen)remember('panelOpen',speechSettings.open);
+  updateCompactStatus();
+});
+document.addEventListener('pointerdown',event=>{
+  if(speechSettings.open&&!toolbar.contains(event.target))speechSettings.open=false;
+});
+function updateCompactStatus(){
+  const message=$('speechStatus').textContent;
+  const problem=[message,$('speechAssetStatus').textContent,$('speechOptionsStatus').textContent].some(text=>/실패|초과|못했/.test(text));
+  const preparing=$('speechPrepare').disabled;
+  $('speechCompactStatus').textContent=speechSettings.open?'':
+    problem?' · 확인 필요':preparing?' · 파일 저장 중':message?' · '+message.replace(/^Supertonic 3 /,'').slice(0,22):'';
+}
+const speechStatusObserver=new MutationObserver(updateCompactStatus);
+for(const id of ['speechStatus','speechAssetStatus','speechOptionsStatus'])
+  speechStatusObserver.observe($(id),{childList:true,subtree:true,characterData:true});
+speechStatusObserver.observe($('speechPrepare'),{attributes:true,attributeFilter:['disabled']});
 if (mobile) {
   const option = $('speechEngine').querySelector('[value="native"]');
   option.disabled = true;option.textContent += ' (PC용)';
@@ -95,7 +125,7 @@ const appOfflineReady = directBrowser && 'serviceWorker' in navigator
   : Promise.resolve();
 appOfflineReady.catch(error => optionStatus('오프라인 화면 저장 실패 · ' + error.message));
 
-let browserWorker;
+let browserWorker, browserAssetsReady=false;
 const browserJobs = new Map();
 function browserRequest(action, data = {}) {
   if (!directBrowser) return request(action,data);
@@ -105,6 +135,7 @@ function browserRequest(action, data = {}) {
       const job = browserJobs.get(message.id);
       if (!job) return;
       if (message.action === 'progress') {
+        if(browserAssetsReady&&job.action==='synthesize')return;
         const percent = Math.min(99,Math.floor(message.loaded / message.total * 100));
         $('speechAssetProgress').hidden = false;$('speechAssetProgress').value = percent;
         $('speechAssetStatus').textContent = `낭독 파일 저장 ${percent}% · ${Math.floor(message.loaded/1048576)}/${Math.ceil(message.total/1048576)} MB`;
@@ -115,6 +146,7 @@ function browserRequest(action, data = {}) {
       if (message.action === 'error') job.reject(Error(message.message));
       else {
         if (message.action === 'audio' || job.action === 'prepare') {
+          browserAssetsReady=true;
           $('speechAssetProgress').hidden = true;
           $('speechAssetStatus').textContent = '낭독 파일 저장됨 · 이 기기에서 오프라인 합성';
         }
@@ -159,13 +191,14 @@ $('speechPrepareCancel').onclick = () => browserWorker?.postMessage({action:'can
 
 function applyPreferences() {
   const value = settings();
-  if (mobile) value.engine = 'browser';
   const notesChanged=viewerSettings.showBracketNotes!==value.showNotes;
   for (const [key,id] of Object.entries(controls)) {
     const control = $(id);
     if (control.type === 'checkbox') control.checked = value[key];
-    else if ([...control.options].some(option => option.value === value[key])) control.value = value[key];
+    else if ([...control.options].some(option => option.value === String(value[key]))) control.value = value[key];
   }
+  speechSettings.open=value.panelOpen;
+  $('readerMp3Range').hidden=value.mp3Scope!=='range';
   document.documentElement.dataset.speechHighlight = value.highlight;
   $('speechPrepare').hidden = !directBrowser;
   document.documentElement.classList.toggle('speech-hide-notes', !value.showNotes);
@@ -181,28 +214,48 @@ function mergePreferences(value) {
 }
 function saveLocal() {
   try {
+    mergePreferences(JSON.parse(localStorage.getItem(STORAGE)||'{}'));
     localStorage.setItem(STORAGE, JSON.stringify(preferences));
     return true;
   } catch (error) {
-    optionStatus('듣기 옵션 저장 실패 · ' + error.message);
+    optionStatus('듣기 옵션을 보조 저장소에 저장하는 중…');
     return false;
   }
 }
+let preferenceDatabase;
+const preferenceDatabaseReady=new Promise((resolve,reject)=>{
+  try{
+    const opening=indexedDB.open('ebookViewerSpeechPreferencesV1',1);
+    opening.onupgradeneeded=()=>opening.result.createObjectStore('options');
+    opening.onsuccess=()=>{preferenceDatabase=opening.result;resolve(preferenceDatabase);};
+    opening.onerror=()=>reject(opening.error||Error('듣기 옵션 저장소 열기 실패'));
+    opening.onblocked=()=>reject(Error('듣기 옵션 저장소가 다른 창에 의해 잠겨 있습니다.'));
+  }catch(error){reject(error);}
+});
+preferenceDatabaseReady.catch(()=>{});
+function writePreferenceDatabase(){
+  if(!preferenceDatabase)return preferenceDatabaseReady.then(writePreferenceDatabase);
+  return new Promise((resolve,reject)=>{
+    try{
+      let tx;
+      try{tx=preferenceDatabase.transaction('options','readwrite',{durability:'strict'});}
+      catch{tx=preferenceDatabase.transaction('options','readwrite');}
+      tx.objectStore('options').put(JSON.parse(JSON.stringify(preferences)),'latest');
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('옵션 저장 취소'));
+    }catch(error){reject(error);}
+  });
+}
+const databasePreferences=preferenceDatabaseReady.then(db=>new Promise((resolve,reject)=>{
+  const tx=db.transaction('options','readonly');const read=tx.objectStore('options').get('latest');
+  read.onsuccess=()=>resolve(read.result);read.onerror=()=>reject(read.error);
+}));
 try { mergePreferences(JSON.parse(localStorage.getItem(STORAGE) || '{}')); }
-catch (error) { optionStatus('듣기 옵션 불러오기 실패 · ' + error.message); }
-// Older web versions defaulted to native without an explicit choice. Migrate once,
-// retaining all unrelated preferences and any subsequent explicit native choice.
-if (directBrowser && (preferences.engine?.scope !== WEB_ENGINE_SCOPE ||
-    (mobile && preferences.engine?.value === 'native'))) {
-  revision = Math.max(revision,...Object.values(preferences).map(item => item.revision+1));
-  preferences.engine = {value:'browser',revision,scope:WEB_ENGINE_SCOPE};
-  saveLocal();
-} else if (mobile && preferences.engine?.value === 'native') delete preferences.engine;
+catch (error) { optionStatus('듣기 옵션을 보조 저장소에서 불러오는 중…'); }
 applyPreferences();
 if (directBrowser && settings().engine === 'browser') {
   $('speechAssetStatus').textContent = '처음에는 [낭독 파일 저장]을 눌러 주세요. 약 395 MB · 본문은 이 기기 안에서 처리됩니다.';
   browserRequest('check').then(info => {
-    if (info.ready) $('speechAssetStatus').textContent = '낭독 파일 저장됨 · 이 기기에서 오프라인 합성';
+    if (info.ready) {browserAssetsReady=true;$('speechAssetStatus').textContent = '낭독 파일 저장됨 · 이 기기에서 오프라인 합성';}
   }).catch(error => {$('speechAssetStatus').textContent = '낭독 파일 확인 실패 · ' + error.message;});
 }
 
@@ -267,16 +320,26 @@ async function request(action, data = {}) {
   });
 }
 const rpc = (path,body = {}) => request('rpc',{path,body});
-let preferenceReady = (mobile || directBrowser ? Promise.resolve() : rpc('/preferences').then(async remote => {
+const databasePreferenceReady=databasePreferences.then(saved=>{
+  mergePreferences(saved);applyPreferences();
+  const local=saveLocal();
+  return writePreferenceDatabase().then(()=>{if(!local)optionStatus('듣기 옵션을 보조 저장소에 저장했습니다.');});
+}).catch(error=>{
+  if(!saveLocal())optionStatus('듣기 옵션 불러오기·저장 실패 · '+error.message);
+});
+let preferenceReady = Promise.all([databasePreferenceReady,(mobile || directBrowser ? Promise.resolve() : rpc('/preferences').then(async remote => {
   mergePreferences(remote);applyPreferences();saveLocal();
   if (Object.keys(preferences).length) await rpc('/preferences',{patch:preferences});
-}).catch(error => optionStatus('듣기 옵션은 이 브라우저에 저장됩니다. ' + error.message)));
+}).catch(error => optionStatus('듣기 옵션은 이 브라우저에 저장됩니다. ' + error.message)))]);
 function remember(key,value) {
+  try{mergePreferences(JSON.parse(localStorage.getItem(STORAGE)||'{}'));}catch{}
   revision = Math.max(Date.now()*1000,revision+1,...Object.values(preferences).map(item => item.revision+1));
   const patch = {[key]:{value,revision}};
-  if (key === 'engine' && directBrowser) patch[key].scope = WEB_ENGINE_SCOPE;
   Object.assign(preferences,patch);
   const local = saveLocal();
+  void writePreferenceDatabase().then(()=>{
+    if(!local)optionStatus('듣기 옵션을 보조 저장소에 저장했습니다.');
+  }).catch(error=>{if(!local)optionStatus('듣기 옵션 저장 실패 · '+error.message);});
   if (mobile || directBrowser) {
     if (local) optionStatus('');
     return;
@@ -288,7 +351,7 @@ function remember(key,value) {
 for (const [key,id] of Object.entries(controls)) {
   $(id).addEventListener('change', async () => {
     const previous = settings();
-    remember(key,$(id).type === 'checkbox' ? $(id).checked : $(id).value);
+    remember(key,$(id).type === 'checkbox' ? $(id).checked : ['mp3From','mp3To'].includes(key)?Number($(id).value):$(id).value);
     applyPreferences();
     if (key === 'showNotes') {
       noteCache.clear();blockCache.clear();saveViewerSettings();
@@ -301,6 +364,10 @@ for (const [key,id] of Object.entries(controls)) {
     }
   });
 }
+addEventListener('storage',event=>{
+  if(event.key!==STORAGE||!event.newValue)return;
+  try{mergePreferences(JSON.parse(event.newValue));applyPreferences();void writePreferenceDatabase().catch(()=>{});}catch{}
+});
 
 function refreshBook() {
   if (source === fullText) return;
@@ -585,6 +652,7 @@ $('speechListen').onclick = async () => {
   try{
     audioContext ||= new AudioContext();
     await audioContext.resume();
+    await preferenceReady;
   }catch(error){$('speechListen').disabled=false;status(error.message);return;}
   if(restoreInProgress)status('페이지 계산이 끝나면 선택한 문장부터 읽습니다…');
   while(restoreInProgress&&ticket===pendingListen&&book===fullText&&viewerOverlay.classList.contains('active'))
@@ -625,10 +693,15 @@ $('speechPickSentence').onclick = () => {
   picker.showModal();
 };
 document.addEventListener('keydown',event => {
+  if(event.key==='Escape'&&speechSettings.open&&!document.querySelector('dialog[open]')&&
+      !settingsPanelIsOpen()&&!readerChapterIsOpen()&&!readerSearchIsOpen()&&!readerGPTIsOpen()){
+    event.preventDefault();event.stopImmediatePropagation();speechSettings.open=false;
+    $('speechSettingsToggle').focus();return;
+  }
   if (!session || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.repeat ||
       settingsPanelIsOpen() || document.querySelector('dialog[open]') || readerGPTIsOpen() ||
       readerNoteIsOpen() || readerTimelineIsOpen() || readerSearchIsOpen() || readerChapterIsOpen() ||
-      event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+      event.target.closest?.('#speechSettings,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
   if (!['<','>',' '].includes(event.key)) return;
   event.preventDefault();event.stopImmediatePropagation();
   if (event.key===' ') void $('speechPause').onclick();else void move(event.key==='<'?-1:1);
@@ -685,7 +758,9 @@ $('readerMp3Open').onclick = async () => {
       option.textContent = `${section.index}. ${section.title}`;select.append(option);
     }
   }
-  $('readerMp3To').value = sections.length-1;
+  const value=settings();
+  $('readerMp3From').value=Math.max(0,Math.min(sections.length-1,Number(value.mp3From)||0));
+  $('readerMp3To').value=value.mp3To===null?sections.length-1:Math.max(0,Math.min(sections.length-1,Number(value.mp3To)||0));
   mp3.showModal();
 };
 $('readerMp3Close').onclick = () => mp3.close();
@@ -759,6 +834,7 @@ window.readerSpeech = {
   atAnchor,adjacent,spokenText,sectionData,sectionText,ready:preferenceReady
 };
 void readerReady.then(() => {
+  applyPreferences();
   if (viewerOverlay.classList.contains('active')) {
     refreshBook();paint();scheduleRepaginate();
   }

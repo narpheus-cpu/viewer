@@ -1,15 +1,26 @@
-#speechToolbar{flex:0 0 auto;border-bottom:1px solid var(--line,#bbb);padding:5px 8px;font-size:12px;background:var(--paper,#fff)}
+#speechToolbar{position:relative;z-index:30;flex:0 0 auto;border-bottom:1px solid var(--line,#bbb);padding:5px 8px;font-size:12px;background:var(--paper,#fff)}
+.speech-main-actions{display:grid;grid-template-columns:minmax(36px,.7fr) minmax(36px,.7fr) minmax(48px,1fr) minmax(82px,1.4fr);gap:4px;max-width:440px}
+#speechToolbar .speech-main-actions button{min-height:40px;white-space:nowrap;min-width:0}
+#speechSettings{position:relative;margin-top:3px}
+#speechSettingsToggle{cursor:pointer;padding:4px 2px;min-height:20px;line-height:20px;user-select:none}
+#speechSettingsToggle:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+#speechCompactStatus{font-size:11px;color:var(--muted,#555);font-weight:normal}
+.speech-settings-body{position:absolute;top:100%;left:0;right:0;z-index:50;box-sizing:border-box;border:1px solid var(--line,#bbb);border-radius:5px;padding:10px;background:var(--paper,#fff);box-shadow:0 5px 18px #0003;max-height:min(54vh,420px);max-height:min(54dvh,420px);overflow:auto;overscroll-behavior:contain}
+#speechSettings:not([open])>.speech-settings-body{display:none}
 .speech-actions,.speech-options{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .speech-options{margin-top:4px}.speech-options label{display:flex;gap:3px;align-items:center}
 #speechToolbar button,#speechToolbar select{font-size:12px;padding:4px 6px;min-height:30px}
-#speechToolbar #speechEngine{max-width:260px}
+#speechToolbar #speechEngine{max-width:min(100%,320px)}
+.speech-settings-body .speech-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px;margin-top:10px}
+.speech-settings-body .speech-options label{display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px}
+.speech-settings-body select{width:100%;min-width:0}
 #speechStatus:empty,#speechOptionsStatus:empty{display:none}
 #speechStatus,#speechOptionsStatus{margin-top:3px;line-height:1.3}
 #speechAssetStatus{font-size:11px;line-height:1.35;margin-top:3px}
 #speechAssetStatus:empty{display:none}
 #speechAssetProgress{width:100%;height:10px}
 #speechAssetProgress[hidden]{display:none}
-@media(max-width:600px){#speechToolbar button,#speechToolbar select{min-height:34px}#speechToolbar #speechEngine{max-width:235px}}
+@media(max-width:600px){#speechToolbar button,#speechToolbar select{min-height:36px}}
 #speechLocalOpen{font-size:12px;color:inherit;text-decoration:underline}
 #speechSentenceDialog,#readerMp3Dialog{max-width:min(640px,94vw);max-height:85vh;box-sizing:border-box;border:1px solid #000;background:#fff;color:#000;padding:12px}
 #speechSentenceDialog::backdrop,#readerMp3Dialog::backdrop{background:#0006}
@@ -32,6 +43,4 @@ mark.speech-sentence{background:#ffe7b0;color:#111}
 .speech-note-hidden.speech-note-marker{display:none}
 .speech-hide-notes .reader-note:not([data-reader-pronunciation]){background:transparent!important;font-style:inherit!important;cursor:inherit!important}
 .speech-hide-notes [data-reader-empty-note],.speech-hide-notes [data-reader-bracket-literal]{display:none!important}
-@media(max-height:550px){#speechToolbar .speech-options{max-height:52px;overflow:auto}#speechToolbar{padding:2px 5px}}
-@media(max-height:400px){#speechToolbar .speech-actions,#speechToolbar .speech-options{flex-wrap:nowrap;overflow-x:auto;max-height:36px}
-#speechToolbar button,#speechToolbar label{flex-shrink:0}#speechStatus,#speechOptionsStatus{max-height:1.3em;overflow:hidden}}
+@media(max-height:550px){#speechToolbar{padding:2px 5px}#speechToolbar .speech-main-actions button{min-height:36px}.speech-settings-body{max-height:48vh;max-height:48dvh}}
