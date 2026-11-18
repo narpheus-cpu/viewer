@@ -93,12 +93,19 @@ const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLang
   mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
   mp3From:'readerMp3From',mp3To:'readerMp3To'};
 const speechSettings=$('speechSettings');
+$('speechSettingsToggle').addEventListener('click',()=>{
+  // Save the native summary's upcoming state before another option can apply
+  // preferences; the details toggle event is dispatched asynchronously.
+  remember('panelOpen',!speechSettings.open);
+});
 speechSettings.addEventListener('toggle',()=>{
   if(speechSettings.open!==settings().panelOpen)remember('panelOpen',speechSettings.open);
   updateCompactStatus();
 });
 document.addEventListener('pointerdown',event=>{
-  if(speechSettings.open&&!toolbar.contains(event.target))speechSettings.open=false;
+  if(speechSettings.open&&!toolbar.contains(event.target)){
+    remember('panelOpen',false);speechSettings.open=false;
+  }
 });
 function updateCompactStatus(){
   const message=$('speechStatus').textContent;
@@ -695,7 +702,7 @@ $('speechPickSentence').onclick = () => {
 document.addEventListener('keydown',event => {
   if(event.key==='Escape'&&speechSettings.open&&!document.querySelector('dialog[open]')&&
       !settingsPanelIsOpen()&&!readerChapterIsOpen()&&!readerSearchIsOpen()&&!readerGPTIsOpen()){
-    event.preventDefault();event.stopImmediatePropagation();speechSettings.open=false;
+    event.preventDefault();event.stopImmediatePropagation();remember('panelOpen',false);speechSettings.open=false;
     $('speechSettingsToggle').focus();return;
   }
   if (!session || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.repeat ||
