@@ -136,7 +136,13 @@ function browserRequest(action, data = {}) {
   });
 }
 $('speechPrepare').hidden = !directBrowser;
+$('speechPrepare').title = '브라우저 낭독에 필요한 파일을 이 기기에 저장합니다. 고속 방식에서는 브라우저 방식으로 전환합니다.';
 $('speechPrepare').onclick = async () => {
+  if (settings().engine !== 'browser') {
+    stop(false);remember('engine','browser');applyPreferences();
+    status('오프라인 브라우저 방식으로 전환했습니다.');
+  }
+  localLink.hidden = true;
   $('speechPrepare').disabled = true;$('speechPrepareCancel').hidden = false;
   $('speechAssetStatus').textContent = '낭독 파일 확인 중… 처음에는 약 394 MB를 저장합니다. Wi-Fi 사용을 권장합니다.';
   try {
@@ -161,7 +167,7 @@ function applyPreferences() {
     else if ([...control.options].some(option => option.value === value[key])) control.value = value[key];
   }
   document.documentElement.dataset.speechHighlight = value.highlight;
-  $('speechPrepare').hidden = !directBrowser || value.engine !== 'browser';
+  $('speechPrepare').hidden = !directBrowser;
   document.documentElement.classList.toggle('speech-hide-notes', !value.showNotes);
   viewerSettings.showBracketNotes = value.showNotes;
   paint();
@@ -211,7 +217,7 @@ function connect() {
     const timer = setTimeout(() => {
       removeEventListener('message',ready);
       frame.remove();frame = null;connecting = null;
-      localLink.hidden=false;
+      localLink.hidden = directBrowser && settings().engine === 'browser';
       reject(Error(directBrowser
         ? '고속 방식에는 PC 도우미가 필요합니다. 오프라인 브라우저로 바꾸면 실행.bat 없이 들을 수 있습니다.'
         : '실행.bat로 PC 고속 낭독 도우미를 켜 주세요.'));
