@@ -65,7 +65,7 @@ let revision = Date.now() * 1000;
 let frame, connecting, serial = 0;
 const requests = new Map();
 let source = null, blockCache = new Map(), noteCache = new Map();
-let selected = null, session = null, audioContext = null, generation = 0;
+let selected = null, session = null, audioContext = null, generation = 0, pendingListen = 0;
 const status = text => { $('speechStatus').textContent = text; };
 const optionStatus = text => { $('speechOptionsStatus').textContent = text; };
 const settings = () => Object.fromEntries(Object.entries(defaults).map(([key,value]) =>
@@ -263,6 +263,7 @@ function sentences(block) {
   return result;
 }
 function atAnchor(anchor) {
+  if(cachedMarkdownSource!==fullText)getPaginationBlocks(fullText);
   let lo = 0, hi = cachedBlockStarts.length-1;
   while (lo < hi) {
     const mid = Math.ceil((lo+hi)/2);
@@ -361,6 +362,7 @@ function cancelRequests() {
   }
 }
 function stop(clear = true) {
+  pendingListen++;
   const old = session;session = null;
   if (old) {
     old.source?.stop();old.finishAudio?.();notify(old);old.queue.length = 0;
@@ -465,8 +467,19 @@ async function move(direction) {
 $('speechPrevious').onclick = () => void move(-1);
 $('speechNext').onclick = () => void move(1);
 $('speechListen').onclick = async () => {
-  if (restoreInProgress || !pages.length || session) return;
-  refreshBook();await start(selected || atAnchor(pageAnchors[pageIndex] || 0));
+  if (!pages.length || session) return;
+  refreshBook();
+  const ticket=++pendingListen,book=fullText;
+  $('speechListen').disabled=true;
+  try{
+    audioContext ||= new AudioContext();
+    await audioContext.resume();
+  }catch(error){$('speechListen').disabled=false;status(error.message);return;}
+  if(restoreInProgress)status('페이지 계산이 끝나면 선택한 문장부터 읽습니다…');
+  while(restoreInProgress&&ticket===pendingListen&&book===fullText&&viewerOverlay.classList.contains('active'))
+    await new Promise(resolve=>setTimeout(resolve,40));
+  if(ticket!==pendingListen||book!==fullText||!viewerOverlay.classList.contains('active'))return;
+  await start(selected || atAnchor(pageAnchors[pageIndex] || 0));
 };
 $('speechPause').onclick = async () => {
   const run = session;if (!run) return;
@@ -517,6 +530,7 @@ addEventListener('pagehide',() => {
 
 let exportId = null, exportRunning = false, exportCancelling = false;
 function sectionData() {
+  if(cachedMarkdownSource!==fullText)getPaginationBlocks(fullText);
   readerCanonical();
   const starts = bookChapters.length ? chapterCanonicalStarts : [0];
   return starts.map((start,index) => ({
