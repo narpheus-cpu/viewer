@@ -3,6 +3,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const ORIGIN = 'http://127.0.0.1:18766';
+const LIBRARY_ORIGIN = 'http://127.0.0.1:38479';
 const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -76,7 +77,8 @@ document.body.append(mp3);
 
 let preferences = {};
 let revision = Date.now() * 1000;
-let frame, connecting, serial = 0;
+let serial = 0, nativeHelperOrigin;
+const helperConnections=new Map(),helperFrames=new Map();
 const requests = new Map();
 let source = null, blockCache = new Map(), noteCache = new Map();
 let selected = null, session = null, audioContext = null, generation = 0, pendingListen = 0;
@@ -155,7 +157,7 @@ function browserRequest(action, data = {}) {
         if (message.action === 'audio' || job.action === 'prepare') {
           browserAssetsReady=true;
           $('speechAssetProgress').hidden = true;
-          $('speechAssetStatus').textContent = '낭독 파일 저장됨 · 이 기기에서 오프라인 합성';
+          $('speechAssetStatus').textContent = '브라우저용 낭독 파일 저장됨 · 브라우저 방식에서 사용';
         }
         job.resolve(message.action === 'result' ? message.result : message);
       }
@@ -262,40 +264,49 @@ applyPreferences();
 if (directBrowser && settings().engine === 'browser') {
   $('speechAssetStatus').textContent = '처음에는 [낭독 파일 저장]을 눌러 주세요. 약 395 MB · 본문은 이 기기 안에서 처리됩니다.';
   browserRequest('check').then(info => {
-    if (info.ready) {browserAssetsReady=true;$('speechAssetStatus').textContent = '낭독 파일 저장됨 · 이 기기에서 오프라인 합성';}
+    if (info.ready) {browserAssetsReady=true;$('speechAssetStatus').textContent = '브라우저용 낭독 파일 저장됨 · 브라우저 방식에서 사용';}
   }).catch(error => {$('speechAssetStatus').textContent = '낭독 파일 확인 실패 · ' + error.message;});
 }
 
-function connect() {
-  if (connecting) return connecting;
-  connecting = new Promise((resolve,reject) => {
-    frame = document.createElement('iframe');
+function connectTo(origin) {
+  if (helperConnections.has(origin)) return helperConnections.get(origin);
+  const connecting = new Promise((resolve,reject) => {
+    const frame = document.createElement('iframe');
     frame.hidden = true;
     frame.title = 'Supertonic 3 로컬 도우미';
     frame.allow = 'local-network-access; local-network; loopback-network';
-    frame.src = ORIGIN + '/supertonic3/bridge.html';
+    frame.src = origin + '/supertonic3/bridge.html?ebook=1';
+    helperFrames.set(origin,frame);
     const timer = setTimeout(() => {
       removeEventListener('message',ready);
-      frame.remove();frame = null;connecting = null;
-      localLink.hidden = directBrowser && settings().engine === 'browser';
-      reject(Error(directBrowser
-        ? '고속 방식에는 PC 도우미가 필요합니다. 오프라인 브라우저로 바꾸면 실행.bat 없이 들을 수 있습니다.'
-        : '실행.bat로 PC 고속 낭독 도우미를 켜 주세요.'));
-    }, 8000);
+      frame.remove();helperFrames.delete(origin);helperConnections.delete(origin);
+      reject(Error('PC 도우미 연결 실패: '+origin));
+    }, 4000);
     const ready = event => {
-      if (event.origin !== ORIGIN || event.source !== frame?.contentWindow ||
+      if (event.origin !== origin || event.source !== frame.contentWindow ||
           event.data?.type !== 'ebook-speech' || event.data.action !== 'ready') return;
-      clearTimeout(timer);removeEventListener('message',ready);resolve(frame);
+      clearTimeout(timer);removeEventListener('message',ready);resolve({frame,origin});
       localLink.hidden=true;
     };
     addEventListener('message',ready);
-    frame.onload = () => frame.contentWindow.postMessage({type:'ebook-speech',action:'connect'},ORIGIN);
+    frame.onload = () => frame.contentWindow.postMessage({type:'ebook-speech',action:'connect'},origin);
     document.body.append(frame);
   });
+  helperConnections.set(origin,connecting);
   return connecting;
 }
+async function connect(action,engine){
+  if(action!=='synthesize'||engine!=='native')return connectTo(ORIGIN);
+  // The library helper starts with Windows; reuse it before the optional host.
+  for(const origin of [LIBRARY_ORIGIN,ORIGIN]){
+    try{const connection=await connectTo(origin);nativeHelperOrigin=origin;return connection;}
+    catch{}
+  }
+  localLink.hidden=settings().engine==='browser';
+  throw Error('고속 도우미에 연결하지 못했습니다. 기존 도서관 도우미 실행 상태와 이 사이트의 로컬 네트워크 접근 허용을 확인해 주세요.');
+}
 addEventListener('message', event => {
-  if (event.origin !== ORIGIN || event.source !== frame?.contentWindow || event.data?.type !== 'ebook-speech') return;
+  if (event.source !== helperFrames.get(event.origin)?.contentWindow || event.data?.type !== 'ebook-speech') return;
   const message = event.data, request = requests.get(message.id);
   if (!request) {
     if(message.action==='error'){
@@ -314,7 +325,7 @@ addEventListener('message', event => {
   else request.resolve(message.action === 'result' ? message.result : message);
 });
 async function request(action, data = {}) {
-  const connection = await connect();
+  const connection = await connect(action,data.engine);
   if(action==='synthesize'&&data.generation!==session?.generation)
     throw new DOMException('낭독 중지','AbortError');
   return new Promise((resolve,reject) => {
@@ -323,7 +334,7 @@ async function request(action, data = {}) {
       requests.delete(id);reject(Error('로컬 도우미 응답 시간이 초과됐습니다.'));
     }, action === 'synthesize' ? 180000 : 20000);
     requests.set(id,{resolve,reject,timer,action});
-    connection.contentWindow.postMessage({type:'ebook-speech',action,id,...data},ORIGIN);
+    connection.frame.contentWindow.postMessage({type:'ebook-speech',action,id,...data},connection.origin);
   });
 }
 const rpc = (path,body = {}) => request('rpc',{path,body});
@@ -536,7 +547,9 @@ async function showEntry(entry) {
   paint();
 }
 function cancelRequests() {
-  frame?.contentWindow?.postMessage({type:'ebook-speech',action:'cancel',generation:++generation},ORIGIN);
+  ++generation;
+  for(const [origin,frame] of helperFrames)
+    frame.contentWindow?.postMessage({type:'ebook-speech',action:'cancel',generation},origin);
   for (const [id,item] of requests) if (item.action === 'synthesize') {
     clearTimeout(item.timer);item.reject(new DOMException('낭독 중지','AbortError'));requests.delete(id);
   }
@@ -604,6 +617,11 @@ async function play(run,item) {
     source.start();
   });
 }
+function playbackStatus(run){
+  return run.options.engine==='native'
+    ? 'Supertonic 3 고속 낭독 중 · '+(nativeHelperOrigin===LIBRARY_ORIGIN?'기존 도서관 도우미':'PC 도우미')
+    : 'Supertonic 3 브라우저 낭독 중';
+}
 async function start(entry,paused = false,cache = new Map()) {
   if (!entry) { status('읽을 문장이 없습니다.');return; }
   const run = {generation:++generation,entry,paused,queue:[],buffered:0,done:false,error:null,
@@ -633,7 +651,7 @@ async function start(entry,paused = false,cache = new Map()) {
       if (current !== item.entry.start) await showEntry(item.entry);
       current = item.entry.start;
       if (session !== run) return;
-      status(run.paused ? '일시중지됨' : 'Supertonic 3 낭독 중');
+      status(run.paused ? '일시중지됨' : playbackStatus(run));
       await play(run,item);
     }
   } catch (error) {
@@ -674,7 +692,7 @@ $('speechPause').onclick = async () => {
     if (session!==run) return;
     run.paused = !run.paused;
     $('speechPause').textContent = run.paused ? '이어 듣기' : '일시중지';
-    status(run.paused?'일시중지됨':'Supertonic 3 낭독 중');
+    status(run.paused?'일시중지됨':playbackStatus(run));
   } catch (error) { status(error.message); }
 };
 $('speechStop').onclick = () => {stop();status('낭독 중지');};
@@ -714,7 +732,7 @@ document.addEventListener('keydown',event => {
   if (event.key===' ') void $('speechPause').onclick();else void move(event.key==='<'?-1:1);
 },true);
 addEventListener('pagehide',() => {
-  frame?.contentWindow?.postMessage({type:'ebook-speech',action:'rpc',id:'last-options',
+  helperFrames.get(ORIGIN)?.contentWindow?.postMessage({type:'ebook-speech',action:'rpc',id:'last-options',
     path:'/preferences',body:{patch:preferences}},ORIGIN);
   stop();
 });
@@ -837,7 +855,7 @@ window.readerSpeech = {
   notesVisible:() => settings().showNotes,
   inspect:() => ({entry:session?.entry || selected,paused:session?.paused ?? false,
     generation:session?.generation,buffered:session?.buffered || 0,queued:session?.queue.length || 0,
-    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,settings:settings(),exportId}),
+    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,settings:settings(),nativeHelperOrigin,exportId}),
   atAnchor,adjacent,spokenText,sectionData,sectionText,ready:preferenceReady
 };
 void readerReady.then(() => {
