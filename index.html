@@ -161,7 +161,7 @@ const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPagi
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
 const readerBrowserResume={away:false,settling:false,timer:0,frame:0};
-const READER_CACHE_VERSION=8;
+const READER_CACHE_VERSION=9;
 const READER_COUNT_VERSION='non-whitespace-v1';
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
@@ -878,7 +878,7 @@ function readerFindNoteRanges(text){
     for(;end<text.length&&depth;end++){if(text[end]==='〔')depth++;else if(text[end]==='〕')depth--;}
     if(depth)break;
     const content=text.slice(at+1,end-1);
-    if(content.trim())ranges.push({start:at,end,content});
+    ranges.push({start:at,end,content});
     at=end;
   }
   return ranges;
@@ -984,7 +984,11 @@ function readerFootnoteHTML(html,protectedNotes=null){
   for(const note of notes.reverse()){
     const container=point(note.start)[0],element=container.nodeType===Node.ELEMENT_NODE?container:container.parentElement;
     if(element.closest('pre,code,[data-reader-note]')){
-      if(protectedNotes){const literal=range(note.start,note.end);literal.deleteContents();literal.insertNode(document.createTextNode('〔'+note.content+'〕'));}
+      if(!element.closest('[data-reader-note]')){
+        const literal=range(note.start,note.end),span=document.createElement('span');
+        span.setAttribute('data-reader-bracket-literal','');
+        span.textContent='〔'+note.content+'〕';literal.deleteContents();literal.insertNode(span);
+      }
       continue;
     }
     const before=text.slice(0,note.start),tail=before.match(/[\t "'’”)\]}」』]*$/u)[0];
@@ -992,7 +996,7 @@ function readerFootnoteHTML(html,protectedNotes=null){
     const removal=range(note.start,note.end);removal.deleteContents();
     const trigger=readerNoteElement(word?.[0]||'각주',note.content.trim());
     if(word){const label=range(end-word[0].length,end);trigger.appendChild(label.extractContents());label.insertNode(trigger);}
-    else{trigger.textContent='※';removal.insertNode(trigger);}
+    else{trigger.textContent='※';trigger.setAttribute('data-reader-empty-note','');removal.insertNode(trigger);}
   }
   return root.innerHTML;
 }
@@ -1035,6 +1039,7 @@ function readerNoteUpdateViewport(){
   style.setProperty('--note-gap',Math.max(2,Math.min(12,width*.03,height*.03))+'px');
 }
 function readerOpenNote(trigger){
+  if(window.readerSpeech?.notesVisible()===false&&!trigger.hasAttribute('data-reader-pronunciation'))return;
   if(!readerNoteLayer||!viewerOverlay.classList.contains('active'))return;
   if(!readerNoteIsOpen()){
     readerNoteBodyOverflow=document.body.style.overflow;readerNoteRootOverflow=document.documentElement.style.overflow;
@@ -2720,6 +2725,7 @@ function setupReaderTools(){
 
 </script>
 <link rel="stylesheet" href="./reader-insights.css?v=9">
+<link rel="stylesheet" href="./reader-speech.css?v=1">
 <script src="./reader-insights-data.js?v=15"></script>
 </head>
 <body>
@@ -3357,7 +3363,8 @@ function getLayoutSignature(){
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
     ...(visiblePageCount()===2?['spread-2']:[]),navigator.userAgent,...(readerSourceHasNotes(fullText)?['footnotes-v1']:[]),
-    ...(readerSourceHasPronunciations(fullText)?['pronunciations-v1']:[])]);
+    ...(readerSourceHasPronunciations(fullText)?['pronunciations-v1']:[]),
+    ...(viewerSettings.showBracketNotes===false?['hidden-notes-v1']:[])]);
 }
 let readingSaveTimer=0;
 let scheduledReadingOpenState=false;
@@ -4135,6 +4142,7 @@ function render(){
 
   readerUpdateChapterPageCount();
   readerPaintSearch();readerTimelineDecorate(pageInnerLeft);readerTimelineDecorate(pageInnerRight);
+  window.readerSpeech?.render();
 
   /* 화면 전환을 먼저 끝내고 저장은 합쳐서 처리해 페이지 넘김을 막지 않는다. */
   if(!restoreInProgress){
@@ -4338,6 +4346,7 @@ async function openViewer(){
 }
 
 function closeViewer(){
+  window.readerSpeech?.close();
   readerChapterOpenPending=false;
   readerChapterClose();
   window.readerInsights?.close();
@@ -4544,5 +4553,6 @@ if(syncReading){
 </script>
 <script src="./reader-insights.js?v=15" defer></script>
 <script src="./reader-insights-nav.js?v=11" defer></script>
+<script src="./reader-speech.js?v=1" defer></script>
 </body>
 </html>
