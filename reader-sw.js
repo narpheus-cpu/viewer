@@ -1,10 +1,10 @@
 /* App files only. User books remain in the reader's existing local database. */
-const CACHE = 'ebook-reader-app-mobile-12';
+const CACHE = 'ebook-reader-app-mobile-13';
 const CORE = [
-  './', './index.html', './reader-speech.js?v=14', './reader-speech.css?v=6',
+  './', './index.html', './reader-speech.js?v=15', './reader-speech.css?v=6',
   './reader-insights.css?v=9', './reader-insights-data.js?v=15',
   './reader-insights.js?v=15', './reader-insights-nav.js?v=11',
-  './supertonic3/browser-worker.mjs?v=2', './supertonic3/asset-list.mjs', './supertonic3/upstream.mjs?v=2',
+  './supertonic3/browser-worker.mjs?v=3', './supertonic3/asset-list.mjs', './supertonic3/upstream.mjs?v=2',
   './supertonic3/runtime/ort.wasm.min.mjs', './supertonic3/runtime/ort-wasm-simd-threaded.mjs'
 ];
 addEventListener('install', event => event.waitUntil((async () => {

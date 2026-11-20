@@ -9,7 +9,6 @@ const total = ASSETS.reduce((n,item) => n + item.bytes, 0);
 let model, loading, generation = 0, queue = Promise.resolve(), controller;
 let assetsReady = false;
 const voices = new Map();
-const fullQualityCost = new Map();
 const cancelled = () => new DOMException('낭독 파일 저장 취소', 'AbortError');
 
 async function cached(item) {
@@ -104,25 +103,14 @@ addEventListener('message', ({data:job}) => {
         voices.set(job.voice, await loadVoiceStyle([url]));
       }
       const engine = model.textToSpeech;
-      // Compare measured inference cost at four steps against audio ready to play.
-      // Model and voice loading are excluded from the estimate.
-      const lengthUnits = Math.max(8, job.text.length);
-      const previousCost = fullQualityCost.get(job.lang);
-      const available = job.timing?.availableMs;
-      const needsFasterSynthesis = previousCost && Number.isFinite(available)
-        && available < previousCost * lengthUnits;
-      const steps = needsFasterSynthesis ? 2 : 4;
       const started = performance.now();
-      const {wav, duration} = await engine.call(job.text, job.lang, voices.get(job.voice), steps);
-      if (steps === 4) {
-        const cost = (performance.now() - started) / lengthUnits;
-        fullQualityCost.set(job.lang, previousCost ? 0.5 * (previousCost + cost) : cost);
-      }
+      const {wav, duration} = await engine.call(job.text, job.lang, voices.get(job.voice), 4);
+      const synthesisMs = performance.now() - started;
       const length = Math.min(wav.length, Math.floor(engine.sampleRate * duration[0]));
       const pcm = length === wav.length && wav.byteOffset === 0 && wav.byteLength === wav.buffer.byteLength
         ? wav : wav.slice(0, length);
       if (!pcm.length) throw Error('합성된 음성이 비어 있습니다.');
-      send('audio',{samples:pcm.buffer, sampleRate:engine.sampleRate},[pcm.buffer]);
+      send('audio',{samples:pcm.buffer, sampleRate:engine.sampleRate, synthesisMs},[pcm.buffer]);
     } catch (error) {
       send('error',{message:error.message || String(error)});
     }
