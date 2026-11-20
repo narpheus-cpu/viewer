@@ -1,13 +1,15 @@
 // Only fixed model/runtime GETs leave this device. Book text stays in this worker.
 import * as ort from './runtime/ort.wasm.min.mjs';
-import {loadTextToSpeech, loadVoiceStyle, AVAILABLE_LANGS} from './upstream.mjs';
+import {loadTextToSpeech, loadVoiceStyle, AVAILABLE_LANGS} from './upstream.mjs?v=2';
 import {ASSETS, MODEL_REVISION} from './asset-list.mjs';
 
 const CACHE = 'reader-supertonic3-' + MODEL_REVISION + '-ort1.24.3';
 const originalFetch = globalThis.fetch.bind(globalThis);
 const total = ASSETS.reduce((n,item) => n + item.bytes, 0);
 let model, loading, generation = 0, queue = Promise.resolve(), controller;
+let assetsReady = false;
 const voices = new Map();
+const fullQualityCost = new Map();
 const cancelled = () => new DOMException('낭독 파일 저장 취소', 'AbortError');
 
 async function cached(item) {
@@ -43,6 +45,7 @@ async function prepare(send) {
       done += item.bytes;
       send('progress', {loaded:done, total, file:index + 1, files:ASSETS.length});
     }
+    assetsReady = true;
     return {bytes:total, files:ASSETS.length};
   })();
   try { return await loading; } finally {loading = null;controller = null;}
@@ -54,7 +57,10 @@ globalThis.fetch = async (input, options) => {
   const item = ASSETS.find(item => item.url === url);
   if (!item) throw Error('허용되지 않은 낭독 파일 요청');
   const response = await cached(item);
-  if (!response) throw Error('낭독 파일이 없습니다. 인터넷 연결 후 [낭독 파일 저장]을 눌러 주세요.');
+  if (!response) {
+    assetsReady = false;
+    throw Error('낭독 파일이 없습니다. 인터넷 연결 후 [낭독 파일 저장]을 눌러 주세요.');
+  }
   return response;
 };
 ort.env.wasm.numThreads = 1; // Works without SharedArrayBuffer on mobile/GitHub Pages.
@@ -73,14 +79,15 @@ addEventListener('message', ({data:job}) => {
       if (job.action === 'check') {
         let bytes = 0;
         for (const item of ASSETS) if (await cached(item)) bytes += item.bytes;
-        send('result',{result:{ready:bytes === total, bytes, total}});return;
+        assetsReady = bytes === total;
+        send('result',{result:{ready:assetsReady, bytes, total}});return;
       }
       if (job.action === 'prepare') {send('result',{result:await prepare(send)});return;}
       if (job.action !== 'synthesize' || job.generation !== generation) return;
       if (typeof job.text !== 'string' || !job.text.trim() || job.text.length > 300 ||
           !AVAILABLE_LANGS.includes(job.lang) || !/^[FM][1-5]$/.test(job.voice))
         throw Error('낭독 문장 또는 목소리를 확인해 주세요.');
-      await prepare(send);
+      if (!assetsReady) await prepare(send);
       if (job.generation !== generation) return;
       if (!model) {
         send('model-progress',{message:'저장된 모델을 여는 중…'});
@@ -97,8 +104,23 @@ addEventListener('message', ({data:job}) => {
         voices.set(job.voice, await loadVoiceStyle([url]));
       }
       const engine = model.textToSpeech;
-      const {wav, duration} = await engine.call(job.text, job.lang, voices.get(job.voice), 4);
-      const pcm = Float32Array.from(wav.slice(0, Math.floor(engine.sampleRate * duration[0])));
+      // Compare measured inference cost at four steps against audio ready to play.
+      // Model and voice loading are excluded from the estimate.
+      const lengthUnits = Math.max(8, job.text.length);
+      const previousCost = fullQualityCost.get(job.lang);
+      const available = job.timing?.availableMs;
+      const needsFasterSynthesis = previousCost && Number.isFinite(available)
+        && available < previousCost * lengthUnits;
+      const steps = needsFasterSynthesis ? 2 : 4;
+      const started = performance.now();
+      const {wav, duration} = await engine.call(job.text, job.lang, voices.get(job.voice), steps);
+      if (steps === 4) {
+        const cost = (performance.now() - started) / lengthUnits;
+        fullQualityCost.set(job.lang, previousCost ? 0.5 * (previousCost + cost) : cost);
+      }
+      const length = Math.min(wav.length, Math.floor(engine.sampleRate * duration[0]));
+      const pcm = length === wav.length && wav.byteOffset === 0 && wav.byteLength === wav.buffer.byteLength
+        ? wav : wav.slice(0, length);
       if (!pcm.length) throw Error('합성된 음성이 비어 있습니다.');
       send('audio',{samples:pcm.buffer, sampleRate:engine.sampleRate},[pcm.buffer]);
     } catch (error) {

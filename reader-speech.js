@@ -100,7 +100,7 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,
+const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,mobileQuality:'auto',
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
   panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
@@ -129,6 +129,7 @@ toolbar.innerHTML = `
   <label>낭독 방식 <select id="speechEngine"><option value="native">Supertonic 3 · 오프라인 고속</option><option value="browser">Supertonic 3 · 오프라인 브라우저</option></select></label>
   <label>목소리 <select id="speechVoice">${voices}</select></label>
   <label>언어 <select id="speechLanguage"><option value="auto">자동</option><option value="ko">한국어</option><option value="en">영어</option><option value="ja">일본어</option></select></label>
+  <label id="speechMobileQualityRow">합성 품질 <select id="speechMobileQuality"><option value="auto">자동 · 끊김 줄이기</option><option value="fixed">기존 음질 유지</option></select></label>
   <label>속도 <span class="speech-speed-control"><input id="speechSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="낭독 속도"><output id="speechSpeedValue" for="speechSpeed">1.00배</output></span></label>
   <label>강조 <select id="speechHighlight"><option value="pastel">파스텔</option><option value="inverse">흑백반전</option><option value="underline">밑줄</option></select></label>
   <label class="speech-checkbox-option"><input id="speechSkipBrackets" type="checkbox"> ( )·〔 〕 안 내용 읽지 않기</label>
@@ -186,10 +187,11 @@ const settings = () => {
   value.speed=normalizeSpeed(value.speed);
   return value;
 };
-const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',
+const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',mobileQuality:'speechMobileQuality',
   showNotes:'viewerBracketNotes',skipBrackets:'speechSkipBrackets',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
   mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
   mp3From:'readerMp3From',mp3To:'readerMp3To'};
+if (!mobile || !directBrowser) $('speechMobileQualityRow').style.display = 'none';
 const speechSettings=$('speechSettings');
 $('speechSettingsToggle').addEventListener('click',()=>{
   // Save the native summary's upcoming state before another option can apply
@@ -235,7 +237,7 @@ const browserJobs = new Map();
 function browserRequest(action, data = {}) {
   if (!directBrowser) return request(action,data);
   if (!browserWorker) {
-    browserWorker = new Worker(new URL('./supertonic3/browser-worker.mjs', document.baseURI), {type:'module'});
+    browserWorker = new Worker(new URL('./supertonic3/browser-worker.mjs?v=2', document.baseURI), {type:'module'});
     browserWorker.onmessage = ({data:message}) => {
       const job = browserJobs.get(message.id);
       if (!job) return;
@@ -715,7 +717,7 @@ function stop(clear = true) {
   clearHighlight();
   $('speechListen').disabled = false;$('speechPause').disabled = true;
   $('speechPause').textContent = '일시중지';
-  $('speechEngine').disabled = $('speechVoice').disabled = $('speechLanguage').disabled = false;
+  $('speechMobileQuality').disabled = $('speechEngine').disabled = $('speechVoice').disabled = $('speechLanguage').disabled = false;
 }
 const notify = run => { for (const wake of run.waiters) wake();run.waiters.clear(); };
 const wait = run => new Promise(resolve => { run.waiters.add(resolve); });
@@ -724,8 +726,14 @@ async function synthesize(run,item) {
   const audio = run.cache.get(key);
   if (audio) return audio;
   const send = run.options.engine === 'browser' && directBrowser ? browserRequest : request;
+  let timing;
+  if (mobile && send === browserRequest && run.options.mobileQuality === 'auto') {
+    const clip = run.source;
+    const remaining = clip ? Math.max(0, clip.duration - clip.media.currentTime) : 0;
+    timing = {availableMs: 1000 * (run.buffered + remaining) / run.options.speed};
+  }
   const value = await send('synthesize',{generation:run.generation,engine:run.options.engine,
-    voice:run.options.voice,text:item.text,lang:item.lang});
+    voice:run.options.voice,text:item.text,lang:item.lang,timing});
   if (session !== run) throw new DOMException('낭독 중지','AbortError');
   run.cache.set(key,value);
   while (run.cache.size > 8) run.cache.delete(run.cache.keys().next().value);
@@ -774,7 +782,7 @@ async function start(entry,paused = false,cache = new Map()) {
   session = run;selected = entry;
   $('speechListen').disabled = true;$('speechPause').disabled = false;
   $('speechPause').textContent = paused ? '이어 듣기' : '일시중지';
-  $('speechEngine').disabled = $('speechVoice').disabled = $('speechLanguage').disabled = true;
+  $('speechMobileQuality').disabled = $('speechEngine').disabled = $('speechVoice').disabled = $('speechLanguage').disabled = true;
   status(paused ? '일시중지됨' : '다음 문장을 미리 준비하는 중…');
   try {
     audioContext ||= new AudioContext();
