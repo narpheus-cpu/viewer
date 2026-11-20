@@ -8,7 +8,7 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,
+const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,speed:1,
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
   panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
@@ -37,6 +37,7 @@ toolbar.innerHTML = `
   <label>낭독 방식 <select id="speechEngine"><option value="native">Supertonic 3 · 오프라인 고속</option><option value="browser">Supertonic 3 · 오프라인 브라우저</option></select></label>
   <label>목소리 <select id="speechVoice">${voices}</select></label>
   <label>언어 <select id="speechLanguage"><option value="auto">자동</option><option value="ko">한국어</option><option value="en">영어</option><option value="ja">일본어</option></select></label>
+  <label>속도 <span class="speech-speed-control"><input id="speechSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="낭독 속도"><output id="speechSpeedValue" for="speechSpeed">1.00배</output></span></label>
   <label>강조 <select id="speechHighlight"><option value="pastel">파스텔</option><option value="inverse">흑백반전</option><option value="underline">밑줄</option></select></label>
  </div>
  <div id="speechStatus" role="status" aria-live="polite"></div>
@@ -88,9 +89,10 @@ const settings = () => {
   const value=Object.fromEntries(Object.entries(defaults).map(([key,fallback]) =>
     [key, preferences[key]?.value ?? fallback]));
   if(mobile)value.engine='browser';
+  value.speed=normalizeSpeed(value.speed);
   return value;
 };
-const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',
+const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',
   showNotes:'viewerBracketNotes',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
   mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
   mp3From:'readerMp3From',mp3To:'readerMp3To'};
@@ -204,6 +206,7 @@ function applyPreferences() {
   for (const [key,id] of Object.entries(controls)) {
     const control = $(id);
     if (control.type === 'checkbox') control.checked = value[key];
+    else if (control.type === 'range') control.value = String(value[key]);
     else if ([...control.options].some(option => option.value === String(value[key]))) control.value = value[key];
   }
   speechSettings.open=value.panelOpen;
@@ -212,8 +215,24 @@ function applyPreferences() {
   $('speechPrepare').hidden = !directBrowser;
   document.documentElement.classList.toggle('speech-hide-notes', !value.showNotes);
   viewerSettings.showBracketNotes = value.showNotes;
+  applySpeechSpeed();
   paint();
   if(notesChanged&&viewerOverlay.classList.contains('active'))scheduleRepaginate();
+}
+function normalizeSpeed(value){
+  const number=Number(value);
+  return Number.isFinite(number)?Math.round(Math.min(2,Math.max(0.5,number))*20)/20:1;
+}
+function applySpeechSpeed(){
+  const speed=settings().speed;
+  $('speechSpeed').value=String(speed);
+  $('speechSpeed').setAttribute('aria-valuetext',speed.toFixed(2)+'배');
+  $('speechSpeedValue').value=speed.toFixed(2)+'배';
+  if(session){
+    session.options.speed=speed;
+    if(session.source&&audioContext)
+      session.source.playbackRate.setValueAtTime(speed,audioContext.currentTime);
+  }
 }
 function mergePreferences(value) {
   for (const [key,item] of Object.entries(value || {})) {
@@ -367,10 +386,10 @@ function remember(key,value) {
   }).catch(error => optionStatus((local ? '브라우저에는 저장됐습니다. 도우미 저장 실패 · ' : '옵션 저장 실패 · ') + error.message));
 }
 for (const [key,id] of Object.entries(controls)) {
-  $(id).addEventListener('change', async () => {
+  $(id).addEventListener(key==='speed'?'input':'change', async () => {
     const previous = settings();
-    remember(key,$(id).type === 'checkbox' ? $(id).checked : ['mp3From','mp3To'].includes(key)?Number($(id).value):$(id).value);
-    applyPreferences();
+    remember(key,$(id).type === 'checkbox' ? $(id).checked : key==='speed'?normalizeSpeed($(id).value):['mp3From','mp3To'].includes(key)?Number($(id).value):$(id).value);
+    if(key==='speed')applySpeechSpeed();else applyPreferences();
     if (key === 'showNotes') {
       noteCache.clear();blockCache.clear();saveViewerSettings();
       readerCloseNote();
@@ -607,7 +626,8 @@ async function play(run,item) {
   buffer.copyToChannel(pcm,0);
   await new Promise(resolve => {
     const source = audioContext.createBufferSource();
-    source.buffer = buffer;source.connect(audioContext.destination);run.source = source;
+    source.buffer = buffer;source.playbackRate.value=run.options.speed;
+    source.connect(audioContext.destination);run.source = source;
     const finish=()=>{
       source.onended=null;
       if(run.source===source)run.source=null;
@@ -855,7 +875,8 @@ window.readerSpeech = {
   notesVisible:() => settings().showNotes,
   inspect:() => ({entry:session?.entry || selected,paused:session?.paused ?? false,
     generation:session?.generation,buffered:session?.buffered || 0,queued:session?.queue.length || 0,
-    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,settings:settings(),nativeHelperOrigin,exportId}),
+    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.playbackRate.value,
+    settings:settings(),nativeHelperOrigin,exportId}),
   atAnchor,adjacent,spokenText,sectionData,sectionText,ready:preferenceReady
 };
 void readerReady.then(() => {
