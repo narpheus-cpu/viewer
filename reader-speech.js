@@ -82,7 +82,7 @@ let serial = 0, nativeHelperOrigin;
 const helperConnections=new Map(),helperFrames=new Map();
 const requests = new Map();
 let source = null, blockCache = new Map(), noteCache = new Map();
-let selected = null, session = null, audioContext = null, generation = 0, pendingListen = 0;
+let selected = null, session = null, audioContext = null, speechAudio = null, generation = 0, pendingListen = 0;
 const status = text => { $('speechStatus').textContent = text; };
 const optionStatus = text => { $('speechOptionsStatus').textContent = text; };
 const settings = () => {
@@ -230,9 +230,8 @@ function applySpeechSpeed(){
   $('speechSpeedValue').value=speed.toFixed(2)+'배';
   if(session){
     session.options.speed=speed;
-    if(session.source&&audioContext)
-      session.source.playbackRate.setValueAtTime(speed,audioContext.currentTime);
   }
+  speechAudio?.setSpeed(speed);
 }
 function mergePreferences(value) {
   for (const [key,item] of Object.entries(value || {})) {
@@ -583,6 +582,7 @@ function stop(clear = true) {
   if (old) {
     old.source?.stop();old.finishAudio?.();notify(old);old.queue.length = 0;
   }
+  speechAudio?.stop();
   cancelRequests();
   if (clear) selected = null;
   clearHighlight();
@@ -614,28 +614,26 @@ async function fillQueue(run,startEntry) {
         const audio = await synthesize(run,item);
         if (session !== run) return;
         const duration = audio.samples.byteLength/4/audio.sampleRate;
-        run.queue.push({...item,audio,duration});run.buffered += duration;notify(run);
+        run.queue.push({...item,audio,duration});run.buffered += duration;preloadAudio(run);notify(run);
       }
     }
   } catch (error) { if (session===run) run.error = error; }
   finally { run.done = true;notify(run); }
 }
+function preloadAudio(run){
+  if(session!==run||!run.source||!run.queue.length||run.queue[0].clip)return;
+  run.queue[0].clip=speechAudio.prepare(run.queue[0].audio);
+}
 async function play(run,item) {
-  const pcm = new Float32Array(item.audio.samples);
-  const buffer = audioContext.createBuffer(1,pcm.length,item.audio.sampleRate);
-  buffer.copyToChannel(pcm,0);
-  await new Promise(resolve => {
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;source.playbackRate.value=run.options.speed;
-    source.connect(audioContext.destination);run.source = source;
-    const finish=()=>{
-      source.onended=null;
-      if(run.source===source)run.source=null;
-      run.finishAudio=null;source.disconnect();resolve();
-    };
-    run.finishAudio=finish;source.onended=finish;
-    source.start();
-  });
+  speechAudio.setSpeed(run.options.speed);
+  const clip=item.clip||speechAudio.prepare(item.audio);run.source=clip;
+  const playing=speechAudio.play(clip,run.paused);
+  run.finishAudio=()=>clip.finish?.();
+  preloadAudio(run);
+  try{await playing;}finally{
+    if(run.source===clip)run.source=null;
+    run.finishAudio=null;
+  }
 }
 function playbackStatus(run){
   return run.options.engine==='native'
@@ -696,7 +694,9 @@ $('speechListen').onclick = async () => {
   $('speechListen').disabled=true;
   try{
     audioContext ||= new AudioContext();
-    await audioContext.resume();
+    speechAudio ||= new ReaderSpeechAudio(audioContext);
+    const unlocked=speechAudio.unlock();
+    await audioContext.resume();await unlocked;
     await preferenceReady;
   }catch(error){$('speechListen').disabled=false;status(error.message);return;}
   if(restoreInProgress)status('페이지 계산이 끝나면 선택한 문장부터 읽습니다…');
@@ -708,9 +708,14 @@ $('speechListen').onclick = async () => {
 $('speechPause').onclick = async () => {
   const run = session;if (!run) return;
   try {
-    if (run.paused) await audioContext.resume();else await audioContext.suspend();
+    if (run.paused) {
+      await audioContext.resume();if(session!==run)return;
+      run.paused=false;
+      try{await speechAudio.resume();}catch(error){run.paused=true;await audioContext.suspend();throw error;}
+    } else {
+      run.paused=true;speechAudio.pause();await audioContext.suspend();
+    }
     if (session!==run) return;
-    run.paused = !run.paused;
     $('speechPause').textContent = run.paused ? '이어 듣기' : '일시중지';
     status(run.paused?'일시중지됨':playbackStatus(run));
   } catch (error) { status(error.message); }
@@ -875,7 +880,9 @@ window.readerSpeech = {
   notesVisible:() => settings().showNotes,
   inspect:() => ({entry:session?.entry || selected,paused:session?.paused ?? false,
     generation:session?.generation,buffered:session?.buffered || 0,queued:session?.queue.length || 0,
-    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.playbackRate.value,
+    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.media.playbackRate,
+    mediaTime:session?.source?.media.currentTime,preservesPitch:session?.source?.media.preservesPitch,
+    preparedAudio:speechAudio?.clips.size||0,
     settings:settings(),nativeHelperOrigin,exportId}),
   atAnchor,adjacent,spokenText,sectionData,sectionText,ready:preferenceReady
 };
