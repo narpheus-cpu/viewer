@@ -100,7 +100,7 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,speed:1,
+const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
   panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
@@ -131,7 +131,9 @@ toolbar.innerHTML = `
   <label>언어 <select id="speechLanguage"><option value="auto">자동</option><option value="ko">한국어</option><option value="en">영어</option><option value="ja">일본어</option></select></label>
   <label>속도 <span class="speech-speed-control"><input id="speechSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="낭독 속도"><output id="speechSpeedValue" for="speechSpeed">1.00배</output></span></label>
   <label>강조 <select id="speechHighlight"><option value="pastel">파스텔</option><option value="inverse">흑백반전</option><option value="underline">밑줄</option></select></label>
+  <label class="speech-checkbox-option"><input id="speechSkipBrackets" type="checkbox"> ( )·〔 〕 안 내용 읽지 않기</label>
  </div>
+ <p class="speech-option-help">선택하면 (… )·〔…〕 안의 내용을 낭독과 MP3에서 제외합니다. 본문 표시는 유지됩니다.</p>
  <div id="speechStatus" role="status" aria-live="polite"></div>
  <div id="speechAssetStatus" role="status"></div>
  <progress id="speechAssetProgress" max="100" hidden></progress>
@@ -185,7 +187,7 @@ const settings = () => {
   return value;
 };
 const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',
-  showNotes:'viewerBracketNotes',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
+  showNotes:'viewerBracketNotes',skipBrackets:'speechSkipBrackets',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
   mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
   mp3From:'readerMp3From',mp3To:'readerMp3To'};
 const speechSettings=$('speechSettings');
@@ -481,14 +483,14 @@ for (const [key,id] of Object.entries(controls)) {
     const previous = settings();
     remember(key,$(id).type === 'checkbox' ? $(id).checked : key==='speed'?normalizeSpeed($(id).value):['mp3From','mp3To'].includes(key)?Number($(id).value):$(id).value);
     if(key==='speed')applySpeechSpeed();else applyPreferences();
-    if (key === 'showNotes') {
-      noteCache.clear();blockCache.clear();saveViewerSettings();
-      readerCloseNote();
+    if (key === 'showNotes' || key === 'skipBrackets') {
+      noteCache.clear();blockCache.clear();
+      if(key==='showNotes'){saveViewerSettings();readerCloseNote();}
       if (session) {
         const entry = session.entry, paused = session.paused;
-        stop(false);await start(entry,paused);
-      }
-      if (previous.showNotes !== settings().showNotes) scheduleRepaginate();
+        stop(false);await start(atAnchor(entry.start),paused);
+      } else if(selected) {selected=atAnchor(selected.start);paint();}
+      if (key==='showNotes' && previous.showNotes !== settings().showNotes) scheduleRepaginate();
     }
   });
 }
@@ -513,6 +515,39 @@ function withoutNotes(text) {
   for (const item of ranges) { result += text.slice(at,item.start);at = item.end; }
   return result + text.slice(at);
 }
+// Match the two opt-in narration exclusions without changing source offsets.
+const speechBracketPairs = new Map([['(',')'],['〔','〕']]);
+const speechBracketClosers=new Set(speechBracketPairs.values());
+let speechBracketSource=null,speechBracketRanges=[];
+function findSpeechBracketRanges(text){
+  const stack=[],ranges=[];
+  for(let at=0;at<text.length;at++){
+    const character=text[at];
+    if(speechBracketPairs.has(character))stack.push({start:at,end:speechBracketPairs.get(character),count:ranges.length});
+    else if(speechBracketClosers.has(character)&&stack.at(-1)?.end===character){
+      const opening=stack.pop();
+      ranges.length=opening.count;ranges.push({start:opening.start,end:at+1});
+    }
+  }
+  return ranges;
+}
+function maskSpeechBrackets(text,base){
+  if(!settings().skipBrackets)return text;
+  const canonical=readerCanonical();
+  if(speechBracketSource!==canonical){speechBracketSource=canonical;speechBracketRanges=findSpeechBracketRanges(canonical);}
+  // Slice the full-book ranges, retaining exact source offsets across sentences,
+  // pages, Markdown blocks and export sections. Unmatched brackets retain text.
+  const ranges=speechBracketRanges,end=base+text.length;
+  let lo=0,hi=ranges.length;
+  while(lo<hi){const mid=(lo+hi)>>>1;if(ranges[mid].end<=base)lo=mid+1;else hi=mid;}
+  const parts=[];let at=0;
+  for(let index=lo;index<ranges.length&&ranges[index].start<end;index++){
+    const left=Math.max(0,ranges[index].start-base),right=Math.min(text.length,ranges[index].end-base);
+    parts.push(text.slice(at,left),' '.repeat(right-left));at=right;
+  }
+  if(!parts.length)return text;
+  parts.push(text.slice(at));return parts.join('');
+}
 function notesForBlock(index) {
   if (noteCache.has(index)) return noteCache.get(index);
   const root = document.createElement('div');
@@ -532,8 +567,8 @@ function notesForBlock(index) {
   return results;
 }
 function spokenText(block,left,right) {
-  let text = cachedBlockTexts[block].slice(left,right);
-  if (settings().showNotes) {
+  let text = maskSpeechBrackets(cachedBlockTexts[block].slice(left,right),(cachedBlockStarts[block]||0)+left);
+  if (settings().showNotes && !settings().skipBrackets) {
     for (const item of notesForBlock(block).filter(n => n.offset > left && n.offset <= right).reverse())
       text = text.slice(0,item.offset-left) + item.text + text.slice(item.offset-left);
   } else text = withoutNotes(text);
@@ -542,7 +577,7 @@ function spokenText(block,left,right) {
 function sentences(block) {
   if (blockCache.has(block)) return blockCache.get(block);
   const text = cachedBlockTexts[block] || '', base = cachedBlockStarts[block] || 0;
-  let boundaryText=text;
+  let boundaryText=maskSpeechBrackets(text,base);
   if(!settings().showNotes){
     for(const note of readerFindNoteRanges(text).reverse())
       boundaryText=boundaryText.slice(0,note.start)+' '.repeat(note.end-note.start)+boundaryText.slice(note.end);
