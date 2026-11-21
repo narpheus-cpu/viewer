@@ -161,7 +161,7 @@ const readerStats={splits:0,cacheHits:0,visibleRenders:0,measurements:0,lastPagi
 let resolveReaderReady;
 const readerReady=new Promise(resolve=>{resolveReaderReady=resolve;});
 const readerBrowserResume={away:false,settling:false,timer:0,frame:0};
-const READER_CACHE_VERSION=9;
+const READER_CACHE_VERSION=10;
 const READER_COUNT_VERSION='non-whitespace-v1';
 const READER_CACHE_DB='ebookViewerLayoutCacheV1';
 
@@ -952,14 +952,14 @@ function readerPronunciationHTML(html){
   }
   return root.innerHTML;
 }
-function readerMarkdownNoteBlocks(text){
+function readerMarkdownNoteBlocks(text,sourceContext={}){
   const notes=readerFindNoteRanges(text);
-  if(!notes.length)return markdownToBlocks(text).map(readerPronunciationHTML);
+  if(!notes.length)return markdownToBlocks(text,sourceContext).map(readerPronunciationHTML);
   let prefix='\uE000readerNote';while(text.includes(prefix))prefix+='\uE000';
   let protectedText='',at=0;
   notes.forEach((note,index)=>{protectedText+=text.slice(at,note.start)+prefix+index+'\uE001';at=note.end;});
   protectedText+=text.slice(at);
-  return markdownToBlocks(protectedText).map(html=>readerPronunciationHTML(readerFootnoteHTML(html,{notes,prefix})));
+  return markdownToBlocks(protectedText,sourceContext).map(html=>readerPronunciationHTML(readerFootnoteHTML(html,{notes,prefix})));
 }
 function readerFootnoteHTML(html,protectedNotes=null){
   if(!protectedNotes&&!html.includes('〔'))return html;
@@ -2195,7 +2195,9 @@ function readerChapterBlocks(text){
   const blocks=[],plainTexts=[];let anchor=0;
   bookChapters.forEach((chapter,index)=>{
     chapterBlockBoundaries.add(blocks.length);chapterCanonicalStarts.push(anchor);
-    const part=chapter.blocks?chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length));
+    const part=chapter.blocks?chapter.blocks.map(html=>readerPronunciationHTML(readerFootnoteHTML(html))):readerMarkdownNoteBlocks(text.slice(chapter.start,bookChapters[index+1]?.start??text.length),{
+      blankBefore:chapter.start>0&&!text.slice(0,chapter.start).replace(/\n$/,'').split('\n').at(-1).trim()
+    });
     const content=part.length?part:['<p></p>'];
     blocks.push(...content);
     for(const html of content){const plain=htmlToStableText(html);plainTexts.push(plain);anchor+=plain.length+1;}
@@ -2725,7 +2727,7 @@ function setupReaderTools(){
 
 </script>
 <link rel="stylesheet" href="./reader-insights.css?v=9">
-<link rel="stylesheet" href="./reader-speech.css?v=6">
+<link rel="stylesheet" href="./reader-speech.css?v=7">
 <script src="./reader-insights-data.js?v=15"></script>
 </head>
 <body>
@@ -3358,7 +3360,7 @@ function visiblePageCount(){return getComputedStyle(pageInnerRight.parentElement
 
 function getLayoutSignature(){
   const rect=pageInnerLeft.getBoundingClientRect(),style=getComputedStyle(pageInnerLeft);
-  return JSON.stringify(['layout-v8-uppercase-periods',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
+  return JSON.stringify(['layout-v9-title-cues',chapterSignature,readerBreakKey(),rect.width,rect.height,devicePixelRatio,
     viewerSettings.font,viewerSettings.font==='custom'?readerState.fontId:'system',
     style.fontFamily,style.fontSize,style.lineHeight,style.letterSpacing,style.wordBreak,style.overflowWrap,
     viewerSettings.padTop,viewerSettings.padBottom,viewerSettings.padLeft,viewerSettings.padRight,
@@ -3949,7 +3951,17 @@ function renderTable(headerLine,separatorLine,rowLines){
   return html;
 }
 
-function markdownToBlocks(md){
+function readerCueLineType(lines,index,sourceContext={}){
+  const text=lines[index].trim();
+  if(/^\[[\s\S]+\]$/.test(text)&&/[\p{L}\p{N}]/u.test(text))return 'bracket';
+  const blankBefore=index>0?!lines[index-1].trim():sourceContext.blankBefore===true;
+  const blankAfter=index+1<lines.length&&!lines[index+1].trim();
+  if(blankBefore&&blankAfter
+    &&/[\p{L}\p{M}\p{N}!！]$/u.test(text)&&!/[.。．]/u.test(text))return 'plain';
+  return null;
+}
+
+function markdownToBlocks(md,sourceContext={}){
   md=String(md||'').replace(/\r/g,'');
   const blocks=[];
   const lines=md.split('\n');
@@ -3967,6 +3979,13 @@ function markdownToBlocks(md){
       if(i<lines.length)i++;
       blocks.push(`<pre><code${lang?` data-lang="${escapeHtml(lang)}"`:''}>${escapeHtml(code.join('\n'))}</code></pre>`);
       continue;
+    }
+
+    const cueTitle=readerCueLineType(lines,i,sourceContext);
+    if(cueTitle){
+      const titleText=line.replace(/^(#{1,4})\s+/,'');
+      blocks.push('<p data-reader-title="'+cueTitle+'">'+inlineMarkdown(titleText)+'</p>');
+      i++;continue;
     }
 
     const heading=line.match(/^(#{1,4})\s+(.+)$/);
@@ -4025,6 +4044,7 @@ function markdownToBlocks(md){
       lines[i].trim()&&
       !/^(#{1,4})\s+/.test(lines[i])&&
       !/^```/.test(lines[i])&&
+      !readerCueLineType(lines,i,sourceContext)&&
       !/^>\s?/.test(lines[i])&&
       !/^\s*[-*+]\s+/.test(lines[i])&&
       !/^\s*\d+\.\s+/.test(lines[i])&&
@@ -4166,6 +4186,7 @@ async function repaginate(){
 }
 
 function goPrevPage(){
+  if(window.readerSpeech?.sentenceMode()){void window.readerSpeech.turnSentence(-1);return;}
   if(readerLazyActive()){void readerLazyTurn(-1);return;}
   if(restoreInProgress)return;
   if(pageIndex>0){
@@ -4176,6 +4197,7 @@ function goPrevPage(){
 }
 
 function goNextPage(){
+  if(window.readerSpeech?.sentenceMode()){void window.readerSpeech.turnSentence(1);return;}
   if(restoreInProgress)return;
   const ticket=window.readerInsights?.prepareAdvance();
   if(readerLazyActive()){
@@ -4553,6 +4575,6 @@ if(syncReading){
 </script>
 <script src="./reader-insights.js?v=15" defer></script>
 <script src="./reader-insights-nav.js?v=11" defer></script>
-<script src="./reader-speech.js?v=15" defer></script>
+<script src="./reader-speech.js?v=16" defer></script>
 </body>
 </html>

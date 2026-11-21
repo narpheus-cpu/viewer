@@ -100,7 +100,7 @@ const STORAGE = 'ebookViewerSpeechOptionsV1';
 const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && location.origin !== ORIGIN;
-const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,
+const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,viewMode:'book',
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
   panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
@@ -130,6 +130,7 @@ toolbar.innerHTML = `
   <label>목소리 <select id="speechVoice">${voices}</select></label>
   <label>언어 <select id="speechLanguage"><option value="auto">자동</option><option value="ko">한국어</option><option value="en">영어</option><option value="ja">일본어</option></select></label>
   <label>속도 <span class="speech-speed-control"><input id="speechSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="낭독 속도"><output id="speechSpeedValue" for="speechSpeed">1.00배</output></span></label>
+  <label>보기 <select id="speechViewMode"><option value="book">전자책</option><option value="sentence">한문장</option></select></label>
   <label>강조 <select id="speechHighlight"><option value="pastel">파스텔</option><option value="inverse">흑백반전</option><option value="underline">밑줄</option></select></label>
   <label class="speech-checkbox-option"><input id="speechSkipBrackets" type="checkbox"> ( )·〔 〕 안 내용 읽지 않기</label>
  </div>
@@ -145,6 +146,20 @@ localLink.target='_blank';localLink.rel='noopener';
 localLink.textContent='로컬 실행 화면 열기';localLink.hidden=true;
 toolbar.querySelector('.speech-settings-body').append(localLink);
 $('chapterNav').before(toolbar);
+const singleButton=document.createElement('button');
+singleButton.id='openSentenceViewerBtn';singleButton.type='button';singleButton.className='primary';
+singleButton.textContent='한문장으로 보기';
+$('openViewerBtn').after(singleButton);
+singleButton.onclick=async()=>{remember('viewMode','sentence');applyPreferences();await openViewer();};
+$('openViewerBtn').addEventListener('click',()=>{remember('viewMode','book');applyPreferences();},{capture:true});
+const sentenceView=document.createElement('section');
+sentenceView.id='sentenceReading';sentenceView.hidden=true;
+sentenceView.innerHTML='<div id="sentenceText"></div><div class="sentence-navigation"><button type="button" id="sentencePrevious">이전 문장</button><button type="button" id="sentenceNext">다음 문장</button></div>';
+$('pageSpread').append(sentenceView);
+sentenceView.addEventListener('pointerdown',event=>event.stopPropagation());
+sentenceView.addEventListener('click',event=>event.stopPropagation());
+$('sentencePrevious').onclick=()=>void move(-1);
+$('sentenceNext').onclick=()=>void move(1);
 const noteLabel = document.createElement('label');
 noteLabel.className = 'reader-spacing-option';
 noteLabel.innerHTML = '<input id="viewerBracketNotes" type="checkbox" checked> 〔 〕 안의 주석 표시';
@@ -186,7 +201,7 @@ const settings = () => {
   value.speed=normalizeSpeed(value.speed);
   return value;
 };
-const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',
+const controls = {engine:'speechEngine',voice:'speechVoice',language:'speechLanguage',highlight:'speechHighlight',speed:'speechSpeed',viewMode:'speechViewMode',
   showNotes:'viewerBracketNotes',skipBrackets:'speechSkipBrackets',mp3Model:'readerMp3Model',mp3Voice:'readerMp3Voice',
   mp3Bitrate:'readerMp3Bitrate',mp3Split:'readerMp3Split',mp3Scope:'readerMp3Scope',
   mp3From:'readerMp3From',mp3To:'readerMp3To'};
@@ -325,7 +340,7 @@ function applySpeechSpeed(){
   if(session){
     session.options.speed=speed;
   }
-  speechAudio?.setSpeed(speed);
+  speechAudio?.setSpeed(session?.phase&&session.phase!=='speech'?1:speed);
 }
 function mergePreferences(value) {
   for (const [key,item] of Object.entries(value || {})) {
@@ -574,6 +589,10 @@ function spokenText(block,left,right) {
   } else text = withoutNotes(text);
   return text.replace(/※/g,'').replace(/\s+/g,' ').trim();
 }
+function titleType(block){
+  const match=(cachedOriginalBlocks[block]||'').match(/data-reader-title="(plain|bracket)"/);
+  return match?.[1]||null;
+}
 function sentences(block) {
   if (blockCache.has(block)) return blockCache.get(block);
   const text = cachedBlockTexts[block] || '', base = cachedBlockStarts[block] || 0;
@@ -582,7 +601,8 @@ function sentences(block) {
     for(const note of readerFindNoteRanges(text).reverse())
       boundaryText=boundaryText.slice(0,note.start)+' '.repeat(note.end-note.start)+boundaryText.slice(note.end);
   }
-  const ends = readerSentenceEnds(boundaryText,cachedQuoteRoles,base);
+  const title=titleType(block);
+  const ends = title ? [text.length] : readerSentenceEnds(boundaryText,cachedQuoteRoles,base);
   if (ends.at(-1) !== text.length) ends.push(text.length);
   const result = [];
   let left = 0;
@@ -590,8 +610,10 @@ function sentences(block) {
     let start = left, right = end;
     while (start < right && /\s/.test(boundaryText[start])) start++;
     while (right > start && /\s/.test(boundaryText[right-1])) right--;
-    if (/[\p{L}\p{N}]/u.test(boundaryText.slice(start,right)))
-      result.push({block,left:start,right,start:base+start,end:base+right});
+    const summary=text.slice(left,end).indexOf('(3줄 요약)');
+    if(summary>=0){start=Math.min(start,left+summary);right=Math.max(right,left+summary+'(3줄 요약)'.length);}
+    if (/[\p{L}\p{N}]/u.test(boundaryText.slice(start,right)) || summary>=0)
+      result.push({block,left:start,right,start:base+start,end:base+right,title});
     left = end;
   }
   if (blockCache.size >= 32) blockCache.delete(blockCache.keys().next().value);
@@ -639,8 +661,30 @@ function clearHighlight() {
     const parent = mark.parentNode;mark.replaceWith(...mark.childNodes);parent.normalize();
   }
 }
+function renderSentenceView(){
+  const enabled=settings().viewMode==='sentence';
+  $('pageSpread').classList.toggle('sentence-mode',enabled);
+  sentenceView.hidden=!enabled;
+  if(!enabled||!pages.length||source!==fullText)return;
+  const entry=session?.entry||selected||atAnchor(readerAnchor());
+  if(!entry){$('sentenceText').replaceChildren();return;}
+  const style=getComputedStyle(pageInnerLeft);
+  for(const key of ['fontFamily','fontSize','lineHeight','letterSpacing','paddingTop','paddingBottom','paddingLeft','paddingRight'])
+    $('sentenceText').style[key]=style[key];
+  const html=readerBlockSlicer(cachedOriginalBlocks[entry.block])(entry.left,entry.right);
+  $('sentenceText').innerHTML=html;
+  if(entry.title)$('sentenceText').firstElementChild?.setAttribute('data-reader-title',entry.title);
+  sentenceView.dataset.start=entry.start;
+}
+function saveStoppedSentence(entry){
+  if(!entry||source!==fullText||restoreInProgress)return;
+  const text=readerCanonical(),start=entry.start;
+  readerChooseAnchor(start,{before:text.slice(Math.max(0,start-128),start),after:text.slice(start,entry.end+128)});
+  flushReadingSessionSave(true);
+  flushActiveRecentPositionSave();
+}
 function paintNotes() {
-  for (const root of [pageInnerLeft,pageInnerRight]) {
+  for (const root of [pageInnerLeft,pageInnerRight,$('sentenceText')]) {
     for (const node of root.querySelectorAll('[data-reader-note]:not([data-reader-pronunciation])')) {
       node.classList.toggle('speech-note-hidden',!settings().showNotes);
       node.classList.toggle('speech-note-marker',node.textContent === '※');
@@ -649,7 +693,7 @@ function paintNotes() {
   }
 }
 function paint() {
-  clearHighlight();paintNotes();
+  clearHighlight();renderSentenceView();paintNotes();
   const entry = session?.entry || selected;
   if (!entry || source !== fullText) return;
   const ranges = [];
@@ -675,6 +719,9 @@ function paint() {
       }
       base = offset+1;
     }
+  }
+  if(settings().viewMode==='sentence'&&Number(sentenceView.dataset.start)===entry.start){
+    const range=document.createRange();range.selectNodeContents($('sentenceText'));ranges.push(range);
   }
   if (globalThis.CSS?.highlights && typeof Highlight === 'function') {
     CSS.highlights.set('speech-current-sentence',new Highlight(...ranges));
@@ -707,6 +754,7 @@ function stop(clear = true) {
   pendingListen++;
   const old = session;session = null;
   if (old) {
+    saveStoppedSentence(old.entry);
     old.source?.stop();old.finishAudio?.();notify(old);old.queue.length = 0;
   }
   speechAudio?.stop();
@@ -731,15 +779,52 @@ async function synthesize(run,item) {
   while (run.cache.size > 8) run.cache.delete(run.cache.keys().next().value);
   return value;
 }
+const cueFiles={plain:'standalone-title.mp3',bracket:'bracket-title.mp3',quote:'quote-revised.mp3',summary:'summary.mp3'};
+const decodedCues=new Map();
+const cueSilence={samples:new Float32Array(16000),sampleRate:16000};
+async function cueAudio(kind){
+  if(!decodedCues.has(kind))decodedCues.set(kind,(async()=>{
+    const response=await fetch(new URL('./sounds/'+cueFiles[kind],document.baseURI));
+    if(!response.ok)throw Error('효과음을 불러오지 못했습니다.');
+    const audio=await audioContext.decodeAudioData(await response.arrayBuffer());
+    const samples=new Float32Array(audio.length);
+    for(let channel=0;channel<audio.numberOfChannels;channel++){
+      const values=audio.getChannelData(channel);
+      for(let n=0;n<values.length;n++)samples[n]+=values[n]/audio.numberOfChannels;
+    }
+    return {samples,sampleRate:audio.sampleRate};
+  })().catch(error=>{decodedCues.delete(kind);throw error;}));
+  return decodedCues.get(kind);
+}
+function* sentencePlan(entry){
+  if(entry.title){yield {kind:'cue',cue:entry.title};yield {kind:'gap'};}
+  const raw=cachedBlockTexts[entry.block].slice(entry.left,entry.right);
+  if(/^\s*["“]/u.test(raw))yield {kind:'cue',cue:'quote'};
+  let left=0;
+  for(const marker of raw.matchAll(/\(3줄 요약\)/g)){
+    const before=spokenText(entry.block,entry.left+left,entry.left+marker.index);
+    for(const text of chunks(before))yield {kind:'speech',text};
+    yield {kind:'cue',cue:'summary'};yield {kind:'gap'};
+    left=marker.index;
+    if(settings().skipBrackets)left+=marker[0].length;
+    else{
+      // Keep the marker after its cue without matching it a second time.
+      const spoken=spokenText(entry.block,entry.left+left,entry.left+left+marker[0].length);
+      for(const text of chunks(spoken))yield {kind:'speech',text};
+      left+=marker[0].length;
+    }
+  }
+  for(const text of chunks(spokenText(entry.block,entry.left+left,entry.right)))yield {kind:'speech',text};
+}
 async function fillQueue(run,startEntry) {
   try {
     for (let entry=startEntry;entry && session===run;entry=adjacent(entry,1)) {
-      for (const text of chunks(spokenText(entry.block,entry.left,entry.right))) {
+      for (const part of sentencePlan(entry)) {
         while (session===run && (run.buffered >= 16 || run.queue.length >= 6)) await wait(run);
         if (session !== run) return;
-        const item = {entry,text,lang:language(text)};
-        run.pendingLength = text.length;
-        const audio = await synthesize(run,item);
+        const item={...part,entry,lang:part.text?language(part.text):null};
+        run.pendingLength=part.text?.length||0;
+        const audio=part.kind==='speech'?await synthesize(run,item):part.kind==='gap'?cueSilence:await cueAudio(part.cue);
         if (session !== run) return;
         const duration = audio.samples.byteLength/4/audio.sampleRate;
         run.queue.push({...item,audio,duration});run.buffered += duration;preloadAudio(run);notify(run);
@@ -749,11 +834,12 @@ async function fillQueue(run,startEntry) {
   finally { run.done = true;notify(run); }
 }
 function preloadAudio(run){
-  if(session!==run||!run.source||!run.queue.length||run.queue[0].clip)return;
+  if(session!==run||!run.source||!run.queue.length||run.queue[0].clip||speechAudio.clips.size>=2)return;
   run.queue[0].clip=speechAudio.prepare(run.queue[0].audio);
 }
 async function play(run,item) {
-  speechAudio.setSpeed(run.options.speed);
+  run.phase=item.kind||'speech';run.cue=item.cue||null;
+  speechAudio.setSpeed(run.phase==='speech'?run.options.speed:1);
   const clip=item.clip||speechAudio.prepare(item.audio);run.source=clip;
   const playing=speechAudio.play(clip,run.paused);
   run.finishAudio=()=>clip.finish?.();
@@ -831,7 +917,7 @@ async function start(entry,paused = false,cache = new Map(),continuousStart = fa
 }
 async function move(direction) {
   refreshBook();
-  const target = adjacent(session?.entry || selected || atAnchor(pageAnchors[pageIndex] || 0),direction);
+  const target = adjacent(session?.entry || selected || atAnchor(readerAnchor()),direction);
   if (!target) { status(direction>0?'마지막 문장입니다.':'첫 문장입니다.');return; }
   if (session) {
     const paused = session.paused,cache = session.cache;
@@ -1030,10 +1116,11 @@ $('readerMp3Cancel').onclick = async () => {
 window.readerSpeech = {
   render() {refreshBook();paint();},
   close() {stop();picker.close();mp3.close();},
+  sentenceMode:()=>settings().viewMode==='sentence',turnSentence:move,
   notesVisible:() => settings().showNotes,
   inspect:() => ({entry:session?.entry || selected,paused:session?.paused ?? false,
     generation:session?.generation,buffered:session?.buffered || 0,queued:session?.queue.length || 0,
-    sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.media.playbackRate,
+    phase:session?.phase,cue:session?.cue,sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.media.playbackRate,
     mediaTime:session?.source?.media.currentTime,preservesPitch:session?.source?.media.preservesPitch,
     preparedAudio:speechAudio?.clips.size||0,
     settings:settings(),nativeHelperOrigin,exportId}),

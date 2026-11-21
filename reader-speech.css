@@ -50,3 +50,15 @@ mark.speech-sentence{background:#ffe7b0;color:#111}
 .speech-hide-notes .reader-note:not([data-reader-pronunciation]){background:transparent!important;font-style:inherit!important;cursor:inherit!important}
 .speech-hide-notes [data-reader-empty-note],.speech-hide-notes [data-reader-bracket-literal]{display:none!important}
 @media(max-height:550px){#speechToolbar{padding:2px 5px}#speechToolbar .speech-main-actions button{min-height:36px}.speech-settings-body{max-height:48vh;max-height:48dvh}}
+.page-inner [data-reader-title="plain"],#sentenceText [data-reader-title="plain"]{background:#000!important;color:#fff!important;-webkit-text-fill-color:#fff!important}
+[data-reader-title="plain"]::highlight(speech-current-sentence){background:#000;color:#fff}
+[data-reader-title="plain"] mark.speech-sentence{background:#000!important;color:#fff!important;-webkit-text-fill-color:#fff!important}
+#pageSpread{position:relative}
+#pageSpread.sentence-mode>.page{visibility:hidden}
+#sentenceReading{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;background:var(--paper,#fff);z-index:2}
+#sentenceReading[hidden]{display:none}
+#sentenceText{flex:1;overflow:auto;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere}
+#sentenceText>p{margin:0}
+.sentence-navigation{display:flex;justify-content:center;gap:20px;padding:8px}
+#openSentenceViewerBtn{margin-top:8px;width:100%}
+.page-inner [data-reader-title="plain"] *,#sentenceText [data-reader-title="plain"] *{color:#fff!important;-webkit-text-fill-color:#fff!important;background-color:transparent!important}
