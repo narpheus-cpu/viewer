@@ -669,8 +669,10 @@ function renderSentenceView(){
   const entry=session?.entry||selected||atAnchor(readerAnchor());
   if(!entry){$('sentenceText').replaceChildren();return;}
   const style=getComputedStyle(pageInnerLeft);
-  for(const key of ['fontFamily','fontSize','lineHeight','letterSpacing','paddingTop','paddingBottom','paddingLeft','paddingRight'])
+  for(const key of ['fontFamily','fontSize','lineHeight','letterSpacing'])
     $('sentenceText').style[key]=style[key];
+  const pageStyle=getComputedStyle(pageInnerLeft.parentElement);
+  for(const key of ['paddingTop','paddingBottom','paddingLeft','paddingRight'])$('sentenceText').style[key]=pageStyle[key];
   const html=readerBlockSlicer(cachedOriginalBlocks[entry.block])(entry.left,entry.right);
   $('sentenceText').innerHTML=html;
   if(entry.title)$('sentenceText').firstElementChild?.setAttribute('data-reader-title',entry.title);
