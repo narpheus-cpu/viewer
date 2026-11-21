@@ -602,7 +602,14 @@ function sentences(block) {
       boundaryText=boundaryText.slice(0,note.start)+' '.repeat(note.end-note.start)+boundaryText.slice(note.end);
   }
   const title=titleType(block);
-  const ends = title ? [text.length] : readerSentenceEnds(boundaryText,cachedQuoteRoles,base);
+  const boundaries = title ? [text.length] : readerSentenceEnds(boundaryText,cachedQuoteRoles,base);
+  if(!title){
+    // A speaker label and its quoted dialogue can share a paragraph.
+    // Keep the canonical position of the opening quote as a sentence boundary.
+    const labels=/(?:^|\n)[ \t]*[\p{L}\p{N}_ ·\-]{1,48}[:：][ \t]*(?:\n[ \t]*)+(?=["“])/gu;
+    for(const match of boundaryText.matchAll(labels))boundaries.push(match.index+match[0].length);
+  }
+  const ends=[...new Set(boundaries)].sort((a,b)=>a-b);
   if (ends.at(-1) !== text.length) ends.push(text.length);
   const result = [];
   let left = 0;
@@ -792,7 +799,7 @@ async function cueAudio(kind){
     const samples=new Float32Array(audio.length);
     for(let channel=0;channel<audio.numberOfChannels;channel++){
       const values=audio.getChannelData(channel);
-      for(let n=0;n<values.length;n++)samples[n]+=values[n]/audio.numberOfChannels;
+      for(let n=0;n<values.length;n++)samples[n]+=0.8*values[n]/audio.numberOfChannels;
     }
     return {samples,sampleRate:audio.sampleRate};
   })().catch(error=>{decodedCues.delete(kind);throw error;}));

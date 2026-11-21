@@ -1,8 +1,8 @@
 /* App files only. User books remain in the reader's existing local database. */
-const CACHE = 'ebook-reader-app-mobile-15';
+const CACHE = 'ebook-reader-app-mobile-16';
 const CORE = [
   './sounds/standalone-title.mp3', './sounds/bracket-title.mp3', './sounds/quote-revised.mp3', './sounds/summary.mp3',
-  './', './index.html', './reader-speech.js?v=17', './reader-speech.css?v=7',
+  './', './index.html', './reader-speech.js?v=18', './reader-speech.css?v=7',
   './reader-insights.css?v=9', './reader-insights-data.js?v=15',
   './reader-insights.js?v=15', './reader-insights-nav.js?v=11',
   './supertonic3/browser-worker.mjs?v=3', './supertonic3/asset-list.mjs', './supertonic3/upstream.mjs?v=2',
