@@ -114,13 +114,13 @@ toolbar.innerHTML = `
   <button id="speechNext" type="button" aria-label="다음 문장">&gt;&gt;</button>
   <button id="speechListen" type="button">듣기</button>
   <button id="speechPause" type="button" disabled>일시중지</button>
+  <button id="speechStop" type="button">중지</button>
  </div>
  <details id="speechSettings">
  <summary id="speechSettingsToggle">듣기 설정<span id="speechCompactStatus" role="status" aria-live="polite"></span></summary>
  <div class="speech-settings-body">
  <div class="speech-actions">
   <button id="speechPickSentence" type="button">시작 문장 선택</button>
-  <button id="speechStop" type="button">중지</button>
   <button id="readerMp3Open" type="button">MP3 만들기</button>
   <button id="speechPrepare" type="button">낭독 파일 저장</button>
   <button id="speechPrepareCancel" type="button" hidden>파일 저장 취소</button>

@@ -1,5 +1,5 @@
 #speechToolbar{position:relative;z-index:30;flex:0 0 auto;border-bottom:1px solid var(--line,#bbb);padding:5px 8px;font-size:12px;background:var(--paper,#fff)}
-.speech-main-actions{display:grid;grid-template-columns:minmax(36px,.7fr) minmax(36px,.7fr) minmax(48px,1fr) minmax(82px,1.4fr);gap:4px;max-width:440px}
+.speech-main-actions{display:grid;grid-template-columns:minmax(30px,.6fr) minmax(30px,.6fr) minmax(42px,.9fr) minmax(66px,1.3fr) minmax(40px,.7fr);gap:4px;max-width:500px}
 #speechToolbar .speech-main-actions button{min-height:40px;white-space:nowrap;min-width:0}
 #speechSettings{position:relative;margin-top:3px}
 #speechSettingsToggle{cursor:pointer;padding:4px 2px;min-height:20px;line-height:20px;user-select:none}
