@@ -1,18 +1,33 @@
 {
-  "id": "./",
+  "id": "/viewer/ebook-reader-app",
   "name": "전자책 뷰어",
   "short_name": "전자책 뷰어",
   "description": "텍스트와 EPUB을 읽고 읽던 위치와 보기 설정을 기억하는 전자책 뷰어",
   "lang": "ko",
-  "start_url": "./?app=1",
-  "scope": "./",
+  "start_url": "/viewer/?app=1",
+  "scope": "/viewer/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#202020",
   "prefer_related_applications": false,
   "icons": [
-    { "src": "./icons/reader-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icons/reader-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "./icons/reader-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icons/reader-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/reader-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/reader-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
