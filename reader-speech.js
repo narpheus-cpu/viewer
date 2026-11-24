@@ -156,7 +156,9 @@ const sentenceView=document.createElement('section');
 sentenceView.id='sentenceReading';sentenceView.hidden=true;
 sentenceView.innerHTML='<div id="sentenceText"></div><div class="sentence-navigation"><button type="button" id="sentencePrevious">이전 문장</button><button type="button" id="sentenceNext">다음 문장</button></div>';
 $('pageSpread').append(sentenceView);
-sentenceView.addEventListener('pointerdown',event=>event.stopPropagation());
+sentenceView.addEventListener('pointerdown',event=>{
+  if(!event.target.closest?.('[data-reader-note],[data-reader-year]'))event.stopPropagation();
+});
 sentenceView.addEventListener('click',event=>event.stopPropagation());
 $('sentencePrevious').onclick=()=>void move(-1);
 $('sentenceNext').onclick=()=>void move(1);
@@ -530,6 +532,31 @@ function withoutNotes(text) {
   for (const item of ranges) { result += text.slice(at,item.start);at = item.end; }
   return result + text.slice(at);
 }
+// Pronunciations are popup-only, regardless of either bracket/note preference.
+function withoutPronunciations(text) {
+  for (const note of readerFindPronunciations(text).reverse())
+    text = text.slice(0,note.start) + text.slice(note.end);
+  return text;
+}
+let speechPronunciationSource=null,speechPronunciationRanges=[];
+function maskSpeechPronunciations(text,base) {
+  const canonical=readerCanonical();
+  if(speechPronunciationSource!==canonical){
+    speechPronunciationSource=canonical;speechPronunciationRanges=readerFindPronunciations(canonical);
+  }
+  // Match against the complete canonical text before slicing. Even a page,
+  // sentence or synthesis-chunk boundary inside /IPA/ cannot expose a fragment.
+  const ranges=speechPronunciationRanges,end=base+text.length;
+  let lo=0,hi=ranges.length;
+  while(lo<hi){const mid=(lo+hi)>>>1;if(ranges[mid].end<=base)lo=mid+1;else hi=mid;}
+  const parts=[];let at=0;
+  for(let index=lo;index<ranges.length&&ranges[index].start<end;index++){
+    const left=Math.max(0,ranges[index].start-base),right=Math.min(text.length,ranges[index].end-base);
+    parts.push(text.slice(at,left),' '.repeat(right-left));at=right;
+  }
+  if(!parts.length)return text;
+  parts.push(text.slice(at));return parts.join('');
+}
 // Match the two opt-in narration exclusions without changing source offsets.
 const speechBracketPairs = new Map([['(',')'],['〔','〕']]);
 const speechBracketClosers=new Set(speechBracketPairs.values());
@@ -574,7 +601,7 @@ function notesForBlock(index) {
     if (node.nodeName === 'BR') { if (!node.hasAttribute('data-reader-break')) offset++;return; }
     for (const child of node.childNodes) walk(child);
     if (node.hasAttribute?.('data-reader-note') && !node.hasAttribute('data-reader-pronunciation'))
-      results.push({offset,text:' ' + node.getAttribute('data-reader-note') + ' '});
+      results.push({offset,text:' ' + withoutPronunciations(node.getAttribute('data-reader-note')) + ' '});
   }
   walk(root);
   if (noteCache.size > 32) noteCache.delete(noteCache.keys().next().value);
@@ -582,7 +609,8 @@ function notesForBlock(index) {
   return results;
 }
 function spokenText(block,left,right) {
-  let text = maskSpeechBrackets(cachedBlockTexts[block].slice(left,right),(cachedBlockStarts[block]||0)+left);
+  const base=(cachedBlockStarts[block]||0)+left;
+  let text = maskSpeechPronunciations(maskSpeechBrackets(cachedBlockTexts[block].slice(left,right),base),base);
   if (settings().showNotes && !settings().skipBrackets) {
     for (const item of notesForBlock(block).filter(n => n.offset > left && n.offset <= right).reverse())
       text = text.slice(0,item.offset-left) + item.text + text.slice(item.offset-left);
@@ -596,7 +624,7 @@ function titleType(block){
 function sentences(block) {
   if (blockCache.has(block)) return blockCache.get(block);
   const text = cachedBlockTexts[block] || '', base = cachedBlockStarts[block] || 0;
-  let boundaryText=maskSpeechBrackets(text,base);
+  let boundaryText=maskSpeechPronunciations(maskSpeechBrackets(text,base),base);
   if(!settings().showNotes){
     for(const note of readerFindNoteRanges(text).reverse())
       boundaryText=boundaryText.slice(0,note.start)+' '.repeat(note.end-note.start)+boundaryText.slice(note.end);
