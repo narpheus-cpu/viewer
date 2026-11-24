@@ -5,9 +5,10 @@
   const actions=button.closest('.reader-app-actions');
   const notice=document.getElementById('readerAppInstallNotice');
   const standalone=matchMedia('(display-mode: standalone)');
-  const appManifest=new URL('/viewer/reader-app.webmanifest',location.origin).href;
-  const appIdentity=new URL('/viewer/ebook-reader-app',location.origin).href;
-  const freshInstallUrl=new URL('/viewer/?install=3',location.origin).href;
+  const installationOrigin=/^https?:$/.test(location.protocol)?location.origin:'https://narpheus-cpu.github.io';
+  const appManifest=new URL('/viewer/reader-app.webmanifest',installationOrigin).href;
+  const appIdentity=new URL('/viewer/ebook-reader-app',installationOrigin).href;
+  const freshInstallUrl=new URL('/viewer/?install=3',installationOrigin).href;
   const dedicatedDocument=()=>document.querySelector('link[rel="manifest"]')?.href===appManifest;
   let pendingPrompt=null,installed=false,identityState='checking';
   const inApp=()=>standalone.matches||navigator.standalone===true;
