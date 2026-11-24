@@ -241,7 +241,7 @@ if (mobile) {
   $('speechEngine').querySelector('[value="native"]').textContent += ' (PC 도우미 필요)';
 }
 const appOfflineReady = directBrowser && 'serviceWorker' in navigator
-  ? navigator.serviceWorker.register('./reader-sw.js').then(() => navigator.serviceWorker.ready)
+  ? (window.readerAppReady || navigator.serviceWorker.register('./reader-sw.js').then(() => navigator.serviceWorker.ready))
   : Promise.resolve();
 appOfflineReady.catch(error => optionStatus('오프라인 화면 저장 실패 · ' + error.message));
 
@@ -1142,3 +1142,4 @@ void readerReady.then(() => {
   }
 });
 })();
+

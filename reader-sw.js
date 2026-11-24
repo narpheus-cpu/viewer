@@ -1,8 +1,10 @@
 /* App files only. User books remain in the reader's existing local database. */
-const CACHE = 'ebook-reader-app-mobile-17';
+const CACHE = 'ebook-reader-app-mobile-18';
 const CORE = [
+  './manifest.webmanifest', './reader-pwa.css?v=1', './reader-pwa.js?v=1',
+  './icons/reader.svg', './icons/reader-192.png', './icons/reader-512.png', './icons/reader-maskable-512.png',
   './sounds/standalone-title.mp3', './sounds/bracket-title.mp3', './sounds/quote-revised.mp3', './sounds/summary.mp3',
-  './', './index.html', './reader-speech.js?v=19', './reader-speech.css?v=8',
+  './', './index.html', './reader-speech.js?v=20', './reader-speech.css?v=8',
   './reader-insights.css?v=9', './reader-insights-data.js?v=15',
   './reader-insights.js?v=15', './reader-insights-nav.js?v=11',
   './supertonic3/browser-worker.mjs?v=3', './supertonic3/asset-list.mjs', './supertonic3/upstream.mjs?v=2',
@@ -38,3 +40,4 @@ addEventListener('fetch', event => {
     }
   })());
 });
+

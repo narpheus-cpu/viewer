@@ -1,0 +1,12 @@
+.reader-app-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
+#readerInstallApp{width:auto;min-height:36px;padding:6px 14px}
+#readerAppInstallNotice{flex:1 1 220px;font-size:12px;line-height:1.5;color:var(--muted,#555)}
+#readerAppInstallNotice[hidden],.reader-app-actions[hidden]{display:none!important}
+#readerInstallDialog{width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;box-sizing:border-box;padding:18px;border:1px solid #202020;border-radius:8px;background:#fff;color:#111;font-size:14px;line-height:1.7}
+#readerInstallDialog::backdrop{background:#0006}
+#readerInstallDialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#readerInstallDialog h2{font-size:18px;margin:0}
+#readerInstallDialog button{width:auto;min-height:36px;padding:5px 12px}
+#readerInstallDialog ol{padding-left:22px}
+#readerInstallDialog a{color:inherit;text-underline-offset:3px}
+@media(display-mode:standalone){.reader-app-actions{display:none}}
