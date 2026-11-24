@@ -1,7 +1,7 @@
 /* App files only. User books remain in the reader's existing local database. */
-const CACHE = 'ebook-reader-app-mobile-18';
+const CACHE = 'ebook-reader-app-mobile-19';
 const CORE = [
-  './manifest.webmanifest', './reader-pwa.css?v=1', './reader-pwa.js?v=1',
+  './manifest.webmanifest', './reader-pwa.css?v=1', './reader-pwa.js?v=2',
   './icons/reader.svg', './icons/reader-192.png', './icons/reader-512.png', './icons/reader-maskable-512.png',
   './sounds/standalone-title.mp3', './sounds/bracket-title.mp3', './sounds/quote-revised.mp3', './sounds/summary.mp3',
   './', './index.html', './reader-speech.js?v=20', './reader-speech.css?v=8',
