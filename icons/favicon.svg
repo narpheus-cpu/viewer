@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2b2e"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c9ccd1"/>
+      <stop offset="0.7" stop-color="#8d9199"/>
+      <stop offset="1" stop-color="#d9dce0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#9a9da4" stroke-opacity="0.35" stroke-width="4"/>
+  <path d="M121.03023516237401 70.0V238.2956326987682H389.3034714445689V70.0H334.7323628219485V112.07390817469206H176.01791713325866V70.0ZM176.01791713325866 155.81410974244122H334.7323628219485V194.13885778275477H176.01791713325866ZM81.45576707726764 274.9540873460246V318.6942889137738H159.35498320268755V442.0H214.7592385218365V318.6942889137738H296.8241881298992V442.0H352.64501679731245V318.6942889137738H430.54423292273236V274.9540873460246Z" fill="url(#silver)"/>
+</svg>
