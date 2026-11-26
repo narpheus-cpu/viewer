@@ -103,6 +103,9 @@ const directBrowser = /^https?:$/.test(location.protocol) && isSecureContext && 
 const defaults = {engine:mobile?'browser':'native',voice:'M1',language:'auto',highlight:'pastel',showNotes:true,skipBrackets:false,speed:1,viewMode:'book',
   mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false,
   panelOpen:false,mp3Scope:'all',mp3From:0,mp3To:null};
+const speechLanguages=[{code:'ko',name:'한국어'},{code:'en',name:'영어'},{code:'ja',name:'일본어'}];
+defaults.languageProfiles=false;
+for(const {code} of speechLanguages)Object.assign(defaults,{[code+'Voice']:'',[code+'Speed']:0,[code+'SkipBrackets']:'inherit'});
 const voices = ['M','F'].flatMap(sex => [1,2,3,4,5].map(n =>
   `<option value="${sex}${n}">${sex==='M'?'남성':'여성'} ${n}</option>`)).join('');
 const toolbar = document.createElement('section');
@@ -135,6 +138,18 @@ toolbar.innerHTML = `
   <label class="speech-checkbox-option"><input id="speechSkipBrackets" type="checkbox"> ( )·〔 〕 안 내용 읽지 않기</label>
  </div>
  <p class="speech-option-help">선택하면 (… )·〔…〕 안의 내용을 낭독과 MP3에서 제외합니다. 본문 표시는 유지됩니다.</p>
+ <section id="speechLanguageProfiles" aria-label="언어별 듣기 설정">
+  <label class="speech-checkbox-option"><input id="speechUseLanguageProfiles" type="checkbox"> 언어별 설정 사용</label>
+  <p id="speechDetectedLanguages" class="speech-option-help" role="status"></p>
+  <p class="speech-option-help">언어를 자동으로 선택했을 때 낭독에 적용합니다. 한 문장 안의 언어도 구분하며, 따로 지정하지 않은 값은 공통 설정을 따릅니다. MP3는 생성 창의 설정을 사용합니다.</p>
+  <div class="speech-language-cards">${speechLanguages.map(({code,name})=>`
+   <fieldset class="speech-language-card" data-speech-language="${code}"><legend>${name}<span id="speechDetected-${code}"></span></legend>
+    <label>목소리 <select id="speechProfileVoice-${code}" aria-label="${name} 목소리"><option value="">공통 설정</option>${voices}</select></label>
+    <label class="speech-checkbox-option"><input id="speechProfileInheritSpeed-${code}" type="checkbox" checked> 속도는 공통 설정</label>
+    <label>속도 <span class="speech-speed-control"><input id="speechProfileSpeed-${code}" type="range" min="0.5" max="2" step="0.05" aria-label="${name} 낭독 속도"><output id="speechProfileSpeedValue-${code}" for="speechProfileSpeed-${code}"></output></span></label>
+    <label>괄호 읽기 <select id="speechProfileBrackets-${code}" aria-label="${name} 괄호 읽기"><option value="inherit">공통 설정</option><option value="read">읽기</option><option value="skip">읽지 않기</option></select></label>
+   </fieldset>`).join('')}</div>
+ </section>
  <div id="speechStatus" role="status" aria-live="polite"></div>
  <div id="speechAssetStatus" role="status"></div>
  <progress id="speechAssetProgress" max="100" hidden></progress>
@@ -192,7 +207,7 @@ let revision = Date.now() * 1000;
 let serial = 0, nativeHelperOrigin;
 const helperConnections=new Map(),helperFrames=new Map();
 const requests = new Map();
-let source = null, blockCache = new Map(), noteCache = new Map();
+let source = null, blockCache = new Map(), noteCache = new Map(),speechTextCache=new Map();
 let selected = null, session = null, audioContext = null, speechAudio = null, generation = 0, pendingListen = 0;
 const status = text => { $('speechStatus').textContent = text; };
 const optionStatus = text => { $('speechOptionsStatus').textContent = text; };
@@ -327,6 +342,7 @@ function applyPreferences() {
   document.documentElement.classList.toggle('speech-hide-notes', !value.showNotes);
   viewerSettings.showBracketNotes = value.showNotes;
   applySpeechSpeed();
+  paintLanguageProfiles();
   paint();
   if(notesChanged&&viewerOverlay.classList.contains('active'))scheduleRepaginate();
 }
@@ -342,7 +358,87 @@ function applySpeechSpeed(){
   if(session){
     session.options.speed=speed;
   }
-  speechAudio?.setSpeed(session?.phase&&session.phase!=='speech'?1:speed);
+  speechAudio?.setSpeed(session?.phase&&session.phase!=='speech'?1:speechProfile(session?.currentLanguage).speed);
+}
+function useLanguageProfiles(){const value=settings();return value.languageProfiles&&value.language==='auto';}
+function speechProfile(lang){
+  const value=settings();
+  if(!useLanguageProfiles()||!speechLanguages.some(item=>item.code===lang))return value;
+  const voice=value[lang+'Voice'],speed=Number(value[lang+'Speed']),brackets=value[lang+'SkipBrackets'];
+  return {...value,voice:/^[MF][1-5]$/.test(voice)?voice:value.voice,
+    speed:speed>0?normalizeSpeed(speed):value.speed,
+    skipBrackets:brackets==='skip'?true:brackets==='read'?false:value.skipBrackets};
+}
+// Script boundaries are independent of page width and synthesis chunk size.
+// Han-only text is ambiguous: nearby kana identifies Japanese, otherwise retain
+// the existing Korean fallback. Latin text uses the supported English engine.
+function languageRuns(text){
+  const tokens=[...text.matchAll(/[\p{Script=Hangul}]+|[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+|[\p{Script=Latin}\p{M}]+(?:['’\-][\p{Script=Latin}\p{M}]+)*/gu)];
+  if(!tokens.length)return [{start:0,end:text.length,lang:language(text)}];
+  const result=[];let start=0;
+  for(let index=0;index<tokens.length;index++){
+    const token=tokens[index],near=text.slice(Math.max(0,token.index-96),Math.min(text.length,token.index+token[0].length+96));
+    const lang=/\p{Script=Hangul}/u.test(token[0])?'ko':/\p{Script=Latin}/u.test(token[0])?'en':/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(near)?'ja':'ko';
+    let end=index+1<tokens.length?tokens[index+1].index:text.length;
+    // Opening punctuation belongs to the following language, not the previous one.
+    if(index+1<tokens.length){const suffix=text.slice(token.index+token[0].length,end).match(/[\s]*[(〔["“‘「『]+[\s]*$/u);if(suffix)end-=suffix[0].length;}
+    if(result.at(-1)?.lang===lang)result.at(-1).end=end;
+    else result.push({start,end,lang});
+    start=end;
+  }
+  return result;
+}
+let detectedLanguageSource=null,detectedLanguages=new Set();
+function paintLanguageProfiles(){
+  const canonical=fullText?readerCanonical():'';
+  if(detectedLanguageSource!==canonical){
+    detectedLanguageSource=canonical;
+    // Full-book detection is cached. Avoid a book-sized token array.
+    detectedLanguages=new Set();
+    const plain=withoutPronunciations(canonical);
+    if(/\p{Script=Hangul}/u.test(plain))detectedLanguages.add('ko');
+    if(/\p{Script=Latin}/u.test(plain))detectedLanguages.add('en');
+    if(/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(plain))detectedLanguages.add('ja');
+    if(!detectedLanguages.size&&/\p{Script=Han}/u.test(plain))detectedLanguages.add('ko');
+  }
+  const value=settings();$('speechUseLanguageProfiles').checked=!!value.languageProfiles;
+  const names=speechLanguages.filter(item=>detectedLanguages.has(item.code)).map(item=>item.name);
+  $('speechDetectedLanguages').textContent=(names.length?'감지된 언어: '+names.join(' · '):'본문을 열면 언어를 감지합니다.')+
+    (value.language!=='auto'?' · 적용하려면 언어를 자동으로 바꾸세요.':value.languageProfiles?' · 언어별 설정 적용 중':' · 현재 공통 설정 적용 중');
+  for(const {code} of speechLanguages){
+    const ownSpeed=Number(value[code+'Speed'])>0;
+    $('speechDetected-'+code).textContent=detectedLanguages.has(code)?' · 감지됨':'';
+    $('speechProfileVoice-'+code).value=value[code+'Voice'];
+    $('speechProfileBrackets-'+code).value=value[code+'SkipBrackets'];
+    $('speechProfileInheritSpeed-'+code).checked=!ownSpeed;
+    $('speechProfileSpeed-'+code).value=String(ownSpeed?normalizeSpeed(value[code+'Speed']):value.speed);
+    $('speechProfileSpeedValue-'+code).value=(ownSpeed?normalizeSpeed(value[code+'Speed']):value.speed).toFixed(2)+'배';
+    $('speechProfileSpeed-'+code).setAttribute('aria-valuetext',$('speechProfileSpeedValue-'+code).value);
+  }
+}
+async function restartSpeechProfile(){
+  noteCache.clear();blockCache.clear();
+  if(session){const anchor=session.entry.start,paused=session.paused;stop(false);await start(atAnchor(anchor),paused);}
+  else if(selected){selected=atAnchor(selected.start);paint();}
+}
+$('speechUseLanguageProfiles').addEventListener('change',async()=>{
+  remember('languageProfiles',$('speechUseLanguageProfiles').checked);applyPreferences();await restartSpeechProfile();
+});
+for(const {code} of speechLanguages){
+  for(const [field,id] of [['Voice','speechProfileVoice-'],['SkipBrackets','speechProfileBrackets-']]){
+    $(id+code).addEventListener('change',async()=>{
+      remember(code+field,$(id+code).value);remember('languageProfiles',true);applyPreferences();await restartSpeechProfile();
+    });
+  }
+  $('speechProfileSpeed-'+code).addEventListener('input',()=>{
+    remember(code+'Speed',normalizeSpeed($('speechProfileSpeed-'+code).value));
+    const active=useLanguageProfiles();remember('languageProfiles',true);paintLanguageProfiles();applySpeechSpeed();
+    if(!active)void restartSpeechProfile();
+  });
+  $('speechProfileInheritSpeed-'+code).addEventListener('change',()=>{
+    remember(code+'Speed',$('speechProfileInheritSpeed-'+code).checked?0:normalizeSpeed($('speechProfileSpeed-'+code).value));
+    paintLanguageProfiles();applySpeechSpeed();
+  });
 }
 function mergePreferences(value) {
   for (const [key,item] of Object.entries(value || {})) {
@@ -499,7 +595,7 @@ for (const [key,id] of Object.entries(controls)) {
   $(id).addEventListener(key==='speed'?'input':'change', async () => {
     const previous = settings();
     remember(key,$(id).type === 'checkbox' ? $(id).checked : key==='speed'?normalizeSpeed($(id).value):['mp3From','mp3To'].includes(key)?Number($(id).value):$(id).value);
-    if(key==='speed')applySpeechSpeed();else applyPreferences();
+    if(key==='speed'){applySpeechSpeed();paintLanguageProfiles();}else applyPreferences();
     if (key === 'showNotes' || key === 'skipBrackets') {
       noteCache.clear();blockCache.clear();
       if(key==='showNotes'){saveViewerSettings();readerCloseNote();}
@@ -519,6 +615,7 @@ addEventListener('storage',event=>{
 function refreshBook() {
   if (source === fullText) return;
   stop(false);source = fullText;selected = null;blockCache.clear();noteCache.clear();
+  paintLanguageProfiles();
 }
 function language(text) {
   if (settings().language !== 'auto') return settings().language;
@@ -534,9 +631,9 @@ function withoutNotes(text) {
 }
 // Pronunciations are popup-only, regardless of either bracket/note preference.
 function withoutPronunciations(text) {
-  for (const note of readerFindPronunciations(text).reverse())
-    text = text.slice(0,note.start) + text.slice(note.end);
-  return text;
+  const parts=[];let at=0;
+  for (const note of readerFindPronunciations(text)) {parts.push(text.slice(at,note.start));at=note.end;}
+  parts.push(text.slice(at));return parts.join('');
 }
 let speechPronunciationSource=null,speechPronunciationRanges=[];
 function maskSpeechPronunciations(text,base) {
@@ -573,8 +670,8 @@ function findSpeechBracketRanges(text){
   }
   return ranges;
 }
-function maskSpeechBrackets(text,base){
-  if(!settings().skipBrackets)return text;
+function maskSpeechBrackets(text,base,skip=settings().skipBrackets){
+  if(!skip)return text;
   const canonical=readerCanonical();
   if(speechBracketSource!==canonical){speechBracketSource=canonical;speechBracketRanges=findSpeechBracketRanges(canonical);}
   // Slice the full-book ranges, retaining exact source offsets across sentences,
@@ -608,12 +705,24 @@ function notesForBlock(index) {
   noteCache.set(index,results);
   return results;
 }
-function spokenText(block,left,right) {
-  const base=(cachedBlockStarts[block]||0)+left;
-  let text = maskSpeechPronunciations(maskSpeechBrackets(cachedBlockTexts[block].slice(left,right),base),base);
-  if (settings().showNotes && !settings().skipBrackets) {
+function speechBlockText(block,profiles=true){
+  const value=settings(),enabled=profiles&&useLanguageProfiles(),base=cachedBlockStarts[block]||0,raw=cachedBlockTexts[block]||'';
+  const key=JSON.stringify([block,enabled,value.skipBrackets,...speechLanguages.map(item=>value[item.code+'SkipBrackets'])]);
+  const cached=speechTextCache.get(key);if(cached?.raw===raw&&cached.base===base)return cached.text;
+  const text=maskSpeechPronunciations(raw,base);
+  const masked=enabled?languageRuns(text).map(run=>maskSpeechBrackets(text.slice(run.start,run.end),base+run.start,speechProfile(run.lang).skipBrackets)).join(''):maskSpeechBrackets(text,base);
+  if(speechTextCache.size>=32)speechTextCache.delete(speechTextCache.keys().next().value);
+  speechTextCache.set(key,{raw,base,text:masked});return masked;
+}
+function spokenNote(text,profiles){
+  if(!profiles||!useLanguageProfiles())return settings().skipBrackets?'':text;
+  return languageRuns(text).map(run=>speechProfile(run.lang).skipBrackets?'':text.slice(run.start,run.end)).join('');
+}
+function spokenText(block,left,right,profiles=true) {
+  let text = speechBlockText(block,profiles).slice(left,right);
+  if (settings().showNotes) {
     for (const item of notesForBlock(block).filter(n => n.offset > left && n.offset <= right).reverse())
-      text = text.slice(0,item.offset-left) + item.text + text.slice(item.offset-left);
+      text = text.slice(0,item.offset-left) + spokenNote(item.text,profiles) + text.slice(item.offset-left);
   } else text = withoutNotes(text);
   return text.replace(/※/g,'').replace(/\s+/g,' ').trim();
 }
@@ -624,7 +733,7 @@ function titleType(block){
 function sentences(block) {
   if (blockCache.has(block)) return blockCache.get(block);
   const text = cachedBlockTexts[block] || '', base = cachedBlockStarts[block] || 0;
-  let boundaryText=maskSpeechPronunciations(maskSpeechBrackets(text,base),base);
+  let boundaryText=speechBlockText(block);
   if(!settings().showNotes){
     for(const note of readerFindNoteRanges(text).reverse())
       boundaryText=boundaryText.slice(0,note.start)+' '.repeat(note.end-note.start)+boundaryText.slice(note.end);
@@ -805,12 +914,13 @@ function stop(clear = true) {
 const notify = run => { for (const wake of run.waiters) wake();run.waiters.clear(); };
 const wait = run => new Promise(resolve => { run.waiters.add(resolve); });
 async function synthesize(run,item) {
-  const key = `${run.options.engine}|${run.options.voice}|${item.lang}|${item.text}`;
+  const voice=item.voice||run.options.voice;
+  const key = `${run.options.engine}|${voice}|${item.lang}|${item.text}`;
   const audio = run.cache.get(key);
   if (audio) return audio;
   const send = run.options.engine === 'browser' && directBrowser ? browserRequest : request;
   const value = await send('synthesize',{generation:run.generation,engine:run.options.engine,
-    voice:run.options.voice,text:item.text,lang:item.lang});
+    voice,text:item.text,lang:item.lang});
   if (session !== run) throw new DOMException('낭독 중지','AbortError');
   run.cache.set(key,value);
   while (run.cache.size > 8) run.cache.delete(run.cache.keys().next().value);
@@ -833,6 +943,13 @@ async function cueAudio(kind){
   })().catch(error=>{decodedCues.delete(kind);throw error;}));
   return decodedCues.get(kind);
 }
+function* speechChunks(text){
+  const runs=useLanguageProfiles()?languageRuns(text):[{start:0,end:text.length,lang:language(text)}];
+  for(const run of runs){
+    const profile=speechProfile(run.lang);
+    for(const chunk of chunks(text.slice(run.start,run.end)))yield {kind:'speech',text:chunk,lang:run.lang,voice:profile.voice};
+  }
+}
 function* sentencePlan(entry){
   if(entry.title){yield {kind:'cue',cue:entry.title};yield {kind:'gap'};}
   const raw=cachedBlockTexts[entry.block].slice(entry.left,entry.right);
@@ -840,18 +957,18 @@ function* sentencePlan(entry){
   let left=0;
   for(const marker of raw.matchAll(/\(3줄 요약\)/g)){
     const before=spokenText(entry.block,entry.left+left,entry.left+marker.index);
-    for(const text of chunks(before))yield {kind:'speech',text};
+    yield* speechChunks(before);
     yield {kind:'cue',cue:'summary'};yield {kind:'gap'};
     left=marker.index;
-    if(settings().skipBrackets)left+=marker[0].length;
+    if(speechProfile('ko').skipBrackets)left+=marker[0].length;
     else{
       // Keep the marker after its cue without matching it a second time.
       const spoken=spokenText(entry.block,entry.left+left,entry.left+left+marker[0].length);
-      for(const text of chunks(spoken))yield {kind:'speech',text};
+      yield* speechChunks(spoken);
       left+=marker[0].length;
     }
   }
-  for(const text of chunks(spokenText(entry.block,entry.left+left,entry.right)))yield {kind:'speech',text};
+  yield* speechChunks(spokenText(entry.block,entry.left+left,entry.right));
 }
 async function fillQueue(run,startEntry) {
   try {
@@ -859,7 +976,7 @@ async function fillQueue(run,startEntry) {
       for (const part of sentencePlan(entry)) {
         while (session===run && (run.buffered >= 16 || run.queue.length >= 6)) await wait(run);
         if (session !== run) return;
-        const item={...part,entry,lang:part.text?language(part.text):null};
+        const item={...part,entry,lang:part.lang??(part.text?language(part.text):null)};
         run.pendingLength=part.text?.length||0;
         const audio=part.kind==='speech'?await synthesize(run,item):part.kind==='gap'?cueSilence:await cueAudio(part.cue);
         if (session !== run) return;
@@ -876,7 +993,8 @@ function preloadAudio(run){
 }
 async function play(run,item) {
   run.phase=item.kind||'speech';run.cue=item.cue||null;
-  speechAudio.setSpeed(run.phase==='speech'?run.options.speed:1);
+  run.currentLanguage=item.lang;run.currentVoice=item.voice;
+  speechAudio.setSpeed(run.phase==='speech'?speechProfile(item.lang).speed:1);
   const clip=item.clip||speechAudio.prepare(item.audio);run.source=clip;
   const playing=speechAudio.play(clip,run.paused);
   run.finishAudio=()=>clip.finish?.();
@@ -896,7 +1014,7 @@ async function bufferForContinuousStart(run) {
   if (run.done || run.paused || run.queue.length !== 1) return;
   const first = run.queue[0];
   if (!first.audio.synthesisMs || !run.pendingLength) return;
-  const availableMs = 1000 * first.duration / run.options.speed;
+  const availableMs = 1000 * first.duration / speechProfile(first.lang).speed;
   const nextMs = first.audio.synthesisMs * Math.max(8, run.pendingLength) / Math.max(8, first.text.length);
   const budget = Math.min(2500, Math.ceil(nextMs * 1.15 - availableMs));
   if (budget <= 0) return;
@@ -1054,7 +1172,7 @@ function sectionText(section) {
     const base = cachedBlockStarts[block],end = base+cachedBlockTexts[block].length;
     if (end < section.start || base >= section.end) continue;
     if (!first) text += '\n';first = false;
-    text += spokenText(block,Math.max(0,section.start-base),Math.min(end,section.end)-base);
+    text += spokenText(block,Math.max(0,section.start-base),Math.min(end,section.end)-base,false);
   }
   return text;
 }
@@ -1065,7 +1183,7 @@ async function exportSection(section) {
     const base=cachedBlockStarts[block],end=base+cachedBlockTexts[block].length;
     if(base>=section.end)break;
     if(exportCancelling)throw Error('MP3 만들기를 취소했습니다.');
-    parts.push(spokenText(block,Math.max(0,section.start-base),Math.min(end,section.end)-base));
+    parts.push(spokenText(block,Math.max(0,section.start-base),Math.min(end,section.end)-base,false));
     if(++processed%128===0)await delay(0);
   }
   return parts.join('\n');
@@ -1160,7 +1278,7 @@ window.readerSpeech = {
     phase:session?.phase,cue:session?.cue,sourceActive:!!session?.source,audioTime:audioContext?.currentTime,playbackRate:session?.source?.media.playbackRate,
     mediaTime:session?.source?.media.currentTime,preservesPitch:session?.source?.media.preservesPitch,
     preparedAudio:speechAudio?.clips.size||0,
-    settings:settings(),nativeHelperOrigin,exportId}),
+    settings:settings(),nativeHelperOrigin,exportId,currentLanguage:session?.currentLanguage,currentVoice:session?.currentVoice}),
   atAnchor,adjacent,spokenText,sectionData,sectionText,ready:preferenceReady
 };
 void readerReady.then(() => {

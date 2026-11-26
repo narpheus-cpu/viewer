@@ -20,6 +20,16 @@
 .speech-speed-control{display:grid;grid-template-columns:minmax(0,1fr) 54px;gap:8px;align-items:center;min-width:0}
 #speechSpeed{width:100%;min-width:0;min-height:36px;margin:0;accent-color:var(--ink,#111)}
 #speechSpeedValue{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#speechLanguageProfiles{border-top:1px solid var(--line,#bbb);margin-top:10px;padding-top:8px;min-width:0}
+#speechLanguageProfiles>.speech-checkbox-option{display:flex;align-items:center;gap:7px;min-height:36px}
+.speech-language-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px;margin-top:8px}
+.speech-language-card{min-width:0;margin:0;padding:8px;border:1px solid var(--line,#bbb);border-radius:4px}
+.speech-language-card legend{font-weight:bold;font-size:12px}
+.speech-language-card legend span{font-weight:normal;color:var(--muted,#555)}
+.speech-language-card>label{display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px;align-items:center;margin:6px 0}
+.speech-language-card>label.speech-checkbox-option{display:flex;min-height:32px}
+.speech-language-card input[type=range]{width:100%;min-width:0;min-height:36px;margin:0}
+.speech-language-card output{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 #speechStatus:empty,#speechOptionsStatus:empty{display:none}
 #speechStatus,#speechOptionsStatus{margin-top:3px;line-height:1.3}
 #speechAssetStatus{font-size:11px;line-height:1.35;margin-top:3px}
